@@ -32,35 +32,35 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section className="relative w-full overflow-hidden pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 md:px-12 bg-white">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+    <section className="relative w-full overflow-hidden pt-28 pb-16 lg:pt-48 lg:pb-32 px-4 md:px-12 bg-white">
+      <div className="max-w-7xl mx-auto grid grid-cols-2 gap-4 md:gap-12 lg:gap-24 items-center">
         
         {/* LEFT: Content (STRICT BLACK & BLUE) */}
         <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8 }}
-          className="flex flex-col gap-6"
+          className="flex flex-col gap-4 md:gap-6"
         >
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold leading-[1.1] tracking-tight">
+          <h1 className="text-2xl sm:text-4xl md:text-7xl lg:text-8xl font-serif font-bold leading-[1.1] tracking-tight">
             <span className="text-bbBlue-deep">BARBER AND</span> <br />
             <span className="text-charcoal">BEAUTY CONNECT</span> <br />
             <span className="text-bbBlue italic">NETWORK</span>
           </h1>
-          <p className="text-lg text-gray-500 mt-2 max-w-lg leading-relaxed font-medium">
+          <p className="text-[10px] sm:text-xs md:text-lg text-gray-500 max-w-lg leading-relaxed font-medium">
             The premium ecosystem for industry-leading grooming and beauty professionals. Connection, discovery, and growth redefined.
           </p>
           
-          <div className="flex flex-row gap-4 mt-6">
+          <div className="flex flex-col sm:flex-row gap-3 mt-2 md:mt-6">
              <button 
                 onClick={() => handleAction('/explore')}
-                className="bg-bbBlue text-white px-10 py-4 rounded-full font-bold shadow-xl shadow-bbBlue/20 hover:bg-blue-600 transition-all uppercase text-xs tracking-widest text-center active:scale-95"
+                className="bg-bbBlue text-white px-4 md:px-10 py-2.5 md:py-4 rounded-full font-bold shadow-lg shadow-bbBlue/20 hover:bg-blue-600 transition-all uppercase text-[8px] md:text-xs tracking-widest text-center active:scale-95"
               >
                 Start Exploring
              </button>
              <button 
                 onClick={() => handleAction('/auth')}
-                className="bg-transparent border-2 border-charcoal text-charcoal px-10 py-4 rounded-full font-bold hover:bg-charcoal hover:text-white transition-all uppercase text-xs tracking-widest text-center active:scale-95"
+                className="bg-transparent border border-charcoal md:border-2 text-charcoal px-4 md:px-10 py-2.5 md:py-4 rounded-full font-bold hover:bg-charcoal hover:text-white transition-all uppercase text-[8px] md:text-xs tracking-widest text-center active:scale-95"
               >
                 Join as Partner
              </button>
@@ -74,7 +74,8 @@ const Hero: React.FC = () => {
           transition={{ duration: 1 }}
           className="relative flex justify-center items-center"
         >
-          <div className="relative w-[320px] h-[320px] md:w-[450px] md:h-[450px] lg:w-[500px] lg:h-[500px] rounded-full overflow-hidden border-4 border-gold shadow-2xl z-10 bg-white">
+          {/* Scaled circle container for mobile/tablet/desktop */}
+          <div className="relative w-[140px] h-[140px] sm:w-[240px] sm:h-[240px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] rounded-full overflow-hidden border-2 md:border-4 border-gold shadow-2xl z-10 bg-white">
             <AnimatePresence mode="wait">
               <motion.img
                 key={currentSlide}
@@ -90,8 +91,8 @@ const Hero: React.FC = () => {
           </div>
           
           {/* Subtle Accent Rings */}
-          <div className="absolute w-[350px] h-[350px] md:w-[480px] md:h-[480px] lg:w-[540px] lg:h-[540px] rounded-full border border-gray-100"></div>
-          <div className="absolute w-[380px] h-[380px] md:w-[510px] md:h-[510px] lg:w-[580px] lg:h-[580px] rounded-full border border-gray-50"></div>
+          <div className="absolute w-[160px] h-[160px] sm:w-[270px] sm:h-[270px] md:w-[430px] md:h-[430px] lg:w-[540px] lg:h-[540px] rounded-full border border-gray-100"></div>
+          <div className="absolute w-[180px] h-[180px] sm:w-[300px] sm:h-[300px] md:w-[460px] md:h-[460px] lg:w-[580px] lg:h-[580px] rounded-full border border-gray-50"></div>
         </motion.div>
       </div>
     </section>
