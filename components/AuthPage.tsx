@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -21,12 +20,12 @@ const AuthPage: React.FC = () => {
 
   const REGISTERED_NUMBERS = ['1234567890', '9876543210'];
 
+  // Redirection fallback if state updates elsewhere
   React.useEffect(() => {
     if (isLoggedIn) {
-      // Logic: If customer, go to dashboard. If partner or new user (no role), go to landing.
       if (user?.role === 'customer') {
         navigate('/customer-dashboard');
-      } else {
+      } else if (user?.role === 'partner') {
         navigate('/');
       }
     }
@@ -46,10 +45,11 @@ const AuthPage: React.FC = () => {
       
       const result = await signInWithPopup(auth, provider);
       
-      // If sign in is successful, the useEffect above will trigger as the AuthContext 
-      // state updates. If no profile exists for this Google user, they stay on Landing.
-      if (!result.user) {
-         setError('Google sign-in was not completed.');
+      if (result.user) {
+        // MANDATORY: Immediate navigation after successful popup
+        navigate('/customer-dashboard');
+      } else {
+        setError('Google sign-in was not completed.');
       }
     } catch (err: any) {
       console.error("Google Auth Error:", err);
@@ -78,6 +78,7 @@ const AuthPage: React.FC = () => {
         await signUp(mockEmail, password, { name: name || 'User' }, userType.toLowerCase() as 'customer' | 'partner');
       }
 
+      // MANDATORY: Explicit navigation based on intent
       if (userType === 'Partner') {
         navigate('/');
       } else {
