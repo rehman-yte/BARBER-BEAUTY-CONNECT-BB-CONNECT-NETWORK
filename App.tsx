@@ -9,7 +9,7 @@ import ExplorePage from './components/ExplorePage';
 import ShopDetail from './components/ShopDetail';
 import CustomerDashboard from './components/CustomerDashboard';
 
-// --- Auth Logic (Frontend Only for Stability) ---
+// --- Auth Logic (Stability First) ---
 interface User {
   name: string;
   mobile: string;
@@ -29,7 +29,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Session Persistence Logic
     const savedUser = localStorage.getItem('bb_session');
     if (savedUser) {
       try {
@@ -63,7 +62,7 @@ export const useAuth = () => {
   return context;
 };
 
-// --- Protected Route Guard ---
+// --- Protected Route Helper ---
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isLoggedIn } = useAuth();
   return isLoggedIn ? <>{children}</> : <Navigate to="/auth" replace />;
@@ -73,18 +72,21 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <HashRouter>
-        <div className="min-h-screen flex flex-col bg-white selection:bg-bbBlue selection:text-white">
+        <div className="min-h-screen flex flex-col bg-white">
           <Navbar />
           <main className="flex-grow">
             <Routes>
+              {/* Public Routes */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
+              
+              {/* Private Routes */}
               <Route path="/explore" element={<ProtectedRoute><ExplorePage /></ProtectedRoute>} />
               <Route path="/shop/:id" element={<ProtectedRoute><ShopDetail /></ProtectedRoute>} />
               <Route path="/customer-dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
-              {/* Alias for dashboard to ensure all links work */}
               <Route path="/dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
-              {/* Fallback */}
+              
+              {/* Permanent Redirects & Fallbacks */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

@@ -34,12 +34,12 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[100] bg-white/95 backdrop-blur-md border-b border-gray-100 py-3 px-6 md:px-12 flex justify-between items-center shadow-sm h-20">
+    <nav className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 py-3 px-6 md:px-12 flex justify-between items-center h-20 shadow-sm">
       
       {/* LEFT: Logo Section (STRICT COLORS: BLACK & BLUE) */}
       <div className="flex-1 flex justify-start">
         <Link to="/" className="flex flex-col items-start leading-none group">
-          <span className="text-base md:text-lg font-serif font-bold text-black tracking-tight group-hover:text-bbBlue transition-colors">
+          <span className="text-base md:text-lg font-serif font-bold text-black tracking-tight transition-colors">
             BARBER & BEAUTY CONNECT
           </span>
           <span className="text-[8px] md:text-[9px] font-bold text-bbBlue uppercase tracking-[0.3em] mt-1">
@@ -48,8 +48,8 @@ const Navbar: React.FC = () => {
         </Link>
       </div>
 
-      {/* CENTER: Permanent Navigation (Visible on all routes, Always centered) */}
-      <div className="hidden md:flex flex-none justify-center items-center gap-10 px-4">
+      {/* CENTER: Permanent Navigation (Visible on ALL routes, NO conditional rendering) */}
+      <div className="flex flex-none justify-center items-center gap-10 px-4">
         <Link 
           to="/" 
           className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
@@ -58,7 +58,7 @@ const Navbar: React.FC = () => {
         </Link>
         <Link 
           to="/customer-dashboard" 
-          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/customer-dashboard' || location.pathname === '/dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
         >
           Dashboard
         </Link>
