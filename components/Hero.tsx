@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+// Fixed: Import useAuth from context/AuthContext instead of App
+import { useAuth } from '../context/AuthContext';
 
 const SLIDE_IMAGES = [
   "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=1000",
@@ -12,7 +13,9 @@ const SLIDE_IMAGES = [
 ];
 
 const Hero: React.FC = () => {
-  const { isLoggedIn } = useAuth();
+  // Fixed: derive isLoggedIn from user presence
+  const { user } = useAuth();
+  const isLoggedIn = !!user;
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
 

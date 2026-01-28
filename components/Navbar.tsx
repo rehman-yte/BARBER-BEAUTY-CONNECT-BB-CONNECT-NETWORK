@@ -1,11 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../App';
+// Fixed: Import useAuth from context/AuthContext instead of App
+import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar: React.FC = () => {
-  const { isLoggedIn, user, logout } = useAuth();
+  // Fixed: derive isLoggedIn from user presence and use available AppUser properties
+  const { user, logout } = useAuth();
+  const isLoggedIn = !!user;
   const navigate = useNavigate();
   const location = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -122,7 +125,7 @@ const Navbar: React.FC = () => {
               >
                 <div className="hidden sm:flex flex-col items-end leading-none">
                   <span className="text-[11px] font-bold text-black group-hover:text-bbBlue transition-colors">{user?.name}</span>
-                  <span className="text-[9px] font-semibold text-gray-400 mt-1 uppercase tracking-tighter">Member ID: {user?.mobile.slice(-4)}X</span>
+                  <span className="text-[9px] font-semibold text-gray-400 mt-1 uppercase tracking-tighter">Member ID: {user?.uid.slice(-4)}X</span>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center shadow-sm overflow-hidden group-hover:border-bbBlue transition-all">
                   <svg className="w-5 h-5 text-gray-300 group-hover:text-bbBlue transition-colors" fill="currentColor" viewBox="0 0 24 24">
@@ -141,7 +144,7 @@ const Navbar: React.FC = () => {
                   >
                     <div className="px-5 py-3 border-b border-gray-50 mb-1">
                        <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mb-1">Signed in as</p>
-                       <p className="text-[10px] font-bold text-black truncate">{user?.mobile}</p>
+                       <p className="text-[10px] font-bold text-black truncate">{user?.email}</p>
                     </div>
                     <Link 
                       to="/customer-dashboard" 

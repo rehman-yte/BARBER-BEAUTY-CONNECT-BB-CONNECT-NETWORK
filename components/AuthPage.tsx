@@ -1,10 +1,14 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+// Fixed: Import useAuth from context/AuthContext instead of App
+import { useAuth } from '../context/AuthContext';
 
 const AuthPage: React.FC = () => {
-  const { login, isLoggedIn } = useAuth();
+  // Fixed: useAuth returns user, signIn, signUp instead of mock login/isLoggedIn
+  const { user, signIn, signUp } = useAuth();
+  const isLoggedIn = !!user;
+  
   const [userType, setUserType] = useState<'Customer' | 'Partner'>('Customer');
   const [mobile, setMobile] = useState('');
   const [name, setName] = useState('');
@@ -24,7 +28,7 @@ const AuthPage: React.FC = () => {
     alert("Google Auth Initializing...");
   };
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -33,17 +37,25 @@ const AuthPage: React.FC = () => {
       return;
     }
 
-    if (REGISTERED_NUMBERS.includes(mobile) && name.length > 0) {
-      setError('This ID is already registered. Please Login using your password.');
-      return;
-    }
+    // Bridging mock logic: Use mobile as part of mock email for Firebase auth
+    const mockEmail = `${mobile}@bbconnect.network`;
 
-    login({ name: name || 'User', mobile, type: userType });
+    try {
+      if (REGISTERED_NUMBERS.includes(mobile)) {
+        // Mock Login Flow
+        await signIn(mockEmail, password);
+      } else {
+        // Mock Signup Flow
+        await signUp(mockEmail, password, { name: name || 'User' }, userType.toLowerCase() as 'customer' | 'partner');
+      }
 
-    if (userType === 'Partner') {
-      navigate('/partner-signup');
-    } else {
-      navigate('/customer-dashboard');
+      if (userType === 'Partner') {
+        navigate('/'); // Pending partners stay on home with notification
+      } else {
+        navigate('/customer-dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed. Please check your credentials.');
     }
   };
 
@@ -57,6 +69,7 @@ const AuthPage: React.FC = () => {
 
         <button 
           onClick={handleGoogleAuth}
+          type="button"
           className="w-full flex items-center justify-center gap-3 py-4 border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all mb-8 group active:scale-[0.98] shadow-sm"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">

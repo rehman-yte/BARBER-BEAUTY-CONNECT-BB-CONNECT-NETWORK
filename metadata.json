@@ -1,5 +1,7 @@
 {
   "name": "BB Connect Network",
   "description": "High-end official landing page for the Barber & Beauty Connect professional network, featuring a luxury aesthetic and advanced platform showcase.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }
