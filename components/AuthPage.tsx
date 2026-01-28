@@ -30,9 +30,9 @@ const AuthPage: React.FC = () => {
   React.useEffect(() => {
     if (isLoggedIn) {
       if (user?.role === 'customer') {
-        navigate('/customer-dashboard');
+        navigate('/customer-dashboard', { replace: true });
       } else if (user?.role === 'partner') {
-        navigate('/');
+        navigate('/', { replace: true });
       }
     }
   }, [isLoggedIn, user, navigate]);
@@ -63,7 +63,7 @@ const AuthPage: React.FC = () => {
         if (!custDoc.exists() && !partDoc.exists()) {
           // Provision as customer by default for Google logins
           await setDoc(userRef, {
-            name: result.user.displayName || 'New User',
+            name: result.user.displayName || 'New Member',
             role: 'customer',
             status: 'active',
             createdAt: serverTimestamp()
@@ -71,7 +71,8 @@ const AuthPage: React.FC = () => {
         }
 
         // IMMEDIATELY navigate to dashboard as requested to break the loop
-        navigate('/customer-dashboard');
+        // Using replace: true to prevent going back to auth page
+        navigate('/customer-dashboard', { replace: true });
       } else {
         setError('Google sign-in was not completed.');
       }
@@ -103,9 +104,9 @@ const AuthPage: React.FC = () => {
 
       // Explicit navigation based on user intent
       if (userType === 'Partner') {
-        navigate('/');
+        navigate('/', { replace: true });
       } else {
-        navigate('/customer-dashboard');
+        navigate('/customer-dashboard', { replace: true });
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please check your credentials.');

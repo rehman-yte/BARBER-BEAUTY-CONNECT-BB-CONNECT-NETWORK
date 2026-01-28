@@ -6,12 +6,14 @@ import Footer from './components/Footer';
 import AuthPage from './components/AuthPage';
 import ExplorePage from './components/ExplorePage';
 import ShopDetail from './components/ShopDetail';
-import CustomerDashboard from './pages/CustomerDashboard'; // Updated Import
+import CustomerDashboard from './pages/CustomerDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // --- Protected Route Helper ---
 const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'customer' | 'partner' }> = ({ children, role }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) return null; // Don't redirect while auth is still loading
   
   if (!user) return <Navigate to="/auth" replace />;
   
@@ -22,7 +24,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'customer' | 
 
   // Handle Pending Partners
   if (user.role === 'partner' && user.status === 'pending') {
-    // Keep pending partners on landing with a notification (handled in UI)
     return <Navigate to="/" replace />;
   }
 
@@ -36,7 +37,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<AuthPage />} />
       
-      {/* Private Routes - Only logged in customers can explore */}
+      {/* Private Routes */}
       <Route path="/explore" element={<ProtectedRoute role="customer"><ExplorePage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute role="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute role="customer"><CustomerDashboard /></ProtectedRoute>} />
