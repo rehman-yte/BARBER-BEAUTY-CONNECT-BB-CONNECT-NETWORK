@@ -5,7 +5,13 @@ import {
   GoogleAuthProvider, 
   signInWithPopup 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import { auth } from '../firebase/firebaseConfig';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  serverTimestamp 
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { auth, db } from '../firebase/firebaseConfig';
 
 const AuthPage: React.FC = () => {
   const { user, signIn, signUp } = useAuth();
@@ -34,26 +40,43 @@ const AuthPage: React.FC = () => {
   const handleGoogleAuth = async () => {
     try {
       setError('');
-      if (!auth) {
+      if (!auth || !db) {
         setError('Authentication system is currently unavailable.');
         return;
       }
 
       const provider = new GoogleAuthProvider();
-      // Optional: Force account selection for better UX
       provider.setCustomParameters({ prompt: 'select_account' });
       
       const result = await signInWithPopup(auth, provider);
       
       if (result.user) {
-        // MANDATORY: Immediate navigation after successful popup
+        // Ensure Firestore record exists to prevent ProtectedRoute from bouncing user
+        const userRef = doc(db, 'customers_roadmap', result.user.uid);
+        const partnerRef = doc(db, 'partners_pending', result.user.uid);
+        
+        const [custDoc, partDoc] = await Promise.all([
+          getDoc(userRef),
+          getDoc(partnerRef)
+        ]);
+
+        if (!custDoc.exists() && !partDoc.exists()) {
+          // Auto-provision as customer for new Google sign-ins
+          await setDoc(userRef, {
+            name: result.user.displayName || 'New User',
+            role: 'customer',
+            status: 'active',
+            createdAt: serverTimestamp()
+          });
+        }
+
+        // MANDATORY: Immediate navigation after successful popup and data verification
         navigate('/customer-dashboard');
       } else {
         setError('Google sign-in was not completed.');
       }
     } catch (err: any) {
       console.error("Google Auth Error:", err);
-      // Only show error if it wasn't a user-initiated cancellation
       if (err.code !== 'auth/cancelled-popup-request' && err.code !== 'auth/popup-closed-by-user') {
         setError('Failed to connect with Google. Please try manual entry.');
       }
