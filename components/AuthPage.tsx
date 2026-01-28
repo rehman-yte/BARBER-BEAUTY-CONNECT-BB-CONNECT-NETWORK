@@ -1,11 +1,14 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Fixed: Import useAuth from context/AuthContext instead of App
 import { useAuth } from '../context/AuthContext';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup 
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { auth } from '../firebase/firebaseConfig';
 
 const AuthPage: React.FC = () => {
-  // Fixed: useAuth returns user, signIn, signUp instead of mock login/isLoggedIn
   const { user, signIn, signUp } = useAuth();
   const isLoggedIn = !!user;
   
@@ -20,12 +23,41 @@ const AuthPage: React.FC = () => {
 
   React.useEffect(() => {
     if (isLoggedIn) {
-      navigate('/customer-dashboard');
+      // Logic: If customer, go to dashboard. If partner or new user (no role), go to landing.
+      if (user?.role === 'customer') {
+        navigate('/customer-dashboard');
+      } else {
+        navigate('/');
+      }
     }
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, user, navigate]);
 
-  const handleGoogleAuth = () => {
-    alert("Google Auth Initializing...");
+  const handleGoogleAuth = async () => {
+    try {
+      setError('');
+      if (!auth) {
+        setError('Authentication system is currently unavailable.');
+        return;
+      }
+
+      const provider = new GoogleAuthProvider();
+      // Optional: Force account selection for better UX
+      provider.setCustomParameters({ prompt: 'select_account' });
+      
+      const result = await signInWithPopup(auth, provider);
+      
+      // If sign in is successful, the useEffect above will trigger as the AuthContext 
+      // state updates. If no profile exists for this Google user, they stay on Landing.
+      if (!result.user) {
+         setError('Google sign-in was not completed.');
+      }
+    } catch (err: any) {
+      console.error("Google Auth Error:", err);
+      // Only show error if it wasn't a user-initiated cancellation
+      if (err.code !== 'auth/cancelled-popup-request' && err.code !== 'auth/popup-closed-by-user') {
+        setError('Failed to connect with Google. Please try manual entry.');
+      }
+    }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -37,20 +69,17 @@ const AuthPage: React.FC = () => {
       return;
     }
 
-    // Bridging mock logic: Use mobile as part of mock email for Firebase auth
     const mockEmail = `${mobile}@bbconnect.network`;
 
     try {
       if (REGISTERED_NUMBERS.includes(mobile)) {
-        // Mock Login Flow
         await signIn(mockEmail, password);
       } else {
-        // Mock Signup Flow
         await signUp(mockEmail, password, { name: name || 'User' }, userType.toLowerCase() as 'customer' | 'partner');
       }
 
       if (userType === 'Partner') {
-        navigate('/'); // Pending partners stay on home with notification
+        navigate('/');
       } else {
         navigate('/customer-dashboard');
       }
