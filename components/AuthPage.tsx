@@ -26,7 +26,7 @@ const AuthPage: React.FC = () => {
 
   const REGISTERED_NUMBERS = ['1234567890', '9876543210'];
 
-  // Redirection fallback if state updates elsewhere
+  // Redirection fallback to handle existing sessions
   React.useEffect(() => {
     if (isLoggedIn) {
       if (user?.role === 'customer') {
@@ -51,7 +51,7 @@ const AuthPage: React.FC = () => {
       const result = await signInWithPopup(auth, provider);
       
       if (result.user) {
-        // Ensure Firestore record exists to prevent ProtectedRoute from bouncing user
+        // Ensure Firestore record exists BEFORE navigation to avoid ProtectedRoute bounce loop
         const userRef = doc(db, 'customers_roadmap', result.user.uid);
         const partnerRef = doc(db, 'partners_pending', result.user.uid);
         
@@ -61,7 +61,7 @@ const AuthPage: React.FC = () => {
         ]);
 
         if (!custDoc.exists() && !partDoc.exists()) {
-          // Auto-provision as customer for new Google sign-ins
+          // Provision as customer by default for Google logins
           await setDoc(userRef, {
             name: result.user.displayName || 'New User',
             role: 'customer',
@@ -70,7 +70,7 @@ const AuthPage: React.FC = () => {
           });
         }
 
-        // MANDATORY: Immediate navigation after successful popup and data verification
+        // IMMEDIATELY navigate to dashboard as requested to break the loop
         navigate('/customer-dashboard');
       } else {
         setError('Google sign-in was not completed.');
@@ -101,7 +101,7 @@ const AuthPage: React.FC = () => {
         await signUp(mockEmail, password, { name: name || 'User' }, userType.toLowerCase() as 'customer' | 'partner');
       }
 
-      // MANDATORY: Explicit navigation based on intent
+      // Explicit navigation based on user intent
       if (userType === 'Partner') {
         navigate('/');
       } else {
