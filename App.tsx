@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -7,7 +6,7 @@ import Footer from './components/Footer';
 import AuthPage from './components/AuthPage';
 import ExplorePage from './components/ExplorePage';
 import ShopDetail from './components/ShopDetail';
-import CustomerDashboard from './components/CustomerDashboard';
+import CustomerDashboard from './pages/CustomerDashboard'; // Updated Import
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // --- Protected Route Helper ---
