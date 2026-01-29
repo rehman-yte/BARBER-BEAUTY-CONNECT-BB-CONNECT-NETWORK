@@ -9,14 +9,12 @@ import {
   query, 
   where, 
   onSnapshot,
-  orderBy,
   limit 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const isLoggedIn = !!user;
-  const isPartner = user?.role === 'partner';
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -33,13 +31,11 @@ const Navbar: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevCount = useRef(0);
 
-  // Initialize Audio
   useEffect(() => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioRef.current.volume = 0.5;
   }, []);
 
-  // Sync Notifications
   useEffect(() => {
     if (!user || !db) return;
 
@@ -57,29 +53,26 @@ const Navbar: React.FC = () => {
       updateNotifications(adminNotifs, 'admin');
     });
 
-    // 2. Booking Status Updates Listener (Only for Customers)
-    let unsubBookings = () => {};
-    if (user.role === 'customer') {
-      const bookingQuery = query(collection(db, 'bookings'), where('customerId', '==', user.uid));
-      unsubBookings = onSnapshot(bookingQuery, (snapshot) => {
-        const bookingNotifs = snapshot.docs.map(doc => {
-          const data = doc.data();
-          let msg = `Your booking at ${data.shopName} is now ${data.status}.`;
-          if (data.status === 'Cancelled' || data.status === 'cancelled') {
-             msg = `Payment Cancelled ❌ for your slot at ${data.shopName}. Slot not booked.`;
-          }
-          return {
-            id: doc.id,
-            type: 'STATUS UPDATE',
-            title: data.status === 'payment_held' ? 'Booking Pending' : 'Booking ' + data.status,
-            message: msg,
-            timestamp: data.createdAt?.toMillis() || Date.now(),
-            isStatus: true
-          };
-        });
-        updateNotifications(bookingNotifs, 'booking');
+    // 2. Booking Status Updates Listener
+    const bookingQuery = query(collection(db, 'bookings'), where('customerId', '==', user.uid));
+    const unsubBookings = onSnapshot(bookingQuery, (snapshot) => {
+      const bookingNotifs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let msg = `Your booking at ${data.shopName} is now ${data.status}.`;
+        if (data.status === 'Cancelled' || data.status === 'cancelled') {
+           msg = `Payment Cancelled ❌ for your slot at ${data.shopName}. Slot not booked.`;
+        }
+        return {
+          id: doc.id,
+          type: 'STATUS UPDATE',
+          title: data.status === 'payment_held' ? 'Booking Pending' : 'Booking ' + data.status,
+          message: msg,
+          timestamp: data.createdAt?.toMillis() || Date.now(),
+          isStatus: true
+        };
       });
-    }
+      updateNotifications(bookingNotifs, 'booking');
+    });
 
     return () => {
       unsubAdmin();
@@ -96,7 +89,6 @@ const Navbar: React.FC = () => {
         .filter(n => !clearedIds.includes(n.id))
         .sort((a, b) => b.timestamp - a.timestamp);
 
-      // Sound logic
       if (combined.length > prevCount.current && prevCount.current !== 0) {
         audioRef.current?.play().catch(e => console.log('Audio play blocked'));
       }
@@ -113,7 +105,7 @@ const Navbar: React.FC = () => {
       .sort((a, b) => b.timestamp - a.timestamp);
     setNotifications(combined);
     prevCount.current = combined.length;
-  }, [clearedIds]);
+  }, [clearedIds, rawNotifs]);
 
   const handleClearNotif = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -139,14 +131,10 @@ const Navbar: React.FC = () => {
     setShowDropdown(false);
   };
 
-  const dashboardLink = isPartner ? "/partner-dashboard" : "/customer-dashboard";
-
   return (
     <nav className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 py-3 px-6 md:px-12 flex justify-between items-center h-20 shadow-sm">
-      
-      {/* LEFT: Logo Section */}
       <div className="flex-1 flex justify-start">
-        <Link to={isPartner ? "/partner-dashboard" : "/"} className="flex flex-col items-start leading-none group">
+        <Link to="/" className="flex flex-col items-start leading-none group">
           <span className="text-base md:text-lg font-serif font-bold text-black tracking-tight transition-colors">
             BARBER & BEAUTY CONNECT
           </span>
@@ -156,33 +144,29 @@ const Navbar: React.FC = () => {
         </Link>
       </div>
 
-      {/* CENTER: Navigation Links */}
       <div className="flex flex-none justify-center items-center gap-10 px-4">
-        {!isPartner && (
+        <Link 
+          to="/" 
+          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+        >
+          Home
+        </Link>
+        {isLoggedIn && (
           <Link 
-            to="/" 
-            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+            to="/customer-dashboard" 
+            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
           >
-            Home
+            Dashboard
           </Link>
         )}
         <Link 
-          to={dashboardLink} 
-          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === dashboardLink ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          to="/explore" 
+          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
         >
-          Dashboard
+          Explore
         </Link>
-        {!isPartner && (
-          <Link 
-            to="/explore" 
-            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-          >
-            Explore
-          </Link>
-        )}
       </div>
 
-      {/* RIGHT: Action & Profile Section */}
       <div className="flex-1 flex justify-end items-center gap-6">
         {!isLoggedIn ? (
           <Link to="/auth" className="text-[10px] font-bold text-black uppercase tracking-widest hover:text-bbBlue transition-all border-b border-transparent hover:border-bbBlue pb-0.5">
@@ -190,7 +174,6 @@ const Navbar: React.FC = () => {
           </Link>
         ) : (
           <div className="flex items-center gap-5 relative">
-            {/* Bell Icon */}
             <div className="relative" ref={notificationRef}>
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -244,7 +227,6 @@ const Navbar: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            {/* Profile Section */}
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setShowDropdown(!showDropdown)}
@@ -252,7 +234,6 @@ const Navbar: React.FC = () => {
               >
                 <div className="hidden sm:flex flex-col items-end leading-none">
                   <span className="text-[11px] font-bold text-black group-hover:text-bbBlue transition-colors">{user?.name}</span>
-                  <span className="text-[9px] font-semibold text-gray-400 mt-1 uppercase tracking-tighter">ID: {user?.uid.slice(-4)}X</span>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center shadow-sm overflow-hidden group-hover:border-bbBlue transition-all">
                    <svg className="w-5 h-5 text-gray-300 group-hover:text-bbBlue transition-colors" fill="currentColor" viewBox="0 0 24 24">
@@ -274,11 +255,11 @@ const Navbar: React.FC = () => {
                        <p className="text-[10px] font-bold text-black truncate">{user?.email}</p>
                     </div>
                     <Link 
-                      to={dashboardLink} 
+                      to="/customer-dashboard" 
                       onClick={() => setShowDropdown(false)}
                       className="block px-5 py-3.5 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
                     >
-                      Dashboard
+                      My Dashboard
                     </Link>
                     <button 
                       onClick={handleLogout}
