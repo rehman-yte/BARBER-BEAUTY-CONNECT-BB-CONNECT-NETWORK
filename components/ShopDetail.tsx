@@ -29,10 +29,15 @@ const ShopDetail: React.FC = () => {
       if (!db || !id) return;
       setLoading(true);
       try {
-        const docRef = doc(db, 'partners', id);
+        // Unified Registry Fetch
+        const docRef = doc(db, 'partners_registry', id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
+          if (data.isVerified !== true) {
+             navigate('/explore');
+             return;
+          }
           setShopData({ id: docSnap.id, ...data });
           if (data.services && data.services.length > 0) {
             setSelectedService(data.services[0]);
@@ -92,7 +97,7 @@ const ShopDetail: React.FC = () => {
       customerId: user.uid,
       customerName: user.name,
       shopId: id,
-      shopName: shopData.name,
+      shopName: shopData.brandName || shopData.name,
       serviceName: selectedService.name,
       price: selectedService.price,
       date: selectedDate.toDateString(),
@@ -119,8 +124,8 @@ const ShopDetail: React.FC = () => {
     if (!shopData) return;
     const merchantUpi = shopData.upiId || "bbconnect@upi";
     const amount = selectedService.price.toFixed(2);
-    const txnNote = `BBCN ${selectedService.name} - ${shopData.name}`;
-    const upiParams = `pa=${merchantUpi}&pn=${encodeURIComponent(shopData.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
+    const txnNote = `BBCN ${selectedService.name} - ${shopData.brandName || shopData.name}`;
+    const upiParams = `pa=${merchantUpi}&pn=${encodeURIComponent(shopData.brandName || shopData.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
     
     let targetUrl = `upi://pay?${upiParams}`;
 
@@ -145,7 +150,7 @@ const ShopDetail: React.FC = () => {
       customerId: user.uid,
       customerName: user.name,
       shopId: id,
-      shopName: shopData.name,
+      shopName: shopData.brandName || shopData.name,
       serviceName: selectedService.name,
       price: selectedService.price,
       date: selectedDate.toDateString(),
@@ -187,39 +192,39 @@ const ShopDetail: React.FC = () => {
         {/* LEFT: Info & Gallery */}
         <div className="space-y-12">
           <header>
-            <h1 className="text-5xl font-serif font-bold text-bbBlue-deep mb-4">{shopData.name}</h1>
+            <h1 className="text-5xl font-serif font-bold text-bbBlue-deep mb-4">{shopData.brandName}</h1>
             <div className="flex items-center gap-4">
-               <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-bold text-charcoal">
-                 {shopData.owner?.[0] || 'M'}
+               <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-bold text-charcoal overflow-hidden uppercase">
+                 {shopData.ownerName?.[0] || 'M'}
                </div>
                <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">Master Professional</p>
-                  <p className="text-sm font-bold text-charcoal">{shopData.owner}</p>
+                  <p className="text-sm font-bold text-charcoal">{shopData.ownerName}</p>
                </div>
             </div>
           </header>
 
           <div className="grid grid-cols-3 gap-4">
-             {(shopData.images || []).map((url: string, i: number) => (
+             {(shopData.shopImages || []).map((url: string, i: number) => (
                 <div key={i} className="aspect-square rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all">
-                   <img src={url} className="w-full h-full object-cover" />
+                   <img src={url} className="w-full h-full object-cover" alt="" />
                 </div>
              ))}
           </div>
 
           <div className="space-y-6">
-             <h3 className="text-xs font-bold uppercase tracking-widest text-charcoal">Available Services</h3>
+             <h3 className="text-xs font-bold uppercase tracking-widest text-charcoal">Registry Portfolio</h3>
              <div className="space-y-3">
                 {(shopData.services || []).map((s: any, i: number) => (
                    <button 
                       key={i}
                       onClick={() => setSelectedService(s)}
-                      className={`w-full flex justify-between items-center p-5 rounded-2xl border transition-all ${
+                      className={`w-full flex justify-between items-center p-6 rounded-3xl border transition-all ${
                         selectedService?.name === s.name ? 'border-bbBlue bg-bbBlue/5 shadow-inner' : 'border-gray-100 hover:border-bbBlue/30'
                       }`}
                    >
-                      <span className="text-sm font-bold text-charcoal">{s.name}</span>
-                      <span className="text-sm font-serif font-bold text-bbBlue">${s.price}</span>
+                      <span className="text-sm font-bold text-charcoal uppercase tracking-tight">{s.name}</span>
+                      <span className="text-sm font-mono font-bold text-bbBlue">₹{s.price}</span>
                    </button>
                 ))}
              </div>
@@ -278,15 +283,15 @@ const ShopDetail: React.FC = () => {
 
              <div className="mt-12 pt-10 border-t border-gray-100 flex flex-col items-center gap-6">
                 <div className="text-center">
-                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Due</p>
-                   <p className="text-3xl font-serif font-bold text-bbBlue-deep">${selectedService?.price || 0}.00</p>
+                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Fee (INR)</p>
+                   <p className="text-3xl font-serif font-bold text-bbBlue-deep">₹{selectedService?.price || 0}.00</p>
                 </div>
                 <button 
                    onClick={handleBooking}
                    disabled={!selectedSlot}
                    className="w-full py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-xs tracking-[0.3em] shadow-2xl shadow-bbBlue/30 hover:bg-blue-600 disabled:bg-gray-200 disabled:shadow-none transition-all"
                 >
-                   Continue to Payment
+                   Initiate Secure Payment
                 </button>
              </div>
           </div>
@@ -311,8 +316,8 @@ const ShopDetail: React.FC = () => {
                      <div className="flex justify-between items-center mb-6">
                         <span className="text-[9px] font-bold uppercase tracking-[0.3em] opacity-60">Escrow Secure</span>
                      </div>
-                     <p className="text-xl font-serif font-bold mb-1">{shopData.name}</p>
-                     <p className="text-3xl font-serif font-bold">${selectedService?.price || 0}.00</p>
+                     <p className="text-xl font-serif font-bold mb-1">{shopData.brandName}</p>
+                     <p className="text-3xl font-serif font-bold">₹{selectedService?.price || 0}.00</p>
                   </div>
                   
                   <div className="p-10 space-y-8">

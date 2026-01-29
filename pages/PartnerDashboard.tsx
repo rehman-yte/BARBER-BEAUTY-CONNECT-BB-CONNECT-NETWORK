@@ -33,7 +33,7 @@ const PartnerDashboard: React.FC = () => {
 
     // Fetch Profile & Services
     const partnerRef = doc(db, 'partners_registry', user.uid);
-    getDoc(partnerRef).then(snap => {
+    const unsubProfile = onSnapshot(partnerRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setProfileData(data);
@@ -43,10 +43,14 @@ const PartnerDashboard: React.FC = () => {
 
     // Real-time Booking Requests
     const q = query(collection(db, 'bookings'), where('shopId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
+    const unsubBookings = onSnapshot(q, (snapshot) => {
       setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsub();
+    
+    return () => {
+      unsubProfile();
+      unsubBookings();
+    };
   }, [user]);
 
   const handleAddService = () => {
@@ -72,7 +76,6 @@ const PartnerDashboard: React.FC = () => {
       await updateDoc(partnerRef, {
         services: services
       });
-      alert("Professional Registry Updated Successfully.");
     } catch (err) {
       console.error("Registry sync failed:", err);
     } finally {
@@ -81,16 +84,40 @@ const PartnerDashboard: React.FC = () => {
   };
 
   const activeRequests = requests.filter(r => r.status === 'payment_held');
+  const isVerified = profileData?.isVerified === true;
 
   return (
     <div className="pt-32 pb-20 px-6 md:px-12 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto">
+        
+        {/* Verification Alert */}
+        {!isVerified && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 bg-blue-50 border border-bbBlue/20 p-6 rounded-[2rem] flex items-center justify-between gap-6"
+          >
+             <div className="flex items-center gap-5">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-bbBlue shadow-sm">
+                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                   <p className="text-[11px] font-bold text-bbBlue uppercase tracking-widest mb-1">Status: Pending Verification</p>
+                   <p className="text-[10px] text-gray-500 font-medium uppercase tracking-widest leading-relaxed">Your professional hub will be visible to the public network once verified by an administrator.</p>
+                </div>
+             </div>
+             <span className="hidden md:block text-[9px] font-bold text-bbBlue uppercase bg-white px-4 py-2 rounded-full border border-bbBlue/10">Registry Admission Under Review</span>
+          </motion.div>
+        )}
+
         {/* Header Section */}
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-16 bg-charcoal p-10 md:p-14 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
            <div className="relative z-10">
              <div className="flex items-center gap-4 mb-4">
                 <span className="text-[9px] font-bold bg-gold/20 text-gold px-4 py-1.5 rounded-full border border-gold/30 uppercase tracking-[0.3em]">{profileData?.category || 'Professional'}</span>
-                <span className="text-[9px] font-bold bg-bbBlue/20 text-bbBlue px-4 py-1.5 rounded-full border border-bbBlue/30 uppercase tracking-[0.3em]">Registry Verified</span>
+                <span className={`text-[9px] font-bold px-4 py-1.5 rounded-full border uppercase tracking-[0.3em] ${isVerified ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-bbBlue/20 text-bbBlue border-bbBlue/30'}`}>
+                   {isVerified ? 'Registry Verified' : 'Registry Pending'}
+                </span>
              </div>
              <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight mb-2 uppercase">{profileData?.brandName || user?.name}</h1>
              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.4em]">Registry Token: {user?.uid}</p>
@@ -98,11 +125,11 @@ const PartnerDashboard: React.FC = () => {
            
            <div className="flex gap-12 z-10">
               <div className="text-center">
-                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Services</p>
+                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Portfolio Items</p>
                  <p className="text-3xl font-serif font-bold text-white">{services.length}</p>
               </div>
               <div className="text-center">
-                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Queue Status</p>
+                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Queue Size</p>
                  <p className="text-3xl font-serif font-bold text-bbBlue">{activeRequests.length}</p>
               </div>
            </div>

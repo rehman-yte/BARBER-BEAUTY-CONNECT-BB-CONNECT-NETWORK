@@ -18,14 +18,16 @@ const ExplorePage: React.FC = () => {
   useEffect(() => {
     if (!db) return;
 
-    const q = query(collection(db, 'partners'), orderBy('createdAt', 'desc'));
+    // Fetching from the unified Professional Registry
+    const q = query(collection(db, 'partners_registry'), orderBy('onboardedAt', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setShops(docs);
+      // MANDATORY FILTER: Only verified shops are visible to the public
+      setShops(docs.filter(shop => shop.isVerified === true));
       setLoading(false);
     }, (err) => {
       console.error("Firestore Fetch Error:", err);
@@ -37,23 +39,23 @@ const ExplorePage: React.FC = () => {
 
   const filteredShops = filter === 'All' 
     ? shops 
-    : shops.filter(shop => shop.type === filter);
+    : shops.filter(shop => shop.category === filter);
 
   return (
     <div className="pt-32 pb-20 px-6 md:px-12 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto">
         <header className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-bbBlue-deep mb-4">Discover Excellence</h1>
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-[0.3em]">Approved Professionals Only</p>
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-bbBlue-deep mb-4 uppercase tracking-tight">Discover Excellence</h1>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">Verified Network Professionals Only</p>
         </header>
 
         {/* Category Tabs */}
-        <div className="flex gap-4 mb-12 border-b border-gray-100 pb-4">
+        <div className="flex gap-4 mb-12 border-b border-gray-100 pb-4 overflow-x-auto scrollbar-hide">
           {['All', 'Barber', 'Beauty Parlour'].map((type) => (
             <button
               key={type}
               onClick={() => setFilter(type as any)}
-              className={`px-8 py-3 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all ${
+              className={`px-8 py-3 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
                 filter === type ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue'
               }`}
             >
@@ -63,12 +65,12 @@ const ExplorePage: React.FC = () => {
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           <AnimatePresence mode="popLayout">
             {loading ? (
               <div className="col-span-full py-40 flex flex-col items-center justify-center">
                 <div className="w-10 h-10 border-4 border-bbBlue border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Scanning Network...</p>
+                <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Scanning Registry...</p>
               </div>
             ) : filteredShops.length > 0 ? (
               filteredShops.map((shop) => (
@@ -78,28 +80,28 @@ const ExplorePage: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden group shadow-sm hover:shadow-xl transition-all duration-500"
+                  className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden group shadow-sm hover:shadow-2xl transition-all duration-700"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
                     <img 
-                      src={shop.image || shop.images?.[0] || "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=600"} 
-                      alt={shop.name} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                      src={shop.shopImages?.[0] || "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=600"} 
+                      alt={shop.brandName} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" 
                     />
-                    <div className="absolute top-4 right-4 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-full flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold text-bbBlue-deep">{shop.rating || 'New'}</span>
-                      <svg className="w-3 h-3 text-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <div className="absolute top-4 right-4 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-full flex items-center gap-1.5 shadow-sm">
+                      <span className="text-[10px] font-bold text-bbBlue-deep">Verified</span>
+                      <svg className="w-3.5 h-3.5 text-bbBlue" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                     </div>
                   </div>
                   <div className="p-8">
-                    <p className="text-[9px] font-bold text-bbBlue uppercase tracking-widest mb-1">{shop.type}</p>
-                    <h3 className="text-xl font-serif font-bold text-charcoal mb-4 group-hover:text-bbBlue transition-colors">{shop.name}</h3>
+                    <p className="text-[9px] font-bold text-bbBlue uppercase tracking-widest mb-1">{shop.category}</p>
+                    <h3 className="text-xl font-serif font-bold text-charcoal mb-4 group-hover:text-bbBlue transition-colors">{shop.brandName}</h3>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-[10px] font-bold text-charcoal">
-                          {shop.owner?.[0] || 'P'}
+                        <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-[10px] font-bold text-charcoal uppercase overflow-hidden">
+                          {shop.ownerName?.[0] || 'M'}
                         </div>
-                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">{shop.owner || 'Verified Partner'}</span>
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">{shop.ownerName}</span>
                       </div>
                       <Link 
                         to={`/shop/${shop.id}`}
@@ -112,8 +114,12 @@ const ExplorePage: React.FC = () => {
                 </motion.div>
               ))
             ) : (
-              <div className="col-span-full py-40 text-center border-2 border-dashed border-gray-50 rounded-[3rem]">
-                <p className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.5em]">No active partners found in this directory</p>
+              <div className="col-span-full py-40 text-center border-2 border-dashed border-gray-100 rounded-[4rem] bg-gray-50/20">
+                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100">
+                   <svg className="w-8 h-8 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5em]">No verified partners in directory</p>
+                <p className="text-[9px] text-gray-300 font-medium uppercase tracking-[0.2em] mt-2">New requests are currently under review</p>
               </div>
             )}
           </AnimatePresence>

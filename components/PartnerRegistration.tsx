@@ -80,6 +80,7 @@ const PartnerRegistration: React.FC = () => {
             upiId: formData.upiId,
             mobile: formData.mobile,
             status: 'active',
+            isVerified: false, // MANDATORY: Admin must approve for public listing
             onboardedAt: serverTimestamp()
           }, { merge: true });
           
