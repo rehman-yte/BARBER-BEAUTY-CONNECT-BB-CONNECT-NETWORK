@@ -64,11 +64,59 @@ const PartnerRegistration: React.FC = () => {
     }
   };
 
+  const performRegistrySync = async (retryCount = 0): Promise<void> => {
+    if (!db) throw new Error("FIREBASE_DB_NOT_INITIALIZED");
+
+    try {
+      console.log(`Sync Attempt ${retryCount + 1}: Contacting Global Registry...`);
+      
+      // STRICT FIELD MAPPING (TEXT-ONLY TO BYPASS PAYLOAD SIZE LIMITS)
+      const registryPayload = {
+        brandName: formData.brandName.trim(),
+        ownerName: formData.ownerName.trim(),
+        category: formData.category,
+        workers: formData.workerCount,
+        upiId: formData.upiId.trim(),
+        mobile: formData.mobile || partnerMobile,
+        status: 'pending',
+        isVerified: false,
+        createdAt: serverTimestamp(),
+        onboardedAt: serverTimestamp(),
+        // Metadata for debugging
+        syncAttempt: retryCount + 1,
+        platformVersion: '2.5.0-fix'
+      };
+
+      await addDoc(collection(db, 'partners_registry'), registryPayload);
+      console.log("Registry Sync SUCCESS: Document committed to 'partners_registry'.");
+      
+      localStorage.setItem('bb_partner_active', 'true');
+      
+      // Final delay for visual confirmation
+      setTimeout(() => {
+        navigate('/partner-dashboard', { replace: true });
+      }, 3000);
+
+    } catch (err: any) {
+      console.error("CRITICAL SYNC ERROR:", {
+        code: err.code,
+        message: err.message,
+        details: err
+      });
+
+      if (retryCount < 1) {
+        console.warn("Retrying Registry Sync due to potential timeout...");
+        return performRegistrySync(retryCount + 1);
+      }
+      
+      throw err;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // STRICT VALIDATION: Ensure mandatory text fields are not empty
     if (!formData.brandName.trim() || !formData.ownerName.trim() || !formData.upiId.trim()) {
       setError("MANDATORY FIELDS MISSING: Brand Name, Owner Name, and UPI ID are required.");
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -77,36 +125,12 @@ const PartnerRegistration: React.FC = () => {
 
     setIsProcessing(true);
     
-    if (db) {
-      try {
-        // MANDATORY SYNC: Mapping all fields to 'partners_registry' collection
-        await addDoc(collection(db, 'partners_registry'), {
-          brandName: formData.brandName.trim(),     // [BRAND NAME]
-          ownerName: formData.ownerName.trim(),     // [OWNER]
-          category: formData.category,               // [CATEGORY]
-          workers: formData.workerCount,             // [WORKERS]
-          upiId: formData.upiId.trim(),
-          mobile: formData.mobile || partnerMobile,
-          status: 'pending',                         // STRICT: Hardcoded pending status
-          isVerified: false,                         // STRICT: Default verification state
-          createdAt: serverTimestamp(),              // [CREATED AT]
-          onboardedAt: serverTimestamp()             // Compatibility with legacy ExplorePage ordering
-        });
-        
-        localStorage.setItem('bb_partner_active', 'true');
-        
-        // 3s high-fidelity processing delay before redirect to dashboard
-        setTimeout(() => {
-          navigate('/partner-dashboard', { replace: true });
-        }, 3000);
-      } catch (err) {
-        console.error("Admission registry write failed:", err);
-        setError("NETWORK ERROR: Secure Registry sync failed. Please check connection.");
-        setIsProcessing(false);
-      }
-    } else {
+    try {
+      await performRegistrySync();
+    } catch (err: any) {
       setIsProcessing(false);
-      setError("SYSTEM OFFLINE: Registry connection unavailable.");
+      setError(`SYNC FAILED [${err.code || 'UNKNOWN'}]: ${err.message || 'Check Console for details.'}`);
+      console.error("Final Submission Failure:", err);
     }
   };
 
@@ -123,7 +147,12 @@ const PartnerRegistration: React.FC = () => {
             <div className="mb-16 text-center md:text-left">
               <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Partner Registry</h1>
               <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.4em]">Establish Professional Identity</p>
-              {error && <p className="mt-6 text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-50 p-4 rounded-xl border border-red-100">{error}</p>}
+              {error && (
+                <div className="mt-6 bg-red-50 p-6 rounded-2xl border border-red-100 flex flex-col gap-2">
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Protocol Sync Failure</p>
+                  <p className="text-[11px] font-medium text-red-600">{error}</p>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-20">
@@ -162,22 +191,7 @@ const PartnerRegistration: React.FC = () => {
                     </select>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Shop Gallery (Upload 6 Photos)</label>
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                    {formData.shopImages.map((file, i) => (
-                      <label key={i} className="aspect-square bg-gray-50 border border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue/30 transition-all overflow-hidden relative">
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'shopImages', i)} />
-                        {file ? (
-                          <img src={URL.createObjectURL(file)} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" />
-                        ) : (
-                          <svg className="w-6 h-6 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="2"/></svg>
-                        )}
-                        <span className="text-[6px] font-bold text-gray-400 uppercase z-10">{file ? `Shop ${i+1}` : 'Upload'}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                
                 <div className="space-y-4">
                    <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Estimated Workers</label>
                    <input type="number" name="workerCount" min="1" max="30" value={formData.workerCount} onChange={handleWorkerCount} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono outline-none focus:border-bbBlue" />
@@ -216,8 +230,8 @@ const PartnerRegistration: React.FC = () => {
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                </div>
             </div>
-            <h2 className="text-4xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Pending Admission</h2>
-            <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.5em] animate-pulse">Syncing Professional Identity with Admin Verification Hub...</p>
+            <h2 className="text-4xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Syncing Registry</h2>
+            <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.5em] animate-pulse">Establishing Secure Handshake with Global Admission Hub...</p>
           </motion.div>
         )}
       </AnimatePresence>
