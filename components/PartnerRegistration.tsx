@@ -11,6 +11,8 @@ const PartnerRegistration: React.FC = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   
+  const partnerMobile = localStorage.getItem('bb_partner_mobile') || '';
+
   const [formData, setFormData] = useState({
     ownerName: user?.name || '',
     ownerPic: null as string | null,
@@ -19,11 +21,10 @@ const PartnerRegistration: React.FC = () => {
     workerCount: 1,
     workerPics: [] as string[],
     upiId: '',
-    mobile: user?.email?.split('@')[0].replace('p_', '') || '',
+    mobile: partnerMobile,
     govId: null as string | null
   });
 
-  // Ensure current scroll is top
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,13 +42,12 @@ const PartnerRegistration: React.FC = () => {
   };
 
   const handleMockUpload = (field: string, index?: number) => {
-    // Simulated asset encryption feedback
     if (typeof index === 'number') {
       const newPics = [...formData.workerPics];
-      newPics[index] = 'VERIFIED_REGISTRY_URI';
+      newPics[index] = 'VERIFIED_ASSET_URI';
       setFormData(prev => ({ ...prev, workerPics: newPics }));
     } else {
-      setFormData(prev => ({ ...prev, [field]: 'VERIFIED_REGISTRY_URI' }));
+      setFormData(prev => ({ ...prev, [field]: 'VERIFIED_ASSET_URI' }));
     }
   };
 
@@ -61,18 +61,15 @@ const PartnerRegistration: React.FC = () => {
     e.preventDefault();
     setIsProcessing(true);
     
-    // Simulate Global Security Registry Scan (3s)
     setTimeout(async () => {
-      if (user && db) {
+      if (db && partnerMobile) {
         try {
-          const partnerRef = doc(db, 'partners_pending', user.uid);
+          const partnerRef = doc(db, 'partners_registry', partnerMobile);
           await updateDoc(partnerRef, {
             ...formData,
-            status: 'active', // Post-onboarding status activation
+            status: 'active',
             registryCompletedAt: serverTimestamp()
           });
-          // Final jump to dashboard
-          localStorage.removeItem('bb_partner_auth');
           navigate('/partner-dashboard', { replace: true });
         } catch (err) {
           console.error("Registry update failure:", err);
@@ -95,42 +92,42 @@ const PartnerRegistration: React.FC = () => {
             className="w-full max-w-4xl bg-white border border-gray-100 p-10 md:p-16 rounded-[4rem] shadow-sm mb-10"
           >
             <div className="mb-16">
-              <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Partner Registry</h1>
-              <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.4em]">Official Membership Onboarding Protocol</p>
+              <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Professional Registry</h1>
+              <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.4em]">Partner Admission Protocol</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-20">
               
               {/* SECTION: OWNER */}
               <section className="space-y-10">
-                <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">01. Master Professional Identity</h3>
+                <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">01. Owner Identity</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-4">
                     <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Full Legal Name</label>
-                    <input required name="ownerName" value={formData.ownerName} onChange={handleInputChange} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:border-bbBlue outline-none transition-all" />
+                    <input required name="ownerName" value={formData.ownerName} onChange={handleInputChange} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none" />
                   </div>
                   <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-3xl p-6 hover:border-bbBlue/30 transition-all cursor-pointer bg-gray-50/50 group" onClick={() => handleMockUpload('ownerPic')}>
                     <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-all ${formData.ownerPic ? 'bg-green-50 text-green-500' : 'bg-white text-gray-200 group-hover:text-bbBlue'}`}>
                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     </div>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{formData.ownerPic ? 'Portrait Captured' : 'Upload Profile Picture'}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{formData.ownerPic ? 'Captured' : 'Upload Portrait'}</span>
                   </div>
                 </div>
               </section>
 
               {/* SECTION: BRAND */}
               <section className="space-y-10">
-                <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">02. Studio Showcase</h3>
+                <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">02. Brand Hub</h3>
                 <div className="space-y-8">
                   <div className="flex flex-col gap-4">
-                    <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Shop / Brand Name</label>
-                    <input required name="brandName" value={formData.brandName} onChange={handleInputChange} placeholder="e.g. The Elite Grooming Lounge" className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:border-bbBlue outline-none transition-all" />
+                    <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Shop / Studio Name</label>
+                    <input required name="brandName" value={formData.brandName} onChange={handleInputChange} placeholder="e.g. The Executive Parlour" className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:border-bbBlue outline-none" />
                   </div>
                   <div className="space-y-4">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Gallery Assets (6 High-Res URLs)</label>
+                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Studio Gallery (6 URLs)</label>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {formData.shopImages.map((img, i) => (
-                        <input key={i} required placeholder={`Studio Image ${i+1} URL`} value={img} onChange={(e) => handleShopImageChange(i, e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] focus:border-bbBlue outline-none transition-all" />
+                        <input key={i} required placeholder={`Image ${i+1} URL`} value={img} onChange={(e) => handleShopImageChange(i, e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] focus:border-bbBlue outline-none" />
                       ))}
                     </div>
                   </div>
@@ -142,8 +139,8 @@ const PartnerRegistration: React.FC = () => {
                 <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">03. Workforce Dynamics</h3>
                 <div className="space-y-10">
                   <div className="flex flex-col gap-4 max-w-xs">
-                    <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Total Staff Members</label>
-                    <input type="number" min="1" value={formData.workerCount} onChange={handleWorkerCount} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:border-bbBlue outline-none transition-all" />
+                    <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Staff Quantity</label>
+                    <input type="number" min="1" value={formData.workerCount} onChange={handleWorkerCount} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:border-bbBlue outline-none" />
                   </div>
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
                     {Array.from({ length: formData.workerCount }).map((_, i) => (
@@ -151,7 +148,7 @@ const PartnerRegistration: React.FC = () => {
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${formData.workerPics[i] ? 'bg-green-50 text-green-500' : 'bg-white text-gray-200 group-hover:text-bbBlue'}`}>
                            {formData.workerPics[i] ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="3"/></svg> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="2"/></svg>}
                         </div>
-                        <span className="text-[7px] font-bold text-gray-400 uppercase leading-none">Worker {i+1}</span>
+                        <span className="text-[7px] font-bold text-gray-400 uppercase leading-none">Staff {i+1}</span>
                       </div>
                     ))}
                   </div>
@@ -160,15 +157,15 @@ const PartnerRegistration: React.FC = () => {
 
               {/* SECTION: SETTLEMENT */}
               <section className="space-y-10">
-                <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">04. Governance & Settlements</h3>
+                <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">04. Legal & Settlements</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">
                     <div className="flex flex-col gap-4">
-                      <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Merchant Settlement UPI ID</label>
-                      <input required name="upiId" value={formData.upiId} onChange={handleInputChange} placeholder="brand@upi" className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono focus:border-bbBlue outline-none transition-all" />
+                      <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Merchant UPI ID</label>
+                      <input required name="upiId" value={formData.upiId} onChange={handleInputChange} placeholder="brand@upi" className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono focus:border-bbBlue outline-none" />
                     </div>
                     <div className="flex flex-col gap-4">
-                      <label className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Verified Mobile Endpoint</label>
+                      <label className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Verified Registry Mobile</label>
                       <input readOnly value={formData.mobile} className="w-full px-6 py-5 bg-gray-100 border border-gray-100 rounded-2xl text-sm font-mono opacity-60 cursor-not-allowed" />
                     </div>
                   </div>
@@ -176,7 +173,7 @@ const PartnerRegistration: React.FC = () => {
                     <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 transition-all ${formData.govId ? 'bg-green-50 text-green-500' : 'bg-white text-gray-200 group-hover:text-bbBlue'}`}>
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     </div>
-                    <span className="text-[10px] font-bold text-charcoal uppercase tracking-widest">{formData.govId ? 'Registry ID Validated' : 'Scan Government ID'}</span>
+                    <span className="text-[10px] font-bold text-charcoal uppercase tracking-widest leading-none">{formData.govId ? 'Validated' : 'Scan Govt ID'}</span>
                   </div>
                 </div>
               </section>
@@ -187,12 +184,7 @@ const PartnerRegistration: React.FC = () => {
             </form>
           </motion.div>
         ) : (
-          <motion.div 
-            key="processing-state"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-40 text-center"
-          >
+          <motion.div key="processing" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-40 text-center">
             <div className="relative w-32 h-32 mb-12">
                <div className="absolute inset-0 border-4 border-bbBlue/10 rounded-full"></div>
                <div className="absolute inset-0 border-4 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
@@ -200,8 +192,8 @@ const PartnerRegistration: React.FC = () => {
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                </div>
             </div>
-            <h2 className="text-4xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Syncing Registry Assets</h2>
-            <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.5em] animate-pulse">Encrypting Professional Identity for Admission Verification...</p>
+            <h2 className="text-4xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight tracking-[-0.03em]">Global Registry Protocol</h2>
+            <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.5em] animate-pulse">Syncing Professional Identity for Admission...</p>
           </motion.div>
         )}
       </AnimatePresence>
