@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebase/firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { db, auth } from '../firebase/firebaseConfig';
+import { doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const PartnerRegistration: React.FC = () => {
   const navigate = useNavigate();
@@ -67,45 +67,51 @@ const PartnerRegistration: React.FC = () => {
   const performRegistrySync = async (retryCount = 0): Promise<void> => {
     if (!db) throw new Error("FIREBASE_DB_NOT_INITIALIZED");
 
+    // Get the unique identifier for the partner document
+    // Using partnerMobile as the primary ID to ensure it matches the lookup in ShopDetail/Dashboards
+    const documentId = partnerMobile; 
+
+    if (!documentId) throw new Error("IDENTIFIER_MISSING: Partner mobile not found in session.");
+
     try {
-      console.log(`Sync Attempt ${retryCount + 1}: Contacting Global Registry...`);
+      console.log(`Sync Attempt ${retryCount + 1}: Force Writing to Registry [ID: ${documentId}]...`);
       
-      // STRICT FIELD MAPPING (TEXT-ONLY TO BYPASS PAYLOAD SIZE LIMITS)
+      // STRICT FIELD MAPPING AS PER INSTRUCTIONS
       const registryPayload = {
-        brandName: formData.brandName.trim(),
-        ownerName: formData.ownerName.trim(),
-        category: formData.category,
-        workers: formData.workerCount,
-        upiId: formData.upiId.trim(),
-        mobile: formData.mobile || partnerMobile,
-        status: 'pending',
-        isVerified: false,
-        createdAt: serverTimestamp(),
-        onboardedAt: serverTimestamp(),
-        // Metadata for debugging
-        syncAttempt: retryCount + 1,
-        platformVersion: '2.5.0-fix'
+        brandName: formData.brandName.trim(),     // [BRAND NAME]
+        ownerName: formData.ownerName.trim(),     // [OWNER]
+        category: formData.category,               // [CATEGORY]
+        workers: formData.workerCount,             // [WORKERS]
+        upiId: formData.upiId.trim(),              // [UPI ID]
+        mobile: partnerMobile,                     // [MOBILE]
+        status: 'pending',                         // STRICT: Hardcoded status
+        isVerified: false,                         // STRICT: Default False
+        createdAt: serverTimestamp(),              // [TIMESTAMP]
+        onboardedAt: serverTimestamp(),            // Legacy compatibility
+        platformVersion: '2.6.0-final-fix'
       };
 
-      await addDoc(collection(db, 'partners_registry'), registryPayload);
-      console.log("Registry Sync SUCCESS: Document committed to 'partners_registry'.");
+      // USE setDoc to tie data to the specific mobile/uid ID
+      await setDoc(doc(db, 'partners_registry', documentId), registryPayload);
       
+      console.log("Registry Sync SUCCESS: Professional data committed.");
+      
+      // Keep loader active for visual confirmation as requested
       localStorage.setItem('bb_partner_active', 'true');
       
-      // Final delay for visual confirmation
-      setTimeout(() => {
-        navigate('/partner-dashboard', { replace: true });
-      }, 3000);
+      // 3s delay before final redirect to dashboard
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      navigate('/partner-dashboard', { replace: true });
 
     } catch (err: any) {
-      console.error("CRITICAL SYNC ERROR:", {
+      console.error("CRITICAL REGISTRY SYNC ERROR:", {
         code: err.code,
         message: err.message,
         details: err
       });
 
       if (retryCount < 1) {
-        console.warn("Retrying Registry Sync due to potential timeout...");
+        console.warn("Retrying sync operation...");
         return performRegistrySync(retryCount + 1);
       }
       
@@ -127,10 +133,10 @@ const PartnerRegistration: React.FC = () => {
     
     try {
       await performRegistrySync();
+      // Loader is closed by the redirect in performRegistrySync on success
     } catch (err: any) {
-      setIsProcessing(false);
-      setError(`SYNC FAILED [${err.code || 'UNKNOWN'}]: ${err.message || 'Check Console for details.'}`);
-      console.error("Final Submission Failure:", err);
+      setIsProcessing(false); // Only close loader on failure
+      setError(`CRITICAL: Registry Sync Failed [${err.code || 'UNKNOWN'}]. Check your network or Admin permissions.`);
     }
   };
 
