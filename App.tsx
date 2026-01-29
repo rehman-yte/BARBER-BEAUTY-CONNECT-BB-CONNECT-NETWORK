@@ -8,6 +8,8 @@ import AuthPage from './components/AuthPage';
 import ExplorePage from './components/ExplorePage';
 import ShopDetail from './components/ShopDetail';
 import CustomerDashboard from './pages/CustomerDashboard';
+import PartnerDashboard from './pages/PartnerDashboard';
+import PartnerRegistration from './components/PartnerRegistration';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsAndConditions from './components/TermsAndConditions';
 import CookiesPolicy from './components/CookiesPolicy';
@@ -17,20 +19,14 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'customer' | 'partner' }> = ({ children, role }) => {
   const { user, loading } = useAuth();
   
-  if (loading) return null; // Don't redirect while auth is still loading
-  
+  if (loading) return null; 
   if (!user) return <Navigate to="/auth" replace />;
   
-  // If role is specified, check it
   if (role && user.role !== role) {
     return <Navigate to="/" replace />;
   }
 
-  // Handle Pending Partners
-  if (user.role === 'partner' && user.status === 'pending') {
-    return <Navigate to="/" replace />;
-  }
-
+  // Special handling for Pending Partners is now managed via redirect logic
   return <>{children}</>;
 };
 
@@ -44,10 +40,14 @@ const AppRoutes: React.FC = () => {
       <Route path="/terms" element={<TermsAndConditions />} />
       <Route path="/cookies" element={<CookiesPolicy />} />
       
-      {/* Private Routes */}
+      {/* Customer Routes (LOCKED) */}
       <Route path="/explore" element={<ProtectedRoute role="customer"><ExplorePage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute role="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute role="customer"><CustomerDashboard /></ProtectedRoute>} />
+      
+      {/* Partner Routes (NEW) */}
+      <Route path="/partner-register" element={<ProtectedRoute role="partner"><PartnerRegistration /></ProtectedRoute>} />
+      <Route path="/partner-dashboard" element={<ProtectedRoute role="partner"><PartnerDashboard /></ProtectedRoute>} />
       
       {/* Fallbacks */}
       <Route path="*" element={<Navigate to="/" replace />} />
