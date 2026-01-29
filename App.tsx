@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -7,6 +8,9 @@ import AuthPage from './components/AuthPage';
 import ExplorePage from './components/ExplorePage';
 import ShopDetail from './components/ShopDetail';
 import CustomerDashboard from './pages/CustomerDashboard';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsAndConditions from './components/TermsAndConditions';
+import CookiesPolicy from './components/CookiesPolicy';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // --- Protected Route Helper ---
@@ -36,6 +40,9 @@ const AppRoutes: React.FC = () => {
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<AuthPage />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsAndConditions />} />
+      <Route path="/cookies" element={<CookiesPolicy />} />
       
       {/* Private Routes */}
       <Route path="/explore" element={<ProtectedRoute role="customer"><ExplorePage /></ProtectedRoute>} />

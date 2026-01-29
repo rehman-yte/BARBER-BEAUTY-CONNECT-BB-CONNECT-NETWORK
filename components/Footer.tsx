@@ -69,9 +69,9 @@ const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-[9px] font-bold text-gray-600 uppercase tracking-[0.2em]">
         <span>© {new Date().getFullYear()} BB CONNECT NETWORK. ALL RIGHTS RESERVED.</span>
         <div className="flex gap-8">
-          <a href="#" className="hover:text-bbBlue transition-colors">Privacy Policy</a>
-          <a href="#" className="hover:text-bbBlue transition-colors">Terms of Service</a>
-          <a href="#" className="hover:text-bbBlue transition-colors">Cookies</a>
+          <Link to="/privacy" className="hover:text-bbBlue transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-bbBlue transition-colors">Terms of Service</Link>
+          <Link to="/cookies" className="hover:text-bbBlue transition-colors">Cookies</Link>
         </div>
       </div>
     </footer>
