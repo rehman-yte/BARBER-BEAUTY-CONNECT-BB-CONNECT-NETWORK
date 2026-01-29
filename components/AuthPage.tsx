@@ -27,42 +27,22 @@ const AuthPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
+  // Handle existing user routing
   useEffect(() => {
     if (user && !loading) {
       if (user.role === 'customer') {
         navigate('/customer-dashboard', { replace: true });
       } else if (user.role === 'partner') {
+        // Partners always go to registration if they aren't marked 'active'
         if (user.status === 'active') {
           navigate('/partner-dashboard', { replace: true });
         } else {
-          window.location.assign('#/partner-register');
+          // Absolute path jump
+          window.location.hash = '/partner-register';
         }
       }
     }
   }, [user, loading, navigate]);
-
-  const handleGoogleAuth = async () => {
-    if (userType === 'Partner') return; 
-    try {
-      if (!auth || !db) return;
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      if (result.user) {
-        const userRef = doc(db, 'customers_roadmap', result.user.uid);
-        const docSnap = await getDoc(userRef);
-        if (!docSnap.exists()) {
-          await setDoc(userRef, {
-            name: result.user.displayName || 'New Member',
-            role: 'customer',
-            status: 'active',
-            createdAt: serverTimestamp()
-          });
-        }
-      }
-    } catch (err: any) {
-      setError('Google Authentication failed.');
-    }
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,54 +56,65 @@ const AuthPage: React.FC = () => {
     }
 
     if (userType === 'Partner') {
-      // PARTNER MOBILE-ONLY PROTOCOL (No Firebase Auth)
+      // PARTNER BYPASS PROTOCOL
       if (otp !== '123456') {
         setError('Invalid OTP. Use 123456.');
         setIsSubmitting(false);
         return;
       }
 
-      try {
-        if (!db) return;
-        const partnerRef = doc(db, 'partners_registry', mobile);
-        const docSnap = await getDoc(partnerRef);
+      // 1. Silent Local Session Generation
+      localStorage.setItem('bb_partner_authenticated', 'true');
+      localStorage.setItem('bb_partner_mobile', mobile);
+      localStorage.setItem('bb_partner_name', name || 'Partner');
 
-        if (!docSnap.exists()) {
-          // Create registry entry for new partner
-          await setDoc(partnerRef, {
-            name: name || 'Professional Partner',
-            mobile: mobile,
-            role: 'partner',
-            status: 'pending',
-            createdAt: serverTimestamp()
-          });
-        }
-
-        // Establish manual session
-        localStorage.setItem('bb_partner_authenticated', 'true');
-        localStorage.setItem('bb_partner_mobile', mobile);
-        
-        // Hard jump to registration form
-        window.location.assign('#/partner-register');
-
-      } catch (err) {
-        setError('Registry access failed. System offline.');
-      } finally {
-        setIsSubmitting(false);
+      // 2. Optional: Create/Update firestore record silently without blocking UI
+      if (db) {
+        setDoc(doc(db, 'partners_registry', mobile), {
+          name: name || 'Partner',
+          mobile: mobile,
+          role: 'partner',
+          status: 'pending',
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(e => console.error("Silent registry log failed", e));
       }
 
+      // 3. FORCE REDIRECT - No loops, just go.
+      window.location.hash = '/partner-register';
+      setIsSubmitting(false);
+
     } else {
-      // Customer Workflow (Email-based internal ID)
+      // Customer Flow (Unchanged)
       const customerEmail = `${mobile}@bb.net`;
       try {
         if (isLogin) await signIn(customerEmail, password);
         else await signUp(customerEmail, password, { name: name || 'User' }, 'customer');
       } catch (err: any) {
-        setError('Verification failed. Use password if account exists.');
+        setError('Verification failed.');
       } finally {
         setIsSubmitting(false);
       }
     }
+  };
+
+  const handleGoogleAuth = async () => {
+    if (userType === 'Partner') return; 
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      if (result.user && db) {
+        const userRef = doc(db, 'customers_roadmap', result.user.uid);
+        const docSnap = await getDoc(userRef);
+        if (!docSnap.exists()) {
+          await setDoc(userRef, {
+            name: result.user.displayName || 'New Member',
+            role: 'customer',
+            status: 'active',
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+    } catch (err: any) { setError('Google Auth failed.'); }
   };
 
   return (
@@ -145,7 +136,7 @@ const AuthPage: React.FC = () => {
 
         <div className="relative mb-8 text-center">
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-50"></div></div>
-          <span className="relative px-4 bg-white text-[9px] font-bold text-gray-300 uppercase tracking-[0.3em]">Network Credentials</span>
+          <span className="relative px-4 bg-white text-[9px] font-bold text-gray-300 uppercase tracking-[0.3em]">Credentials Hub</span>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-6">
@@ -157,8 +148,8 @@ const AuthPage: React.FC = () => {
           <div className="space-y-4">
             {!isLogin && (
               <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Full Name</label>
-                <input required type="text" placeholder="Legal Name" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={name} onChange={(e) => setName(e.target.value)} />
+                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Full Legal Name</label>
+                <input required type="text" placeholder="Owner Name" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
             )}
             
@@ -174,9 +165,9 @@ const AuthPage: React.FC = () => {
               </div>
             </div>
 
-            {!isLogin && isOtpSent && (
+            {isOtpSent && (
               <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">OTP (Demo: 123456)</label>
+                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">OTP (Use 123456)</label>
                 <input required type="text" placeholder="6-digit code" className="w-full px-5 py-4 bg-blue-50/50 border border-bbBlue/20 rounded-2xl text-sm outline-none focus:border-bbBlue text-center tracking-[1em]" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
               </div>
             )}
@@ -192,7 +183,7 @@ const AuthPage: React.FC = () => {
           {error && <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest text-center animate-pulse">{error}</p>}
 
           <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-xs tracking-[0.2em] shadow-xl shadow-bbBlue/20 hover:bg-bbBlue-deep transition-all active:scale-[0.98]">
-            {isSubmitting ? 'Processing...' : 'Enter Portal'}
+            {isSubmitting ? 'Securing Portal...' : 'Enter Portal'}
           </button>
         </form>
 

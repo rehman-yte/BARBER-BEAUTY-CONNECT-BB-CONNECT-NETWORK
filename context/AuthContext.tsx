@@ -4,8 +4,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
-  onAuthStateChanged,
-  User as FirebaseUser
+  onAuthStateChanged 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
   doc, 
@@ -38,6 +37,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Sync session across storage and state
+  const checkGhostSession = () => {
+    const partnerMobile = localStorage.getItem('bb_partner_mobile');
+    const isPartnerAuth = localStorage.getItem('bb_partner_authenticated');
+    const partnerName = localStorage.getItem('bb_partner_name') || 'Partner';
+
+    if (partnerMobile && isPartnerAuth === 'true') {
+      return { 
+        uid: partnerMobile, 
+        email: `${partnerMobile}@partner.ghost`, 
+        name: partnerName,
+        role: 'partner' as const,
+        status: 'pending' as const
+      };
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!auth) {
       setLoading(false);
@@ -47,40 +64,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       
-      // 1. CHECK FIREBASE AUTH (Mainly for Customers)
+      // 1. Priority: Ghost Partner (LocalStorage)
+      const ghost = checkGhostSession();
+      if (ghost) {
+        setUser(ghost);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Firebase User (Customers)
       if (firebaseUser && db) {
         try {
           const custDoc = await getDoc(doc(db, 'customers_roadmap', firebaseUser.uid));
           if (custDoc.exists()) {
             setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...custDoc.data() } as AppUser);
-            setLoading(false);
-            return;
           }
         } catch (err) {
-          console.error("Firestore lookup failed:", err);
-        }
-      }
-
-      // 2. CHECK GHOST PARTNER SESSION (LocalStorage + Mobile Registry)
-      const partnerMobile = localStorage.getItem('bb_partner_mobile');
-      const isPartnerAuth = localStorage.getItem('bb_partner_authenticated');
-
-      if (partnerMobile && isPartnerAuth === 'true' && db) {
-        try {
-          const partDoc = await getDoc(doc(db, 'partners_registry', partnerMobile));
-          if (partDoc.exists()) {
-            setUser({ 
-              uid: partnerMobile, 
-              email: `${partnerMobile}@partner.ghost`, 
-              ...partDoc.data() 
-            } as AppUser);
-          } else {
-            // Failsafe for missing record
-            setUser(null);
-          }
-        } catch (err) {
-          console.error("Partner ghost lookup failed:", err);
-          setUser(null);
+          console.error("Auth lookup error:", err);
         }
       } else {
         setUser(null);
@@ -95,9 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, pass: string, additionalData: any, type: 'customer' | 'partner') => {
     if (!auth || !db) throw new Error("Auth service unavailable");
     const res = await createUserWithEmailAndPassword(auth, email, pass);
-    const uid = res.user.uid;
-
-    await setDoc(doc(db, 'customers_roadmap', uid), {
+    await setDoc(doc(db, 'customers_roadmap', res.user.uid), {
       name: additionalData.name,
       role: 'customer',
       status: 'active',
@@ -113,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     localStorage.removeItem('bb_partner_authenticated');
     localStorage.removeItem('bb_partner_mobile');
+    localStorage.removeItem('bb_partner_name');
     if (auth) await signOut(auth);
     setUser(null);
   };
