@@ -1,7 +1,13 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/firebaseConfig';
+import { 
+  collection, 
+  addDoc, 
+  serverTimestamp 
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const SHOP_DATA = {
   id: 1,
@@ -25,6 +31,7 @@ const SHOP_DATA = {
 
 const ShopDetail: React.FC = () => {
   const { id } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedService, setSelectedService] = useState(SHOP_DATA.services[0]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -32,17 +39,12 @@ const ShopDetail: React.FC = () => {
   const [showPayment, setShowPayment] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Calendar Logic
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
   const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     return d;
   });
 
-  // Time Slots (8 AM - 10 PM)
   const generateSlots = () => {
     const slots = [];
     for (let h = 8; h <= 21; h++) {
@@ -57,7 +59,6 @@ const ShopDetail: React.FC = () => {
   const isSlotDisabled = (slot: string) => {
     const isToday = selectedDate.toDateString() === new Date().toDateString();
     if (!isToday) return false;
-
     const [hour, min] = slot.split(':').map(Number);
     const slotTime = new Date();
     slotTime.setHours(hour, min, 0, 0);
@@ -69,13 +70,55 @@ const ShopDetail: React.FC = () => {
     setShowPayment(true);
   };
 
-  const handlePayment = () => {
+  const handleUPILink = (app: string) => {
+    // Escrow logic: Pre-fill amount and merchant info
+    const merchantUpi = "bbconnect@upi";
+    const amount = selectedService.price.toFixed(2);
+    const txnNote = `BBCN ${selectedService.name} - ${SHOP_DATA.name}`;
+    const upiUrl = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(SHOP_DATA.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
+    
+    // Attempt deep link redirection
+    window.location.href = upiUrl;
+    
+    // Simulate manual confirmation for web demo context
+    console.log(`Redirecting to ${app} via Deep Link:`, upiUrl);
+  };
+
+  const handleConfirmPayment = async (method: string) => {
+    if (!user || !db) return;
     setIsProcessing(true);
-    setTimeout(() => {
+
+    const transactionId = `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    
+    const bookingPayload = {
+      customerId: user.uid,
+      customerName: user.name,
+      shopId: id,
+      shopName: SHOP_DATA.name,
+      serviceName: selectedService.name,
+      price: selectedService.price,
+      date: selectedDate.toDateString(),
+      time: selectedSlot,
+      status: 'payment_held', // ESCROW: Initial status is always 'held'
+      paymentStatus: 'success',
+      paymentMethod: method,
+      transactionId: transactionId,
+      createdAt: serverTimestamp(),
+      expiryTime: Date.now() + 5 * 60 * 1000, // 5 minute response window
+    };
+
+    try {
+      await addDoc(collection(db, 'bookings'), bookingPayload);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setShowPayment(false);
+        navigate('/customer-dashboard');
+      }, 1500);
+    } catch (err) {
+      console.error("Firestore Error:", err);
       setIsProcessing(false);
-      setShowPayment(false);
-      navigate('/customer-dashboard');
-    }, 2000);
+      alert("Platform connection failed. Transaction details saved but registry update pending.");
+    }
   };
 
   return (
@@ -127,7 +170,6 @@ const ShopDetail: React.FC = () => {
           <div className="p-8 md:p-12 border border-gray-100 rounded-[3rem] shadow-sm bg-gray-50/30">
              <h2 className="text-2xl font-serif font-bold text-bbBlue-deep mb-8 text-center uppercase tracking-tight">Schedule Your Slot</h2>
              
-             {/* Calendar Strip */}
              <div className="space-y-4 mb-10">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Select Date</p>
                 <div className="flex justify-between overflow-x-auto gap-3 pb-2 scrollbar-hide">
@@ -149,9 +191,8 @@ const ShopDetail: React.FC = () => {
                 </div>
              </div>
 
-             {/* Slots Grid */}
              <div className="space-y-6">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Select Time (8 AM - 10 PM)</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Select Time</p>
                 <div className="grid grid-cols-4 gap-3">
                    {allSlots.map((slot) => {
                       const disabled = isSlotDisabled(slot);
@@ -182,66 +223,72 @@ const ShopDetail: React.FC = () => {
                 <button 
                    onClick={handleBooking}
                    disabled={!selectedSlot}
-                   className="w-full py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-xs tracking-[0.3em] shadow-2xl shadow-bbBlue/30 hover:bg-blue-600 disabled:bg-gray-200 disabled:shadow-none transition-all active:scale-[0.98]"
+                   className="w-full py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-xs tracking-[0.3em] shadow-2xl shadow-bbBlue/30 hover:bg-blue-600 disabled:bg-gray-200 disabled:shadow-none transition-all"
                 >
-                   Finalize Reservation
+                   Continue to Payment
                 </button>
              </div>
           </div>
         </div>
       </div>
 
-      {/* RAZORPAY MOCK UI */}
       <AnimatePresence>
          {showPayment && (
             <motion.div 
                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-               className="fixed inset-0 z-[1000] bg-charcoal/40 backdrop-blur-md flex items-center justify-center p-6"
+               className="fixed inset-0 z-[1000] bg-charcoal/60 backdrop-blur-md flex items-center justify-center p-6"
             >
                <motion.div 
                   initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }}
-                  className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl"
+                  className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl relative"
                >
-                  <div className="bg-[#1D2B44] p-8 text-white flex justify-between items-center">
-                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Paying To</p>
-                        <p className="text-lg font-serif font-bold">{SHOP_DATA.name}</p>
+                  <button onClick={() => setShowPayment(false)} className="absolute top-6 right-6 text-gray-400 hover:text-charcoal z-10">
+                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+
+                  <div className="bg-[#1D2B44] p-10 text-white">
+                     <div className="flex justify-between items-center mb-6">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.3em] opacity-60">Escrow Secure</span>
+                        <div className="flex gap-1">
+                           <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                           <div className="w-1.5 h-1.5 rounded-full bg-green-400/50"></div>
+                        </div>
                      </div>
-                     <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Amount</p>
-                        <p className="text-2xl font-serif font-bold">${selectedService.price}</p>
-                     </div>
+                     <p className="text-xl font-serif font-bold mb-1">{SHOP_DATA.name}</p>
+                     <p className="text-3xl font-serif font-bold">${selectedService.price}.00</p>
                   </div>
                   
-                  <div className="p-8 space-y-8">
+                  <div className="p-10 space-y-8">
                      <div className="flex flex-col items-center gap-4">
-                        <div className="w-40 h-40 bg-gray-50 border-4 border-gray-50 rounded-2xl flex items-center justify-center p-4">
-                           {/* Mock QR */}
-                           <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_PAYMENT')] bg-center bg-no-repeat bg-contain opacity-80"></div>
+                        <div className="w-40 h-40 bg-gray-50 border border-gray-100 rounded-3xl flex items-center justify-center p-6 shadow-inner">
+                           <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_PAYMENT')] bg-center bg-no-repeat bg-contain opacity-70"></div>
                         </div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Scan QR to pay with any UPI App</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Scan QR or select an app below to initiate deep-link payment</p>
                      </div>
 
-                     <div className="space-y-4">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Payment App</p>
-                        <div className="grid grid-cols-2 gap-3">
-                           {['GPay', 'PhonePe', 'Paytm', 'UPI ID'].map(app => (
-                              <button key={app} className="py-3 border border-gray-100 rounded-xl text-[10px] font-bold text-charcoal hover:border-bbBlue transition-colors">{app}</button>
-                           ))}
-                        </div>
+                     <div className="grid grid-cols-2 gap-3">
+                        {['GPay', 'PhonePe', 'Paytm', 'UPI ID'].map(app => (
+                           <button 
+                             key={app} 
+                             onClick={() => handleUPILink(app)}
+                             className="py-4 border border-gray-100 rounded-2xl text-[10px] font-bold text-charcoal hover:border-bbBlue hover:bg-bbBlue/5 transition-all active:scale-[0.97]"
+                           >
+                             {app}
+                           </button>
+                        ))}
                      </div>
 
                      <button 
-                        onClick={handlePayment}
+                        onClick={() => handleConfirmPayment('UPI_DEEP_LINK')}
                         disabled={isProcessing}
-                        className="w-full py-4 bg-[#2358E1] text-white rounded-xl font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 transition-all hover:bg-blue-700 active:scale-95"
+                        className="w-full py-5 bg-[#2358E1] text-white rounded-2xl font-bold uppercase text-[10px] tracking-[0.25em] flex items-center justify-center gap-3 shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
                      >
                         {isProcessing ? (
                            <>
                               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                              Processing...
+                              Securing Funds...
                            </>
-                        ) : 'Confirm Transaction'}
+                        ) : 'Confirm and Hold Payment'}
                      </button>
                   </div>
                </motion.div>
