@@ -51,14 +51,14 @@ const CustomerDashboard: React.FC = () => {
 
   const filteredBookings = bookings.filter(b => {
     if (activeTab === 'pending') return b.status === 'payment_held';
-    if (activeTab === 'failed') return b.status === 'rejected' || b.paymentStatus === 'failed' || b.status === 'failed';
+    if (activeTab === 'failed') return b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned';
     return b.status === 'approved' || b.status === 'confirmed';
   });
 
   const stats = {
     approved: bookings.filter(b => b.status === 'approved' || b.status === 'confirmed').length,
     pending: bookings.filter(b => b.status === 'payment_held').length,
-    failed: bookings.filter(b => b.status === 'rejected' || b.paymentStatus === 'failed' || b.status === 'failed').length,
+    failed: bookings.filter(b => b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned').length,
   };
 
   const currentUser = auth.currentUser;
@@ -147,7 +147,8 @@ const CustomerDashboard: React.FC = () => {
                    {/* Status Indicator Bar */}
                    <div className={`absolute top-0 left-0 w-full h-1.5 ${
                      booking.status === 'payment_held' ? 'bg-bbBlue animate-pulse' : 
-                     booking.status === 'confirmed' ? 'bg-green-500' : 'bg-red-500'
+                     booking.status === 'confirmed' ? 'bg-green-500' : 
+                     (booking.status === 'failed' || booking.status === 'rejected' || booking.status === 'Cancelled' || booking.status === 'cancelled') ? 'bg-red-500' : 'bg-gray-300'
                    }`}></div>
 
                    <div className="flex justify-between items-start mb-10">
@@ -163,7 +164,9 @@ const CustomerDashboard: React.FC = () => {
                            )}
                          </svg>
                       </div>
-                      <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">TRX-{booking.transactionId?.slice(-6)}</p>
+                      <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">
+                        {(booking.status === 'Cancelled' || booking.status === 'cancelled') ? 'ABND-' : 'TRX-'}{booking.transactionId?.slice(-6)}
+                      </p>
                    </div>
 
                    <div className="flex-grow">
@@ -181,21 +184,21 @@ const CustomerDashboard: React.FC = () => {
                         <div className="text-right">
                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-2">Payment Status</p>
                            <p className={`text-[11px] font-bold uppercase tracking-widest ${
-                             booking.paymentStatus === 'refunded' ? 'text-red-500' : 'text-bbBlue'
+                             booking.paymentStatus === 'refunded' || booking.paymentStatus === 'abandoned' ? 'text-red-500' : 'text-bbBlue'
                            }`}>
-                             {booking.paymentStatus === 'success' && booking.status === 'payment_held' ? 'HELD IN ESCROW' : booking.paymentStatus?.toUpperCase()}
+                             {booking.paymentStatus === 'success' && booking.status === 'payment_held' ? 'HELD IN ESCROW' : booking.paymentStatus?.toUpperCase() || 'VOID'}
                            </p>
                         </div>
                      </div>
                    </div>
 
-                   {booking.statusReason && (
+                   {(booking.message || booking.statusReason) && (
                      <div className="mt-auto p-6 bg-gray-50 rounded-2xl border border-gray-100">
                         <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-bbBlue"></span>
                           Platform Note
                         </p>
-                        <p className="text-[11px] text-gray-600 italic font-medium leading-relaxed">"{booking.statusReason}"</p>
+                        <p className="text-[11px] text-gray-600 italic font-medium leading-relaxed">"{booking.message || booking.statusReason}"</p>
                      </div>
                    )}
                 </motion.div>
@@ -205,7 +208,7 @@ const CustomerDashboard: React.FC = () => {
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="col-span-full py-48 flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-[4rem] bg-gray-50/20"
                 >
-                   <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-xl border border-gray-50">
+                   <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-xl border border-gray-100">
                       <svg className="w-10 h-10 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                    </div>
                    <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5em] mb-4">No Records Found</h4>

@@ -70,18 +70,49 @@ const ShopDetail: React.FC = () => {
     setShowPayment(true);
   };
 
+  const handleAbandonment = async () => {
+    if (!user || !db || isProcessing) {
+      setShowPayment(false);
+      return;
+    }
+
+    const transactionId = `ABND-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    
+    const abandonPayload = {
+      customerId: user.uid,
+      customerName: user.name,
+      shopId: id,
+      shopName: SHOP_DATA.name,
+      serviceName: selectedService.name,
+      price: selectedService.price,
+      date: selectedDate.toDateString(),
+      time: selectedSlot,
+      status: 'Cancelled', // Strict Requirement: Uppercase "Cancelled"
+      message: 'Payment Cancel ❌, Slot Not Booked', // Strict Requirement: "message" field
+      statusReason: 'Payment Cancel ❌, Slot Not Booked', // For UI consistency
+      paymentStatus: 'abandoned',
+      transactionId: transactionId,
+      createdAt: serverTimestamp(),
+    };
+
+    try {
+      await addDoc(collection(db, 'bookings'), abandonPayload);
+    } catch (err) {
+      console.error("Abandonment log failed:", err);
+    }
+    
+    setShowPayment(false);
+    navigate('/customer-dashboard');
+  };
+
   const handleUPILink = (app: string) => {
-    // Escrow logic: Pre-fill amount and merchant info
     const merchantUpi = "bbconnect@upi";
     const amount = selectedService.price.toFixed(2);
     const txnNote = `BBCN ${selectedService.name} - ${SHOP_DATA.name}`;
-    
-    // Construct base UPI query parameters
     const upiParams = `pa=${merchantUpi}&pn=${encodeURIComponent(SHOP_DATA.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
     
     let targetUrl = `upi://pay?${upiParams}`;
 
-    // Target specific Android Apps using Intents to override default app handlers
     if (app === 'GPay') {
       targetUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
     } else if (app === 'PhonePe') {
@@ -90,9 +121,7 @@ const ShopDetail: React.FC = () => {
       targetUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=net.one97.paytm;end`;
     }
     
-    // Attempt redirection
     window.location.href = targetUrl;
-    
     console.log(`Initiating targeted redirection to ${app}:`, targetUrl);
   };
 
@@ -111,12 +140,12 @@ const ShopDetail: React.FC = () => {
       price: selectedService.price,
       date: selectedDate.toDateString(),
       time: selectedSlot,
-      status: 'payment_held', // ESCROW: Initial status is always 'held'
+      status: 'payment_held', 
       paymentStatus: 'success',
       paymentMethod: method,
       transactionId: transactionId,
       createdAt: serverTimestamp(),
-      expiryTime: Date.now() + 5 * 60 * 1000, // 5 minute response window
+      expiryTime: Date.now() + 5 * 60 * 1000, 
     };
 
     try {
@@ -254,7 +283,7 @@ const ShopDetail: React.FC = () => {
                   initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }}
                   className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl relative"
                >
-                  <button onClick={() => setShowPayment(false)} className="absolute top-6 right-6 text-gray-400 hover:text-charcoal z-10">
+                  <button onClick={handleAbandonment} className="absolute top-6 right-6 text-gray-400 hover:text-charcoal z-10">
                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
 
