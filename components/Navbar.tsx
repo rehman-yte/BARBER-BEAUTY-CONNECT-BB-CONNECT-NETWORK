@@ -16,6 +16,7 @@ import {
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const isLoggedIn = !!user;
+  const isPartner = user?.role === 'partner';
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -56,26 +57,29 @@ const Navbar: React.FC = () => {
       updateNotifications(adminNotifs, 'admin');
     });
 
-    // 2. Booking Status Updates Listener
-    const bookingQuery = query(collection(db, 'bookings'), where('customerId', '==', user.uid));
-    const unsubBookings = onSnapshot(bookingQuery, (snapshot) => {
-      const bookingNotifs = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let msg = `Your booking at ${data.shopName} is now ${data.status}.`;
-        if (data.status === 'Cancelled' || data.status === 'cancelled') {
-           msg = `Payment Cancelled ❌ for your slot at ${data.shopName}. Slot not booked.`;
-        }
-        return {
-          id: doc.id,
-          type: 'STATUS UPDATE',
-          title: data.status === 'payment_held' ? 'Booking Pending' : 'Booking ' + data.status,
-          message: msg,
-          timestamp: data.createdAt?.toMillis() || Date.now(),
-          isStatus: true
-        };
+    // 2. Booking Status Updates Listener (Only for Customers)
+    let unsubBookings = () => {};
+    if (user.role === 'customer') {
+      const bookingQuery = query(collection(db, 'bookings'), where('customerId', '==', user.uid));
+      unsubBookings = onSnapshot(bookingQuery, (snapshot) => {
+        const bookingNotifs = snapshot.docs.map(doc => {
+          const data = doc.data();
+          let msg = `Your booking at ${data.shopName} is now ${data.status}.`;
+          if (data.status === 'Cancelled' || data.status === 'cancelled') {
+             msg = `Payment Cancelled ❌ for your slot at ${data.shopName}. Slot not booked.`;
+          }
+          return {
+            id: doc.id,
+            type: 'STATUS UPDATE',
+            title: data.status === 'payment_held' ? 'Booking Pending' : 'Booking ' + data.status,
+            message: msg,
+            timestamp: data.createdAt?.toMillis() || Date.now(),
+            isStatus: true
+          };
+        });
+        updateNotifications(bookingNotifs, 'booking');
       });
-      updateNotifications(bookingNotifs, 'booking');
-    });
+    }
 
     return () => {
       unsubAdmin();
@@ -92,7 +96,7 @@ const Navbar: React.FC = () => {
         .filter(n => !clearedIds.includes(n.id))
         .sort((a, b) => b.timestamp - a.timestamp);
 
-      // Sound logic: Only play if the number of relevant (uncleared) notifications increases
+      // Sound logic
       if (combined.length > prevCount.current && prevCount.current !== 0) {
         audioRef.current?.play().catch(e => console.log('Audio play blocked'));
       }
@@ -102,7 +106,6 @@ const Navbar: React.FC = () => {
     });
   };
 
-  // Persist cleared state
   useEffect(() => {
     localStorage.setItem('bb_cleared_notifs', JSON.stringify(clearedIds));
     const combined = [...rawNotifs.admin, ...rawNotifs.booking]
@@ -136,12 +139,14 @@ const Navbar: React.FC = () => {
     setShowDropdown(false);
   };
 
+  const dashboardLink = isPartner ? "/partner-dashboard" : "/customer-dashboard";
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 py-3 px-6 md:px-12 flex justify-between items-center h-20 shadow-sm">
       
       {/* LEFT: Logo Section */}
       <div className="flex-1 flex justify-start">
-        <Link to="/" className="flex flex-col items-start leading-none group">
+        <Link to={isPartner ? "/partner-dashboard" : "/"} className="flex flex-col items-start leading-none group">
           <span className="text-base md:text-lg font-serif font-bold text-black tracking-tight transition-colors">
             BARBER & BEAUTY CONNECT
           </span>
@@ -151,26 +156,30 @@ const Navbar: React.FC = () => {
         </Link>
       </div>
 
-      {/* CENTER: Permanent Navigation */}
+      {/* CENTER: Navigation Links */}
       <div className="flex flex-none justify-center items-center gap-10 px-4">
+        {!isPartner && (
+          <Link 
+            to="/" 
+            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          >
+            Home
+          </Link>
+        )}
         <Link 
-          to="/" 
-          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-        >
-          Home
-        </Link>
-        <Link 
-          to="/customer-dashboard" 
-          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          to={dashboardLink} 
+          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === dashboardLink ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
         >
           Dashboard
         </Link>
-        <Link 
-          to="/explore" 
-          className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-        >
-          Explore
-        </Link>
+        {!isPartner && (
+          <Link 
+            to="/explore" 
+            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          >
+            Explore
+          </Link>
+        )}
       </div>
 
       {/* RIGHT: Action & Profile Section */}
@@ -181,7 +190,7 @@ const Navbar: React.FC = () => {
           </Link>
         ) : (
           <div className="flex items-center gap-5 relative">
-            {/* Interactive Bell Icon */}
+            {/* Bell Icon */}
             <div className="relative" ref={notificationRef}>
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -207,7 +216,6 @@ const Navbar: React.FC = () => {
                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Notifications</h4>
                        <span className="text-[9px] font-bold text-bbBlue uppercase bg-bbBlue/5 px-2 py-0.5 rounded-full">{notifications.length} Active</span>
                     </div>
-                    
                     <div className="max-h-[350px] overflow-y-auto px-6 space-y-4 custom-scrollbar">
                       {notifications.length > 0 ? (
                         notifications.map((notif) => (
@@ -217,7 +225,6 @@ const Navbar: React.FC = () => {
                               <button 
                                 onClick={(e) => handleClearNotif(notif.id, e)}
                                 className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                                title="Clear"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                               </button>
@@ -267,7 +274,7 @@ const Navbar: React.FC = () => {
                        <p className="text-[10px] font-bold text-black truncate">{user?.email}</p>
                     </div>
                     <Link 
-                      to="/customer-dashboard" 
+                      to={dashboardLink} 
                       onClick={() => setShowDropdown(false)}
                       className="block px-5 py-3.5 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
                     >

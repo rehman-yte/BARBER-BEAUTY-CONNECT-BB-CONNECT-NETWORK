@@ -23,18 +23,27 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'customer' | 
   if (!user) return <Navigate to="/auth" replace />;
   
   if (role && user.role !== role) {
+    // If a partner tries to access a customer route, they go to partner dashboard, not home.
+    if (user.role === 'partner') return <Navigate to="/partner-dashboard" replace />;
     return <Navigate to="/" replace />;
   }
 
-  // Special handling for Pending Partners is now managed via redirect logic
   return <>{children}</>;
 };
 
 const AppRoutes: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+
   return (
     <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={<LandingPage />} />
+      {/* Public / Landing Redirect for Partners */}
+      <Route 
+        path="/" 
+        element={user?.role === 'partner' ? <Navigate to="/partner-dashboard" replace /> : <LandingPage />} 
+      />
+      
       <Route path="/auth" element={<AuthPage />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsAndConditions />} />
@@ -45,7 +54,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/shop/:id" element={<ProtectedRoute role="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute role="customer"><CustomerDashboard /></ProtectedRoute>} />
       
-      {/* Partner Routes (NEW) */}
+      {/* Partner Routes */}
       <Route path="/partner-register" element={<ProtectedRoute role="partner"><PartnerRegistration /></ProtectedRoute>} />
       <Route path="/partner-dashboard" element={<ProtectedRoute role="partner"><PartnerDashboard /></ProtectedRoute>} />
       
