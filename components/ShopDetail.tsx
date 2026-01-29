@@ -29,12 +29,14 @@ const ShopDetail: React.FC = () => {
       if (!db || !id) return;
       setLoading(true);
       try {
-        // Unified Registry Fetch
+        // Unified Registry Fetch from 'partners_registry'
         const docRef = doc(db, 'partners_registry', id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.isVerified !== true) {
+          // STRICT SECURITY: Only allow access if verified AND approved
+          if (data.isVerified !== true || data.status !== 'approved') {
+             console.warn("UNAUTHORIZED ACCESS: Shop is not approved for public booking.");
              navigate('/explore');
              return;
           }

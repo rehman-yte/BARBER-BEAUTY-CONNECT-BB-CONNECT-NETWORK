@@ -18,7 +18,8 @@ const ExplorePage: React.FC = () => {
   useEffect(() => {
     if (!db) return;
 
-    // Fetching from the unified Professional Registry
+    // Fetching from the unified Professional Registry 'partners_registry'
+    // Using a broad query to allow client-side filtering for isVerified and status
     const q = query(collection(db, 'partners_registry'), orderBy('onboardedAt', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -26,8 +27,11 @@ const ExplorePage: React.FC = () => {
         id: doc.id,
         ...doc.data()
       }));
-      // MANDATORY FILTER: Only verified shops are visible to the public
-      setShops(docs.filter(shop => shop.isVerified === true));
+      
+      // STRICT FILTER: Only shops with (isVerified === true) AND (status === 'approved') are visible to customers
+      const approvedShops = docs.filter(shop => shop.isVerified === true && shop.status === 'approved');
+      
+      setShops(approvedShops);
       setLoading(false);
     }, (err) => {
       console.error("Firestore Fetch Error:", err);
@@ -119,7 +123,7 @@ const ExplorePage: React.FC = () => {
                    <svg className="w-8 h-8 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </div>
                 <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5em]">No verified partners in directory</p>
-                <p className="text-[9px] text-gray-300 font-medium uppercase tracking-[0.2em] mt-2">New requests are currently under review</p>
+                <p className="text-[9px] text-gray-300 font-medium uppercase tracking-[0.2em] mt-2">New requests are currently under review by admin</p>
               </div>
             )}
           </AnimatePresence>

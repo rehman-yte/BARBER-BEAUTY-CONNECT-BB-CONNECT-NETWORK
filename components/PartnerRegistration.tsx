@@ -8,6 +8,7 @@ import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/fir
 const PartnerRegistration: React.FC = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState('');
   
   const partnerMobile = localStorage.getItem('bb_partner_mobile') || '';
   const partnerName = localStorage.getItem('bb_partner_name') || '';
@@ -65,39 +66,47 @@ const PartnerRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
+    // STRICT VALIDATION: Ensure mandatory text fields are not empty
+    if (!formData.brandName.trim() || !formData.ownerName.trim() || !formData.upiId.trim()) {
+      setError("MANDATORY FIELDS MISSING: Brand Name, Owner Name, and UPI ID are required.");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     setIsProcessing(true);
     
-    // CRITICAL: Ensure data is written to Firestore BEFORE redirecting
     if (db) {
       try {
-        // MANDATORY SYNC: Using 'partners_registry' collection as requested
-        // Mapping all fields exactly as required by the Admin Panel
+        // MANDATORY SYNC: Mapping all fields to 'partners_registry' collection
         await addDoc(collection(db, 'partners_registry'), {
-          brandName: formData.brandName,     // [BRAND NAME]
-          ownerName: formData.ownerName,     // [OWNER]
-          category: formData.category,       // [CATEGORY]
-          workers: formData.workerCount,     // [WORKERS]
-          status: 'pending',                 // MANDATORY: Admin filter flag
-          isVerified: false,                 // Verification state
-          upiId: formData.upiId,
+          brandName: formData.brandName.trim(),     // [BRAND NAME]
+          ownerName: formData.ownerName.trim(),     // [OWNER]
+          category: formData.category,               // [CATEGORY]
+          workers: formData.workerCount,             // [WORKERS]
+          upiId: formData.upiId.trim(),
           mobile: formData.mobile || partnerMobile,
-          createdAt: serverTimestamp()       // [CREATED AT]
+          status: 'pending',                         // STRICT: Hardcoded pending status
+          isVerified: false,                         // STRICT: Default verification state
+          createdAt: serverTimestamp(),              // [CREATED AT]
+          onboardedAt: serverTimestamp()             // Compatibility with legacy ExplorePage ordering
         });
         
         localStorage.setItem('bb_partner_active', 'true');
         
-        // 3s high-fidelity processing delay for visual UX before redirect
+        // 3s high-fidelity processing delay before redirect to dashboard
         setTimeout(() => {
           navigate('/partner-dashboard', { replace: true });
         }, 3000);
       } catch (err) {
         console.error("Admission registry write failed:", err);
-        alert("Connectivity error. Retrying encryption protocol...");
+        setError("NETWORK ERROR: Secure Registry sync failed. Please check connection.");
         setIsProcessing(false);
       }
     } else {
       setIsProcessing(false);
-      alert("System Registry Offline.");
+      setError("SYSTEM OFFLINE: Registry connection unavailable.");
     }
   };
 
@@ -114,6 +123,7 @@ const PartnerRegistration: React.FC = () => {
             <div className="mb-16 text-center md:text-left">
               <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Partner Registry</h1>
               <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.4em]">Establish Professional Identity</p>
+              {error && <p className="mt-6 text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-50 p-4 rounded-xl border border-red-100">{error}</p>}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-20">
@@ -167,6 +177,10 @@ const PartnerRegistration: React.FC = () => {
                       </label>
                     ))}
                   </div>
+                </div>
+                <div className="space-y-4">
+                   <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em]">Estimated Workers</label>
+                   <input type="number" name="workerCount" min="1" max="30" value={formData.workerCount} onChange={handleWorkerCount} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono outline-none focus:border-bbBlue" />
                 </div>
               </section>
 
