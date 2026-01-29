@@ -22,22 +22,18 @@ const AuthPage: React.FC = () => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [isOtpSent, setIsOtpSent] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // Handle existing user routing
   useEffect(() => {
     if (user && !loading) {
       if (user.role === 'customer') {
         navigate('/customer-dashboard', { replace: true });
       } else if (user.role === 'partner') {
-        // Partners always go to registration if they aren't marked 'active'
         if (user.status === 'active') {
           navigate('/partner-dashboard', { replace: true });
         } else {
-          // Absolute path jump
           window.location.hash = '/partner-register';
         }
       }
@@ -56,19 +52,19 @@ const AuthPage: React.FC = () => {
     }
 
     if (userType === 'Partner') {
-      // PARTNER BYPASS PROTOCOL
+      // SINGLE STEP PARTNER AUTH (Signup/Login Combined)
       if (otp !== '123456') {
         setError('Invalid OTP. Use 123456.');
         setIsSubmitting(false);
         return;
       }
 
-      // 1. Silent Local Session Generation
+      // Establish Local Session Immediately
       localStorage.setItem('bb_partner_authenticated', 'true');
       localStorage.setItem('bb_partner_mobile', mobile);
       localStorage.setItem('bb_partner_name', name || 'Partner');
 
-      // 2. Optional: Create/Update firestore record silently without blocking UI
+      // Silent Firestore Registry Init
       if (db) {
         setDoc(doc(db, 'partners_registry', mobile), {
           name: name || 'Partner',
@@ -76,21 +72,20 @@ const AuthPage: React.FC = () => {
           role: 'partner',
           status: 'pending',
           updatedAt: serverTimestamp()
-        }, { merge: true }).catch(e => console.error("Silent registry log failed", e));
+        }, { merge: true }).catch(err => console.error("Silent log error", err));
       }
 
-      // 3. FORCE REDIRECT - No loops, just go.
+      // Force Immediate Navigation
       window.location.hash = '/partner-register';
       setIsSubmitting(false);
-
     } else {
-      // Customer Flow (Unchanged)
+      // Customer Flow
       const customerEmail = `${mobile}@bb.net`;
       try {
         if (isLogin) await signIn(customerEmail, password);
         else await signUp(customerEmail, password, { name: name || 'User' }, 'customer');
       } catch (err: any) {
-        setError('Verification failed.');
+        setError('Verification failed. Check credentials.');
       } finally {
         setIsSubmitting(false);
       }
@@ -146,50 +141,37 @@ const AuthPage: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {!isLogin && (
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Full Legal Name</label>
-                <input required type="text" placeholder="Owner Name" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-            )}
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Full Name</label>
+              <input required type="text" placeholder="Professional Identity" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
             
             <div className="flex flex-col gap-2">
               <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Mobile Access</label>
-              <div className="relative">
-                <input required type="tel" placeholder="10-digit number" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue font-mono" value={mobile} onChange={(e) => setMobile(e.target.value)} />
-                {!isLogin && (
-                  <button type="button" onClick={() => setIsOtpSent(true)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-bold text-bbBlue uppercase tracking-widest hover:underline">
-                    {isOtpSent ? 'Resend' : 'Send OTP'}
-                  </button>
-                )}
-              </div>
+              <input required type="tel" placeholder="10-digit number" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue font-mono" value={mobile} onChange={(e) => setMobile(e.target.value)} />
             </div>
 
-            {isOtpSent && (
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">OTP (Use 123456)</label>
-                <input required type="text" placeholder="6-digit code" className="w-full px-5 py-4 bg-blue-50/50 border border-bbBlue/20 rounded-2xl text-sm outline-none focus:border-bbBlue text-center tracking-[1em]" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
-              </div>
-            )}
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">OTP (Demo: 123456)</label>
+              <input required type="text" placeholder="6-digit code" className="w-full px-5 py-4 bg-blue-50/50 border border-bbBlue/20 rounded-2xl text-sm outline-none focus:border-bbBlue text-center tracking-[1em]" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
+            </div>
 
-            {userType === 'Customer' && (
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Secure Password</label>
-                <input required type="password" placeholder="••••••••" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-            )}
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Secure Password</label>
+              <input required type="password" placeholder="••••••••" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
           </div>
 
           {error && <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest text-center animate-pulse">{error}</p>}
 
           <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-xs tracking-[0.2em] shadow-xl shadow-bbBlue/20 hover:bg-bbBlue-deep transition-all active:scale-[0.98]">
-            {isSubmitting ? 'Securing Portal...' : 'Enter Portal'}
+            {isSubmitting ? 'Verifying...' : 'Enter Portal'}
           </button>
         </form>
 
         <div className="mt-8 text-center">
           <button onClick={() => setIsLogin(!isLogin)} className="text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
-            {isLogin ? "Join the elite network" : "Existing Member? Access Portal"}
+            {userType === 'Customer' ? (isLogin ? "Join the network" : "Existing Member? Sign In") : "Partner Admission Protocol"}
           </button>
         </div>
       </div>
