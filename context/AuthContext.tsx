@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -28,7 +28,9 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, pass: string, data: any, type: 'customer' | 'partner') => Promise<void>;
   signIn: (email: string, pass: string) => Promise<void>;
+  loginPartnerGhost: (mobile: string, name: string) => void;
   logout: () => Promise<void>;
+  refreshAuth: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,8 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sync session across storage and state
-  const checkGhostSession = () => {
+  const checkGhostSession = useCallback(() => {
     const partnerMobile = localStorage.getItem('bb_partner_mobile');
     const isPartnerAuth = localStorage.getItem('bb_partner_authenticated');
     const partnerName = localStorage.getItem('bb_partner_name') || 'Partner';
@@ -53,7 +54,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
     return null;
-  };
+  }, []);
+
+  const refreshAuth = useCallback(async () => {
+    setLoading(true);
+    const ghost = checkGhostSession();
+    if (ghost) {
+      setUser(ghost);
+      setLoading(false);
+      return;
+    }
+
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser && db) {
+      try {
+        const custDoc = await getDoc(doc(db, 'customers_roadmap', firebaseUser.uid));
+        if (custDoc.exists()) {
+          setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...custDoc.data() } as AppUser);
+        }
+      } catch (err) {
+        console.error("Auth lookup error:", err);
+      }
+    } else {
+      setUser(null);
+    }
+    setLoading(false);
+  }, [checkGhostSession]);
 
   useEffect(() => {
     if (!auth) {
@@ -62,35 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
-      
-      // 1. Priority: Ghost Partner (LocalStorage)
-      const ghost = checkGhostSession();
-      if (ghost) {
-        setUser(ghost);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Firebase User (Customers)
-      if (firebaseUser && db) {
-        try {
-          const custDoc = await getDoc(doc(db, 'customers_roadmap', firebaseUser.uid));
-          if (custDoc.exists()) {
-            setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...custDoc.data() } as AppUser);
-          }
-        } catch (err) {
-          console.error("Auth lookup error:", err);
-        }
-      } else {
-        setUser(null);
-      }
-      
-      setLoading(false);
+      await refreshAuth();
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshAuth]);
 
   const signUp = async (email: string, pass: string, additionalData: any, type: 'customer' | 'partner') => {
     if (!auth || !db) throw new Error("Auth service unavailable");
@@ -108,16 +110,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
+  const loginPartnerGhost = (mobile: string, name: string) => {
+    localStorage.setItem('bb_partner_authenticated', 'true');
+    localStorage.setItem('bb_partner_mobile', mobile);
+    localStorage.setItem('bb_partner_name', name);
+    setUser({
+      uid: mobile,
+      email: `${mobile}@partner.ghost`,
+      name: name,
+      role: 'partner',
+      status: 'pending'
+    });
+  };
+
   const logout = async () => {
     localStorage.removeItem('bb_partner_authenticated');
     localStorage.removeItem('bb_partner_mobile');
     localStorage.removeItem('bb_partner_name');
+    localStorage.removeItem('bb_partner_active');
     if (auth) await signOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, logout }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, loginPartnerGhost, logout, refreshAuth }}>
       {!loading ? children : (
         <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
