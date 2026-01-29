@@ -67,33 +67,38 @@ const PartnerRegistration: React.FC = () => {
     e.preventDefault();
     setIsProcessing(true);
     
-    // 3s admission protocol simulation
-    setTimeout(async () => {
-      if (db && partnerMobile) {
-        try {
-          const partnerRef = doc(db, 'partners_registry', partnerMobile);
-          await setDoc(partnerRef, {
-            ownerName: formData.ownerName,
-            brandName: formData.brandName,
-            category: formData.category,
-            workerCount: formData.workerCount,
-            upiId: formData.upiId,
-            mobile: formData.mobile,
-            status: 'active',
-            isVerified: false, // MANDATORY: Admin must approve for public listing
-            onboardedAt: serverTimestamp()
-          }, { merge: true });
-          
-          localStorage.setItem('bb_partner_active', 'true');
+    // CRITICAL: Ensure data is written to Firestore BEFORE redirecting
+    if (db && partnerMobile) {
+      try {
+        const partnerRef = doc(db, 'partners_registry', partnerMobile);
+        // Explicitly mapping fields to match Admin Verification Center expectations
+        await setDoc(partnerRef, {
+          brandName: formData.brandName,     // [BRAND NAME]
+          ownerName: formData.ownerName,     // [OWNER]
+          category: formData.category,       // [CATEGORY]
+          status: 'pending',                 // MANDATORY: Admin filter flag
+          isVerified: false,                 // Verification state
+          workerCount: formData.workerCount,
+          upiId: formData.upiId,
+          mobile: formData.mobile,
+          onboardedAt: serverTimestamp()
+        }, { merge: true });
+        
+        localStorage.setItem('bb_partner_active', 'true');
+        
+        // 3s high-fidelity processing delay for visual UX before redirect
+        setTimeout(() => {
           navigate('/partner-dashboard', { replace: true });
-        } catch (err) {
-          console.error("Admission failure:", err);
-          navigate('/partner-dashboard', { replace: true });
-        }
-      } else {
-        navigate('/partner-dashboard', { replace: true });
+        }, 3000);
+      } catch (err) {
+        console.error("Admission registry write failed:", err);
+        alert("Connectivity error. Retrying encryption protocol...");
+        setIsProcessing(false);
       }
-    }, 3000);
+    } else {
+      setIsProcessing(false);
+      alert("System Registry Offline.");
+    }
   };
 
   return (
@@ -113,7 +118,7 @@ const PartnerRegistration: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-20">
               
-              {/* Identity */}
+              {/* 01. IDENTITY */}
               <section className="space-y-10">
                 <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">01. Identity</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -131,7 +136,7 @@ const PartnerRegistration: React.FC = () => {
                 </div>
               </section>
 
-              {/* Hub */}
+              {/* 02. SHOP HUB */}
               <section className="space-y-10">
                 <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">02. Shop Hub</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -165,7 +170,7 @@ const PartnerRegistration: React.FC = () => {
                 </div>
               </section>
 
-              {/* Settlement */}
+              {/* 03. SETTLEMENTS */}
               <section className="space-y-10">
                 <h3 className="text-xs font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-4">03. Settlements</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -197,8 +202,8 @@ const PartnerRegistration: React.FC = () => {
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                </div>
             </div>
-            <h2 className="text-4xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Pending Request</h2>
-            <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.5em] animate-pulse">Syncing Professional Identity Registry...</p>
+            <h2 className="text-4xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tight">Pending Admission</h2>
+            <p className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.5em] animate-pulse">Syncing Professional Identity with Admin Verification Hub...</p>
           </motion.div>
         )}
       </AnimatePresence>
