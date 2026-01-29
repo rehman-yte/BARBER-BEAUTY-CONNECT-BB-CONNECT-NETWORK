@@ -31,7 +31,7 @@ const AuthPage: React.FC = () => {
       if (user.role === 'customer') {
         navigate('/customer-dashboard', { replace: true });
       } else if (user.role === 'partner') {
-        if (user.status === 'active') {
+        if (localStorage.getItem('bb_partner_active') === 'true') {
           navigate('/partner-dashboard', { replace: true });
         } else {
           window.location.hash = '/partner-register';
@@ -52,40 +52,54 @@ const AuthPage: React.FC = () => {
     }
 
     if (userType === 'Partner') {
-      // SINGLE STEP PARTNER AUTH (Signup/Login Combined)
-      if (otp !== '123456') {
-        setError('Invalid OTP. Use 123456.');
-        setIsSubmitting(false);
-        return;
+      if (!isLogin) {
+        // PARTNER SIGN UP PROTOCOL
+        if (otp !== '123456') {
+          setError('Invalid OTP. Use 123456.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Establish Local Session
+        localStorage.setItem('bb_partner_authenticated', 'true');
+        localStorage.setItem('bb_partner_mobile', mobile);
+        localStorage.setItem('bb_partner_name', name || 'Partner');
+
+        // Force Navigation to Registration Form
+        window.location.hash = '/partner-register';
+      } else {
+        // PARTNER SIGN IN (Simulated for Demo Registry)
+        if (password.length < 6) {
+          setError('Invalid Password.');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        localStorage.setItem('bb_partner_authenticated', 'true');
+        localStorage.setItem('bb_partner_mobile', mobile);
+        
+        // Check if already registered
+        if (db) {
+          const snap = await getDoc(doc(db, 'partners_registry', mobile));
+          if (snap.exists() && snap.data().status === 'active') {
+             localStorage.setItem('bb_partner_active', 'true');
+             navigate('/partner-dashboard');
+          } else {
+             window.location.hash = '/partner-register';
+          }
+        } else {
+          window.location.hash = '/partner-register';
+        }
       }
-
-      // Establish Local Session Immediately
-      localStorage.setItem('bb_partner_authenticated', 'true');
-      localStorage.setItem('bb_partner_mobile', mobile);
-      localStorage.setItem('bb_partner_name', name || 'Partner');
-
-      // Silent Firestore Registry Init
-      if (db) {
-        setDoc(doc(db, 'partners_registry', mobile), {
-          name: name || 'Partner',
-          mobile: mobile,
-          role: 'partner',
-          status: 'pending',
-          updatedAt: serverTimestamp()
-        }, { merge: true }).catch(err => console.error("Silent log error", err));
-      }
-
-      // Force Immediate Navigation
-      window.location.hash = '/partner-register';
       setIsSubmitting(false);
     } else {
-      // Customer Flow
+      // Customer Flow (Email-based internal ID)
       const customerEmail = `${mobile}@bb.net`;
       try {
         if (isLogin) await signIn(customerEmail, password);
         else await signUp(customerEmail, password, { name: name || 'User' }, 'customer');
       } catch (err: any) {
-        setError('Verification failed. Check credentials.');
+        setError('Verification failed. Use password if account exists.');
       } finally {
         setIsSubmitting(false);
       }
@@ -141,20 +155,24 @@ const AuthPage: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Full Name</label>
-              <input required type="text" placeholder="Professional Identity" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
+            {!isLogin && (
+              <div className="flex flex-col gap-2">
+                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Full Legal Name</label>
+                <input required type="text" placeholder="Professional Identity" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+            )}
             
             <div className="flex flex-col gap-2">
               <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Mobile Access</label>
               <input required type="tel" placeholder="10-digit number" className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:border-bbBlue font-mono" value={mobile} onChange={(e) => setMobile(e.target.value)} />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">OTP (Demo: 123456)</label>
-              <input required type="text" placeholder="6-digit code" className="w-full px-5 py-4 bg-blue-50/50 border border-bbBlue/20 rounded-2xl text-sm outline-none focus:border-bbBlue text-center tracking-[1em]" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
-            </div>
+            {!isLogin && (
+              <div className="flex flex-col gap-2">
+                <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">OTP (Demo: 123456)</label>
+                <input required type="text" placeholder="6-digit code" className="w-full px-5 py-4 bg-blue-50/50 border border-bbBlue/20 rounded-2xl text-sm outline-none focus:border-bbBlue text-center tracking-[1em]" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <label className="text-[9px] font-bold text-charcoal uppercase tracking-[0.2em] ml-1">Secure Password</label>
@@ -169,9 +187,9 @@ const AuthPage: React.FC = () => {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center flex flex-col gap-3">
           <button onClick={() => setIsLogin(!isLogin)} className="text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
-            {userType === 'Customer' ? (isLogin ? "Join the network" : "Existing Member? Sign In") : "Partner Admission Protocol"}
+            {isLogin ? "Join the network" : "Existing Member? Sign In here"}
           </button>
         </div>
       </div>
