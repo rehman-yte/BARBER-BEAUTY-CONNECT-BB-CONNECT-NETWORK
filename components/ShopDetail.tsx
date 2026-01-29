@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -6,38 +7,47 @@ import { db } from '../firebase/firebaseConfig';
 import { 
   collection, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,
+  getDoc
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-
-const SHOP_DATA = {
-  id: 1,
-  name: "The Gentleman's Cut",
-  owner: "Marco Polo",
-  images: [
-    "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=800",
-    "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=800",
-    "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&q=80&w=800",
-    "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&q=80&w=800",
-    "https://images.unsplash.com/photo-1593702288070-622895dfb93a?auto=format&fit=crop&q=80&w=800",
-    "https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?auto=format&fit=crop&q=80&w=800"
-  ],
-  services: [
-    { name: "Executive Haircut", price: 45 },
-    { name: "Beard Sculpture", price: 25 },
-    { name: "Royal Shave", price: 35 },
-    { name: "Scalp Treatment", price: 50 }
-  ]
-};
 
 const ShopDetail: React.FC = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [selectedService, setSelectedService] = useState(SHOP_DATA.services[0]);
+  const [shopData, setShopData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    const fetchShop = async () => {
+      if (!db || !id) return;
+      setLoading(true);
+      try {
+        const docRef = doc(db, 'partners', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setShopData({ id: docSnap.id, ...data });
+          if (data.services && data.services.length > 0) {
+            setSelectedService(data.services[0]);
+          }
+        } else {
+          navigate('/explore');
+        }
+      } catch (err) {
+        console.error("Error fetching shop:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchShop();
+  }, [id, navigate]);
 
   const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -71,7 +81,7 @@ const ShopDetail: React.FC = () => {
   };
 
   const handleAbandonment = async () => {
-    if (!user || !db || isProcessing) {
+    if (!user || !db || isProcessing || !shopData) {
       setShowPayment(false);
       return;
     }
@@ -82,14 +92,14 @@ const ShopDetail: React.FC = () => {
       customerId: user.uid,
       customerName: user.name,
       shopId: id,
-      shopName: SHOP_DATA.name,
+      shopName: shopData.name,
       serviceName: selectedService.name,
       price: selectedService.price,
       date: selectedDate.toDateString(),
       time: selectedSlot,
-      status: 'Cancelled', // Strict Requirement: Uppercase "Cancelled"
-      message: 'Payment Cancel ❌, Slot Not Booked', // Strict Requirement: "message" field
-      statusReason: 'Payment Cancel ❌, Slot Not Booked', // For UI consistency
+      status: 'Cancelled',
+      message: 'Payment Cancel ❌, Slot Not Booked',
+      statusReason: 'Payment Cancel ❌, Slot Not Booked',
       paymentStatus: 'abandoned',
       transactionId: transactionId,
       createdAt: serverTimestamp(),
@@ -106,10 +116,11 @@ const ShopDetail: React.FC = () => {
   };
 
   const handleUPILink = (app: string) => {
-    const merchantUpi = "bbconnect@upi";
+    if (!shopData) return;
+    const merchantUpi = shopData.upiId || "bbconnect@upi";
     const amount = selectedService.price.toFixed(2);
-    const txnNote = `BBCN ${selectedService.name} - ${SHOP_DATA.name}`;
-    const upiParams = `pa=${merchantUpi}&pn=${encodeURIComponent(SHOP_DATA.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
+    const txnNote = `BBCN ${selectedService.name} - ${shopData.name}`;
+    const upiParams = `pa=${merchantUpi}&pn=${encodeURIComponent(shopData.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
     
     let targetUrl = `upi://pay?${upiParams}`;
 
@@ -122,11 +133,10 @@ const ShopDetail: React.FC = () => {
     }
     
     window.location.href = targetUrl;
-    console.log(`Initiating targeted redirection to ${app}:`, targetUrl);
   };
 
   const handleConfirmPayment = async (method: string) => {
-    if (!user || !db) return;
+    if (!user || !db || !shopData) return;
     setIsProcessing(true);
 
     const transactionId = `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -135,7 +145,7 @@ const ShopDetail: React.FC = () => {
       customerId: user.uid,
       customerName: user.name,
       shopId: id,
-      shopName: SHOP_DATA.name,
+      shopName: shopData.name,
       serviceName: selectedService.name,
       price: selectedService.price,
       date: selectedDate.toDateString(),
@@ -158,9 +168,17 @@ const ShopDetail: React.FC = () => {
     } catch (err) {
       console.error("Firestore Error:", err);
       setIsProcessing(false);
-      alert("Platform connection failed. Transaction details saved but registry update pending.");
+      alert("Connection failed. Registry update pending.");
     }
   };
+
+  if (loading) return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+
+  if (!shopData) return null;
 
   return (
     <div className="pt-32 pb-20 px-6 md:px-12 bg-white min-h-screen">
@@ -169,18 +187,20 @@ const ShopDetail: React.FC = () => {
         {/* LEFT: Info & Gallery */}
         <div className="space-y-12">
           <header>
-            <h1 className="text-5xl font-serif font-bold text-bbBlue-deep mb-4">{SHOP_DATA.name}</h1>
+            <h1 className="text-5xl font-serif font-bold text-bbBlue-deep mb-4">{shopData.name}</h1>
             <div className="flex items-center gap-4">
-               <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-bold text-charcoal">M</div>
+               <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-bold text-charcoal">
+                 {shopData.owner?.[0] || 'M'}
+               </div>
                <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">Master Professional</p>
-                  <p className="text-sm font-bold text-charcoal">{SHOP_DATA.owner}</p>
+                  <p className="text-sm font-bold text-charcoal">{shopData.owner}</p>
                </div>
             </div>
           </header>
 
           <div className="grid grid-cols-3 gap-4">
-             {SHOP_DATA.images.map((url, i) => (
+             {(shopData.images || []).map((url: string, i: number) => (
                 <div key={i} className="aspect-square rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all">
                    <img src={url} className="w-full h-full object-cover" />
                 </div>
@@ -190,12 +210,12 @@ const ShopDetail: React.FC = () => {
           <div className="space-y-6">
              <h3 className="text-xs font-bold uppercase tracking-widest text-charcoal">Available Services</h3>
              <div className="space-y-3">
-                {SHOP_DATA.services.map((s, i) => (
+                {(shopData.services || []).map((s: any, i: number) => (
                    <button 
                       key={i}
                       onClick={() => setSelectedService(s)}
                       className={`w-full flex justify-between items-center p-5 rounded-2xl border transition-all ${
-                        selectedService.name === s.name ? 'border-bbBlue bg-bbBlue/5 shadow-inner' : 'border-gray-100 hover:border-bbBlue/30'
+                        selectedService?.name === s.name ? 'border-bbBlue bg-bbBlue/5 shadow-inner' : 'border-gray-100 hover:border-bbBlue/30'
                       }`}
                    >
                       <span className="text-sm font-bold text-charcoal">{s.name}</span>
@@ -259,7 +279,7 @@ const ShopDetail: React.FC = () => {
              <div className="mt-12 pt-10 border-t border-gray-100 flex flex-col items-center gap-6">
                 <div className="text-center">
                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Due</p>
-                   <p className="text-3xl font-serif font-bold text-bbBlue-deep">${selectedService.price}.00</p>
+                   <p className="text-3xl font-serif font-bold text-bbBlue-deep">${selectedService?.price || 0}.00</p>
                 </div>
                 <button 
                    onClick={handleBooking}
@@ -290,13 +310,9 @@ const ShopDetail: React.FC = () => {
                   <div className="bg-[#1D2B44] p-10 text-white">
                      <div className="flex justify-between items-center mb-6">
                         <span className="text-[9px] font-bold uppercase tracking-[0.3em] opacity-60">Escrow Secure</span>
-                        <div className="flex gap-1">
-                           <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
-                           <div className="w-1.5 h-1.5 rounded-full bg-green-400/50"></div>
-                        </div>
                      </div>
-                     <p className="text-xl font-serif font-bold mb-1">{SHOP_DATA.name}</p>
-                     <p className="text-3xl font-serif font-bold">${selectedService.price}.00</p>
+                     <p className="text-xl font-serif font-bold mb-1">{shopData.name}</p>
+                     <p className="text-3xl font-serif font-bold">${selectedService?.price || 0}.00</p>
                   </div>
                   
                   <div className="p-10 space-y-8">
@@ -304,7 +320,7 @@ const ShopDetail: React.FC = () => {
                         <div className="w-40 h-40 bg-gray-50 border border-gray-100 rounded-3xl flex items-center justify-center p-6 shadow-inner">
                            <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_PAYMENT')] bg-center bg-no-repeat bg-contain opacity-70"></div>
                         </div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Scan QR or select an app below to initiate deep-link payment</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Scan QR or select an app below</p>
                      </div>
 
                      <div className="grid grid-cols-2 gap-3">
@@ -324,12 +340,7 @@ const ShopDetail: React.FC = () => {
                         disabled={isProcessing}
                         className="w-full py-5 bg-[#2358E1] text-white rounded-2xl font-bold uppercase text-[10px] tracking-[0.25em] flex items-center justify-center gap-3 shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
                      >
-                        {isProcessing ? (
-                           <>
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                              Securing Funds...
-                           </>
-                        ) : 'Confirm and Hold Payment'}
+                        {isProcessing ? 'Securing Funds...' : 'Confirm and Hold Payment'}
                      </button>
                   </div>
                </motion.div>
