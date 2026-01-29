@@ -75,13 +75,25 @@ const ShopDetail: React.FC = () => {
     const merchantUpi = "bbconnect@upi";
     const amount = selectedService.price.toFixed(2);
     const txnNote = `BBCN ${selectedService.name} - ${SHOP_DATA.name}`;
-    const upiUrl = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(SHOP_DATA.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
     
-    // Attempt deep link redirection
-    window.location.href = upiUrl;
+    // Construct base UPI query parameters
+    const upiParams = `pa=${merchantUpi}&pn=${encodeURIComponent(SHOP_DATA.name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
     
-    // Simulate manual confirmation for web demo context
-    console.log(`Redirecting to ${app} via Deep Link:`, upiUrl);
+    let targetUrl = `upi://pay?${upiParams}`;
+
+    // Target specific Android Apps using Intents to override default app handlers
+    if (app === 'GPay') {
+      targetUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+    } else if (app === 'PhonePe') {
+      targetUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.phonepe.app;end`;
+    } else if (app === 'Paytm') {
+      targetUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=net.one97.paytm;end`;
+    }
+    
+    // Attempt redirection
+    window.location.href = targetUrl;
+    
+    console.log(`Initiating targeted redirection to ${app}:`, targetUrl);
   };
 
   const handleConfirmPayment = async (method: string) => {
@@ -267,7 +279,7 @@ const ShopDetail: React.FC = () => {
                      </div>
 
                      <div className="grid grid-cols-2 gap-3">
-                        {['GPay', 'PhonePe', 'Paytm', 'UPI ID'].map(app => (
+                        {['GPay', 'PhonePe', 'Paytm', 'Other UPI'].map(app => (
                            <button 
                              key={app} 
                              onClick={() => handleUPILink(app)}
