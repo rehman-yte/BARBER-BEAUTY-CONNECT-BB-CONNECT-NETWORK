@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase/firebaseConfig';
-import { doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const PartnerRegistration: React.FC = () => {
   const navigate = useNavigate();
@@ -68,21 +68,21 @@ const PartnerRegistration: React.FC = () => {
     setIsProcessing(true);
     
     // CRITICAL: Ensure data is written to Firestore BEFORE redirecting
-    if (db && partnerMobile) {
+    if (db) {
       try {
-        const partnerRef = doc(db, 'partners_registry', partnerMobile);
-        // Explicitly mapping fields to match Admin Verification Center expectations
-        await setDoc(partnerRef, {
+        // MANDATORY SYNC: Using 'partners_registry' collection as requested
+        // Mapping all fields exactly as required by the Admin Panel
+        await addDoc(collection(db, 'partners_registry'), {
           brandName: formData.brandName,     // [BRAND NAME]
           ownerName: formData.ownerName,     // [OWNER]
           category: formData.category,       // [CATEGORY]
+          workers: formData.workerCount,     // [WORKERS]
           status: 'pending',                 // MANDATORY: Admin filter flag
           isVerified: false,                 // Verification state
-          workerCount: formData.workerCount,
           upiId: formData.upiId,
-          mobile: formData.mobile,
-          onboardedAt: serverTimestamp()
-        }, { merge: true });
+          mobile: formData.mobile || partnerMobile,
+          createdAt: serverTimestamp()       // [CREATED AT]
+        });
         
         localStorage.setItem('bb_partner_active', 'true');
         
