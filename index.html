@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script>
+      // Global process shim for client-side environment variables and legacy module support
+      window.process = window.process || { env: {} };
+      
       tailwind.config = {
         theme: {
           extend: {
@@ -55,7 +58,6 @@
 </head>
   <body class="bg-white text-charcoal font-sans antialiased">
     <div id="root"></div>
-    <!-- Entry point script added to fix white screen -->
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>

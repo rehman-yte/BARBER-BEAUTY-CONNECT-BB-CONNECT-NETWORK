@@ -4,16 +4,22 @@ import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase
 
 /**
  * BB CONNECT NETWORK - MASTER FIREBASE CONFIGURATION
- * Restored and secured via environment variables for Vercel/Production deployment.
- * Supports both NEXT_PUBLIC and REACT_APP prefixes for wide compatibility.
+ * Updated to strictly follow Vite compatibility requirements.
+ * Uses import.meta.env for Vercel/Production environment variable injection.
  */
+
+// Ensure window.process exists for legacy module compatibility
+if (typeof window !== 'undefined' && !(window as any).process) {
+  (window as any).process = { env: {} };
+}
+
 export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.REACT_APP_FIREBASE_API_KEY || process.env.API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || process.env.REACT_APP_FIREBASE_APP_ID
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || (window as any).process?.env?.API_KEY || '',
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || ''
 };
 
 const app = initializeApp(firebaseConfig);
