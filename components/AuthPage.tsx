@@ -28,7 +28,7 @@ const AuthPage: React.FC = () => {
   useEffect(() => {
     if (user && !loading) {
       console.log("Customer session active:", user.uid);
-      navigate('/customer-dashboard', { replace: true });
+      navigate('/explore', { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -64,7 +64,8 @@ const AuthPage: React.FC = () => {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       if (result.user && db) {
-        const userRef = doc(db, 'customers_roadmap', result.user.uid);
+        // Point to 'users' collection and auto-assign customer role
+        const userRef = doc(db, 'users', result.user.uid);
         const docSnap = await getDoc(userRef);
         if (!docSnap.exists()) {
           await setDoc(userRef, {

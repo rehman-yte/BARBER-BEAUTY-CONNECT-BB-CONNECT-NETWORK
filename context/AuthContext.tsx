@@ -43,12 +43,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const firebaseUser = auth.currentUser;
     if (firebaseUser && db) {
       try {
-        const custDoc = await getDoc(doc(db, 'customers_roadmap', firebaseUser.uid));
-        if (custDoc.exists()) {
-          setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...custDoc.data() } as AppUser);
+        // Updated to use the 'users' collection as per security rule requirements
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists()) {
+          setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...userDoc.data() } as AppUser);
         } else {
-          // If Firestore record doesn't exist but Firebase user does, it's a legacy or sync issue
-          setUser(null);
+          // Auto-provision user record if auth exists but firestore record is missing
+          const userData = {
+            name: firebaseUser.displayName || 'Network Member',
+            role: 'customer' as const,
+            status: 'active' as const,
+            createdAt: serverTimestamp()
+          };
+          await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+          setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...userData } as AppUser);
         }
       } catch (err) {
         console.error("Auth lookup error:", err);
@@ -82,7 +90,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: 'active' as const,
       createdAt: serverTimestamp()
     };
-    await setDoc(doc(db, 'customers_roadmap', res.user.uid), userData);
+    // Always assign 'customer' role automatically
+    await setDoc(doc(db, 'users', res.user.uid), userData);
     setUser({ uid: res.user.uid, email: res.user.email, ...userData } as AppUser);
   };
 
