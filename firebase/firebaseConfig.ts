@@ -1,21 +1,19 @@
-
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 /**
- * MASTER FIREBASE CONFIGURATION
- * Restored valid API Key from environment to resolve "400 INVALID_ARGUMENT" errors.
- * Analytics is disabled to prevent unnecessary Installations API calls that may fail.
+ * BB CONNECT NETWORK - MASTER FIREBASE CONFIGURATION
+ * Restored and secured via environment variables for Vercel/Production deployment.
+ * Supports both NEXT_PUBLIC and REACT_APP prefixes for wide compatibility.
  */
-const firebaseConfig = {
-  apiKey: process.env.API_KEY,
-  authDomain: "bb-connect-network.firebaseapp.com",
-  databaseURL: "https://bb-connect-network-default-rtdb.firebaseio.com",
-  projectId: "bb-connect-network",
-  storageBucket: "bb-connect-network.firebasestorage.app",
-  messagingSenderId: "117108477417",
-  appId: "1:117108477417:web:7f935176cc16abf1984f78"
+export const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.REACT_APP_FIREBASE_API_KEY || process.env.API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || process.env.REACT_APP_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
