@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +27,7 @@ const AuthPage: React.FC = () => {
   useEffect(() => {
     if (user && !loading) {
       console.log("Customer session active:", user.uid);
-      navigate('/explore', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -67,14 +66,27 @@ const AuthPage: React.FC = () => {
         // Point to 'users' collection and auto-assign customer role
         const userRef = doc(db, 'users', result.user.uid);
         const docSnap = await getDoc(userRef);
+        
+        // Save or Update User Data with Google Info
+        const userData = {
+          name: result.user.displayName || 'Network Member',
+          photoURL: result.user.photoURL || null,
+          role: 'customer',
+          status: 'active',
+          updatedAt: serverTimestamp()
+        };
+
         if (!docSnap.exists()) {
           await setDoc(userRef, {
-            name: result.user.displayName || 'Network Member',
-            role: 'customer',
-            status: 'active',
+            ...userData,
             createdAt: serverTimestamp()
           });
+        } else {
+          // Update existing to ensure name/photo are fresh
+          await setDoc(userRef, userData, { merge: true });
         }
+        
+        navigate('/dashboard', { replace: true });
       }
     } catch (err: any) { 
       const errMsg = err.code ? `[${err.code}] ${err.message}` : err.message;

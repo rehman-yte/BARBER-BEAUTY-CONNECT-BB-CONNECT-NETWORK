@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -39,7 +38,7 @@ const AppRoutes: React.FC = () => {
       {/* Customer Routes (LOCKED) */}
       <Route path="/explore" element={<ProtectedRoute><ExplorePage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute><ShopDetail /></ProtectedRoute>} />
-      <Route path="/customer-dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
       
       {/* Fallbacks */}
       <Route path="*" element={<Navigate to="/" replace />} />

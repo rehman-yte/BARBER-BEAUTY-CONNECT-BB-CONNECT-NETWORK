@@ -1,9 +1,8 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../firebase/firebaseConfig';
+import { db, auth as firebaseAuth } from '../firebase/firebaseConfig';
 import { 
   collection, 
   query, 
@@ -30,6 +29,11 @@ const Navbar: React.FC = () => {
   const notificationRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevCount = useRef(0);
+
+  // Sync with Auth directly for display name and photo
+  const currentUser = firebaseAuth?.currentUser;
+  const displayName = currentUser?.displayName || user?.name || 'Network Member';
+  const photoURL = currentUser?.photoURL || (user as any)?.photoURL;
 
   useEffect(() => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -153,8 +157,8 @@ const Navbar: React.FC = () => {
         </Link>
         {isLoggedIn && (
           <Link 
-            to="/customer-dashboard" 
-            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+            to="/dashboard" 
+            className={`text-[10px] font-bold uppercase tracking-widest transition-all ${location.pathname === '/dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
           >
             Dashboard
           </Link>
@@ -233,12 +237,16 @@ const Navbar: React.FC = () => {
                 className="flex items-center gap-3 group active:scale-95 transition-all"
               >
                 <div className="hidden sm:flex flex-col items-end leading-none">
-                  <span className="text-[11px] font-bold text-black group-hover:text-bbBlue transition-colors">{user?.name}</span>
+                  <span className="text-[11px] font-bold text-black group-hover:text-bbBlue transition-colors">{displayName}</span>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center shadow-sm overflow-hidden group-hover:border-bbBlue transition-all">
-                   <svg className="w-5 h-5 text-gray-300 group-hover:text-bbBlue transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                  </svg>
+                   {photoURL ? (
+                     <img src={photoURL} className="w-full h-full object-cover" alt="Profile" />
+                   ) : (
+                     <svg className="w-5 h-5 text-gray-300 group-hover:text-bbBlue transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                   )}
                 </div>
               </button>
 
@@ -255,7 +263,7 @@ const Navbar: React.FC = () => {
                        <p className="text-[10px] font-bold text-black truncate">{user?.email}</p>
                     </div>
                     <Link 
-                      to="/customer-dashboard" 
+                      to="/dashboard" 
                       onClick={() => setShowDropdown(false)}
                       className="block px-5 py-3.5 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
                     >

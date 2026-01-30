@@ -61,7 +61,10 @@ const CustomerDashboard: React.FC = () => {
     failed: bookings.filter(b => b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned').length,
   };
 
+  // Sync with actual Google Auth details
   const currentUser = auth.currentUser;
+  const displayName = currentUser?.displayName || user?.name || 'Network Member';
+  const photoURL = currentUser?.photoURL || (user as any)?.photoURL;
 
   return (
     <div className="pt-32 pb-20 px-6 md:px-12 bg-white min-h-screen">
@@ -70,11 +73,11 @@ const CustomerDashboard: React.FC = () => {
         <header className="mb-16 flex flex-col md:flex-row items-center gap-10 bg-gray-50/50 p-10 rounded-[3rem] border border-gray-100 shadow-sm">
            <div className="relative">
              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white">
-               {currentUser?.photoURL ? (
-                 <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+               {photoURL ? (
+                 <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
                ) : (
                  <div className="w-full h-full bg-bbBlue flex items-center justify-center text-white text-4xl font-serif font-bold">
-                   {user?.name?.[0] || 'U'}
+                   {displayName?.[0] || 'U'}
                  </div>
                )}
              </div>
@@ -84,7 +87,7 @@ const CustomerDashboard: React.FC = () => {
            </div>
            
            <div className="text-center md:text-left flex-grow">
-              <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal mb-3 tracking-tight">{user?.name}</h1>
+              <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal mb-3 tracking-tight">Welcome, {displayName}</h1>
               <div className="flex flex-col md:flex-row md:items-center gap-4 mt-2">
                 <span className="text-[10px] font-bold text-bbBlue uppercase tracking-[0.3em] bg-white px-5 py-2 rounded-full border border-bbBlue/20 shadow-sm inline-block">Official Network Member</span>
                 <p className="text-[9px] font-mono font-bold text-gray-400 uppercase tracking-widest">
