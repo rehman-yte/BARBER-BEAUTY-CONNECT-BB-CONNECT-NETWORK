@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "Partner": {
+      "title": "Partner",
+      "description": "A business partner in the BB Connect Network",
+      "type": "object",
+      "properties": {
+        "owner_name": { "type": "string", "description": "Name of the shop owner" },
+        "brand_name": { "type": "string", "description": "Name of the brand/shop" },
+        "mobile_number": { "type": "string", "description": "Primary contact number" },
+        "category": { "type": "string", "description": "Business category (e.g., Barber, Beauty Parlour)" },
+        "worker_quantity": { "type": "integer", "description": "Number of workers in the shop" },
+        "services": { 
+          "type": "array", 
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "price": { "type": "number" }
+            }
+          },
+          "description": "List of services offered" 
+        },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"], "description": "Current onboarding status" },
+        "upi_id": { "type": "string", "description": "UPI ID for settlements" },
+        "onboarded_at": { "type": "string", "format": "date-time", "description": "Timestamp of onboarding" },
+        "lat": { "type": "number", "description": "Latitude of the shop location" },
+        "lng": { "type": "number", "description": "Longitude of the shop location" },
+        "manual_address": { "type": "string", "description": "Manual landmark or address description" },
+        "shopStatus": { "type": "string", "enum": ["open", "closed"], "description": "Current operational status of the shop" }
+      },
+      "required": ["owner_name", "brand_name", "mobile_number", "category", "worker_quantity", "status"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A service booking in the network",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerMobile": { "type": "string" },
+        "partnerId": { "type": "string", "description": "UID of the partner/shop" },
+        "shopId": { "type": "string" },
+        "shopName": { "type": "string" },
+        "service": { "type": "string", "description": "Name of the service booked" },
+        "serviceName": { "type": "string" },
+        "price": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isFrozen": { "type": "boolean" }
+      },
+      "required": ["customerId", "partnerId", "shopId", "service", "price", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A global broadcast notification",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "target": { "type": "string", "enum": ["all", "customers", "partners"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["message", "target", "timestamp", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A premium grooming or beauty product",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "discount": { "type": "number" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "description": { "type": "string" },
+        "features": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "price", "category", "image"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A product order in the network",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "shippingAddress": { "type": "object" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["customerId", "items", "totalAmount", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/partners/{partnerId}": {
+      "schema": "Partner",
+      "description": "Collection of business partners"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Collection of service bookings"
+    },
+    "/settings/{settingId}": {
+      "schema": "object",
+      "description": "Global application settings"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Collection of global broadcast notifications"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of premium products"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of product orders"
+    }
+  }
+}
