@@ -35,11 +35,23 @@ const PartnerRegistration: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'partner')) {
-      console.warn("Unauthorized access to Onboarding. Redirecting...");
-      navigate('/partner-auth');
-    }
-  }, [user, loading, navigate]);
+    const runGuard = async () => {
+      if (!loading && (!user || user.role !== 'partner')) {
+        console.warn("Unauthorized access to Onboarding. Redirecting...");
+        navigate('/partner-auth');
+        return;
+      }
+
+      if (user?.role === 'partner') {
+        const exists = await checkExistingUser(user.email?.split('@')[0] || sessionMobile);
+        if (exists) {
+          console.log("Partner already has an active or pending registry. Moving to Dashboard.");
+          navigate('/partner-dashboard', { replace: true });
+        }
+      }
+    };
+    runGuard();
+  }, [user, loading, navigate, sessionMobile]);
 
   const checkExistingUser = async (mobile: string) => {
     try {
@@ -149,7 +161,7 @@ const PartnerRegistration: React.FC = () => {
         console.error("Geolocation Error:", error);
         let msg = "Unable to fetch location.";
         if (error.code === error.PERMISSION_DENIED) {
-          msg = "Location access denied. Please enable it in your browser settings.";
+          msg = "Location is mandatory for assigning experts and listing your shop. Please enable it in your browser settings.";
         }
         alert(msg);
       }
@@ -246,8 +258,8 @@ const PartnerRegistration: React.FC = () => {
       return;
     }
 
-    if (!formData.lat && !formData.manualAddress.trim()) {
-      alert("Please provide either GPS location or a manual address.");
+    if (!formData.lat) {
+      alert("Location is mandatory for assigning experts and listing your shop. Please use the 'Get Current Location' button.");
       return;
     }
 
@@ -457,13 +469,13 @@ const PartnerRegistration: React.FC = () => {
                  </div>
               </div>
               <h2 className="text-[2.5rem] font-serif font-bold text-charcoal mb-[1rem] uppercase tracking-tight">
-                {generatedToken ? 'Pending Admin Approval' : 'Syncing Registry'}
+                {generatedToken ? 'Registration Successful' : 'Syncing Registry'}
               </h2>
               {generatedToken ? (
                 <div className="space-y-[1.5rem]">
-                  <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.5em]">Request Submitted Successfully</p>
+                  <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.5em]">Admission Request Submitted</p>
                   <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest leading-relaxed max-w-[20rem] mx-auto">
-                    Your registration request is pending admin approval. You are being redirected to your dashboard.
+                    Your details have been committed. Your request is now pending admin approval. You will be redirected shortly.
                   </p>
                 </div>
               ) : (

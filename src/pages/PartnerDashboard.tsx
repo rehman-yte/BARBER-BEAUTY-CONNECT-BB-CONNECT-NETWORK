@@ -64,7 +64,7 @@ const PartnerDashboard: React.FC = () => {
 
     const fetchData = async () => {
       const allShops = await getShops();
-      const myShop = allShops.find((s: any) => s.id === user.uid || s.mobile === user.email);
+      const myShop = allShops.find((s: any) => s.id === user.uid || s.mobile === user.email || s.mobile === user.email?.split('@')[0]);
       
       if (myShop) {
         setProfileData(myShop);
@@ -108,6 +108,9 @@ const PartnerDashboard: React.FC = () => {
         PersistenceService.save('partner_wait_time', wt);
         PersistenceService.save('partner_financial_summary', fs);
         PersistenceService.save('partner_growth', gp);
+      } else {
+        console.warn("Registry profile missing for current partner. Redirecting to Onboarding...");
+        navigate('/onboarding', { replace: true });
       }
     };
 
