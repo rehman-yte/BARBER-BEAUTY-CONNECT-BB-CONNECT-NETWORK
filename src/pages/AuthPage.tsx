@@ -17,7 +17,9 @@ const AuthPage: React.FC = () => {
   useEffect(() => {
     if (user && !loading) {
       if (user.role === 'admin') {
-        navigate('/admin', { replace: true });
+        navigate('/admin-dashboard', { replace: true });
+      } else if (user.role === 'partner') {
+        navigate('/partner-dashboard', { replace: true });
       } else {
         console.log("Customer session active:", user.uid);
         navigate('/dashboard', { replace: true });
@@ -52,8 +54,12 @@ const AuthPage: React.FC = () => {
         errMsg = 'The password is too weak. Please use at least 6 characters.';
       } else if (err.code === 'auth/invalid-email') {
         errMsg = 'The email address is badly formatted.';
-      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        errMsg = 'Invalid email or password. Please try again.';
+      } else if (err.code === 'auth/user-not-found') {
+        errMsg = 'User not found. Would you like to create an account?';
+      } else if (err.code === 'auth/wrong-password') {
+        errMsg = 'Incorrect password. Please try again or reset it.';
+      } else if (err.code === 'auth/invalid-credential') {
+        errMsg = 'Invalid credentials. If you are a new user, please click "Create an account" below.';
       }
       
       console.error("AUTH_FAILURE:", errMsg);

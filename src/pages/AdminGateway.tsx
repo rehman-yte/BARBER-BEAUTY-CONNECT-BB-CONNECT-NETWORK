@@ -28,37 +28,11 @@ const AdminGateway: React.FC = () => {
     }
 
     try {
-      // 1. Strict Credential Verification (Hardcoded Bypass)
-      const isAdminEmail = email === 'haidartheworldking@gmail.com';
-      const isAdminPass = password === 'TheKing1278@';
-
-      if (!isAdminEmail || !isAdminPass) {
-        throw new Error('UNAUTHORIZED: Access Denied. These are not administrative credentials.');
-      }
-      
-      // 2. Perform Firebase Auth
+      // 1. Perform Firebase Auth
       console.log("Initiating Administrative Handshake...");
       await signIn(email, password);
-
-      // 3. Robust Redirection Logic
-      // We wait for the AuthContext to propagate the role change
-      let attempts = 0;
-      const checkInterval = setInterval(() => {
-        attempts++;
-        const currentUser = auth.currentUser;
-        
-        if (currentUser && currentUser.email === 'haidartheworldking@gmail.com') {
-          clearInterval(checkInterval);
-          console.log("Authentication Confirmed. Redirecting to Infrastructure Dashboard.");
-          navigate('/admin', { replace: true });
-        } else if (attempts > 10) {
-          clearInterval(checkInterval);
-          setError('Handshake Timeout: Infrastructure failed to verify identity in time. Please refresh and try again.');
-          setIsSubmitting(false);
-          signOut(auth);
-        }
-      }, 500);
-
+      console.log("Authentication Confirmed. Redirecting to Infrastructure Dashboard.");
+      navigate('/admin-dashboard', { replace: true });
     } catch (err: any) {
       console.error("ADMIN_GATEWAY_FAILURE:", err.message);
       setError(err.message);
