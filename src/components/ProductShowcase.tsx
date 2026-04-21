@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingCart } from 'lucide-react';
+import { X, ShoppingCart, Check } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 
 interface Product {
   id: string;
@@ -66,9 +67,11 @@ const GENUINE_PRODUCTS: Product[] = [
 
 const ProductShowcase: React.FC = () => {
   const navigate = useNavigate();
+  const { addToCart } = useCart();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>(GENUINE_PRODUCTS);
   const [loading, setLoading] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
 
   // FUTURE FIRESTORE INTEGRATION
   /*
@@ -92,7 +95,18 @@ const ProductShowcase: React.FC = () => {
   }, []);
   */
 
-  const closeModal = () => setSelectedProduct(null);
+  const closeModal = () => {
+    setSelectedProduct(null);
+    setIsAdded(false);
+  };
+
+  const handleAddToCart = () => {
+    if (selectedProduct) {
+      addToCart(selectedProduct);
+      setIsAdded(true);
+      setTimeout(() => setIsAdded(false), 2000);
+    }
+  };
 
   return (
     <section className="py-12 bg-white w-full relative">
@@ -218,9 +232,23 @@ const ProductShowcase: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 mt-auto">
-                  <button className="flex-1 py-4 bg-bbBlue text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] shadow-xl shadow-bbBlue/20 hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
-                    <ShoppingCart size={18} />
-                    Add to Cart
+                  <button 
+                    onClick={handleAddToCart}
+                    className={`flex-1 py-4 rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${
+                      isAdded ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-bbBlue text-white shadow-bbBlue/20 hover:bg-blue-600'
+                    }`}
+                  >
+                    {isAdded ? (
+                      <>
+                        <Check size={18} />
+                        Added to Basket
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart size={18} />
+                        Add to Cart
+                      </>
+                    )}
                   </button>
                   <button 
                     onClick={closeModal}

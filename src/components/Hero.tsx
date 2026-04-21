@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import CustomerAuthModal from './CustomerAuthModal';
 
 const SLIDE_IMAGES = [
   "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=1000",
@@ -16,6 +17,8 @@ const Hero: React.FC = () => {
   const isLoggedIn = !!user;
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -28,7 +31,8 @@ const Hero: React.FC = () => {
     if (isLoggedIn) {
       navigate(path);
     } else {
-      navigate('/auth');
+      setPendingPath(path);
+      setShowAuthModal(true);
     }
   };
 
@@ -90,6 +94,14 @@ const Hero: React.FC = () => {
           <div className="absolute w-[18rem] h-[18rem] sm:w-[22rem] sm:h-[22rem] md:w-[24rem] md:h-[24rem] lg:w-[32rem] lg:h-[32rem] rounded-full border border-gray-50"></div>
         </motion.div>
       </div>
+
+      <CustomerAuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          if (pendingPath) navigate(pendingPath);
+        }}
+      />
     </section>
   );
 };

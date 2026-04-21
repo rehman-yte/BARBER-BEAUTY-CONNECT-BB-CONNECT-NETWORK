@@ -5,7 +5,8 @@ import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getBookings, getShopById, updateShop, subscribeToNotifications } from '../services/logic_engine';
 import { PersistenceService } from '../services/PersistenceService';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, User } from 'lucide-react';
+import CustomerAuthModal from './CustomerAuthModal';
 
 const Navbar: React.FC = () => {
   const { user, logout, updateUser } = useAuth();
@@ -17,6 +18,7 @@ const Navbar: React.FC = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [settingsData, setSettingsData] = useState({ upiId: '', isActive: true });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -261,9 +263,12 @@ const Navbar: React.FC = () => {
 
         <div className="flex-1 flex justify-end items-center gap-[0.75rem] md:gap-[1.5rem]">
           {!isLoggedIn ? (
-            <Link to="/auth" className="text-[0.625rem] font-bold text-black uppercase tracking-widest hover:text-bbBlue transition-all border-b border-transparent hover:border-bbBlue pb-[0.125rem] whitespace-nowrap">
+            <button 
+              onClick={() => setShowAuthModal(true)}
+              className="text-[0.625rem] font-bold text-black uppercase tracking-widest hover:text-bbBlue transition-all border-b border-transparent hover:border-bbBlue pb-[0.125rem] whitespace-nowrap"
+            >
               Sign In
-            </Link>
+            </button>
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
             {(!isPartner || location.pathname === '/partner-dashboard') && (
@@ -582,6 +587,14 @@ const Navbar: React.FC = () => {
         onChange={handleFileChange} 
         accept="image/*" 
         className="hidden" 
+      />
+
+      <CustomerAuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        onSuccess={() => {
+          if (location.pathname === '/auth') navigate('/dashboard');
+        }}
       />
     </nav>
   );

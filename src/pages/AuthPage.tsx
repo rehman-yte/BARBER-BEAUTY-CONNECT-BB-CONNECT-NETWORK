@@ -47,7 +47,8 @@ const AuthPage: React.FC = () => {
         await signUp(email, password, { 
           name: name || 'Valued Customer', 
           mobile,
-          role: 'customer' 
+          role: 'customer',
+          user_type: 'customer'
         });
       }
     } catch (err: any) {

@@ -173,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData = {
           name: firebaseUser.displayName || 'Google User',
           role: 'customer',
+          user_type: 'customer',
           status: 'active',
           createdAt: new Date().toISOString()
         };
