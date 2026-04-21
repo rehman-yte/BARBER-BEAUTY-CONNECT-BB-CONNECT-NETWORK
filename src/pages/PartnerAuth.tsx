@@ -2,36 +2,44 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getShops } from '../services/logic_engine';
+import { useAuth } from '../context/AuthContext';
 
 const PartnerAuth: React.FC = () => {
   const [mobile, setMobile] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [redirecting, setRedirecting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { signUp } = useAuth();
 
   const handlePartnerAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
     
-    // RELAXED FOR PREVIEW BYPASS
-    const allShops = await getShops();
-    const existingShop = allShops.find((s: any) => s.mobile === mobile);
-
-    if (existingShop) {
-      setError('Account exists. Please Sign-In.');
-      setRedirecting(true);
-      setTimeout(() => {
-        navigate('/partner-signin');
-      }, 2000);
-      return;
+    try {
+      console.log("Partner Auth Initiated: Establishing credentials...");
+      
+      const email = `${mobile}@bb.net`;
+      await signUp(email, password, { name: name || 'Elite Partner', role: 'partner' });
+      
+      console.log("Auth Success: Moving to Deep Onboarding Form...");
+      localStorage.setItem('bb_partner_mobile', mobile);
+      localStorage.setItem('bb_partner_name', name || 'Elite Partner');
+      localStorage.setItem('bb_partner_password', password);
+      
+      navigate('/onboarding');
+    } catch (err: any) {
+      console.error("Partner Signup Failure:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Account already exists with this mobile number. Please Sign-In.');
+      } else {
+        setError(err.message || 'Failed to initialize registration. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-
-    localStorage.setItem('bb_partner_mobile', mobile);
-    localStorage.setItem('bb_partner_name', name || 'Elite Partner');
-    localStorage.setItem('bb_partner_password', password);
-    navigate('/partner-registration');
   };
 
   return (
@@ -70,8 +78,8 @@ const PartnerAuth: React.FC = () => {
             </div>
           )}
 
-          <button type="submit" disabled={redirecting} className="w-full py-[1.25rem] bg-bbBlue text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] shadow-xl shadow-bbBlue/20 hover:bg-bbBlue-deep transition-all active:scale-[0.98] disabled:opacity-50">
-            {redirecting ? 'Redirecting...' : 'Start Registration'}
+          <button type="submit" disabled={isSubmitting} className="w-full py-[1.25rem] bg-bbBlue text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] shadow-xl shadow-bbBlue/20 hover:bg-bbBlue-deep transition-all active:scale-[0.98] disabled:opacity-50">
+            {isSubmitting ? 'Verifying...' : 'Start Registration'}
           </button>
         </form>
 

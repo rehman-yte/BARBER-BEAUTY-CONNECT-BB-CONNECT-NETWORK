@@ -7,17 +7,19 @@ import { auth } from '../lib/firebase';
 
 const PartnerRegistration: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { user, loading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedToken, setGeneratedToken] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
-  
-  const partnerMobile = localStorage.getItem('bb_partner_mobile') || '';
-  const partnerName = localStorage.getItem('bb_partner_name') || '';
-  const partnerPassword = localStorage.getItem('bb_partner_password') || '';
+  const [error, setError] = useState('');
+
+  // Initial Data from Session/Auth
+  const sessionName = localStorage.getItem('bb_partner_name') || '';
+  const sessionMobile = localStorage.getItem('bb_partner_mobile') || '';
+  const sessionPassword = localStorage.getItem('bb_partner_password') || '';
 
   const [formData, setFormData] = useState({
-    ownerName: partnerName,
+    ownerName: user?.name || sessionName,
     ownerPic: null as File | string | null,
     shopName: '',
     category: 'Barber' as 'Barber' | 'Beauty Parlour',
@@ -25,12 +27,19 @@ const PartnerRegistration: React.FC = () => {
     workerQuantity: 1,
     workerImages: Array(1).fill(null) as (File | null)[],
     upiId: '',
-    mobile: partnerMobile,
+    mobile: user?.email?.split('@')[0] || sessionMobile,
     govId: null as File | string | null,
     lat: null as number | null,
     lng: null as number | null,
     manualAddress: ''
   });
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'partner')) {
+      console.warn("Unauthorized access to Onboarding. Redirecting...");
+      navigate('/partner-auth');
+    }
+  }, [user, loading, navigate]);
 
   const checkExistingUser = async (mobile: string) => {
     try {
@@ -44,10 +53,7 @@ const PartnerRegistration: React.FC = () => {
 
   useEffect(() => { 
     window.scrollTo(0, 0);
-    if (!partnerMobile) {
-      navigate('/auth');
-    }
-  }, [partnerMobile, navigate]);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -151,7 +157,7 @@ const PartnerRegistration: React.FC = () => {
   };
 
   const performRegistrySync = async (retryCount = 0): Promise<void> => {
-    const documentId = partnerMobile; 
+    const documentId = formData.mobile; 
 
     if (!documentId) throw new Error("IDENTIFIER_MISSING: Partner mobile not found in session.");
 
@@ -174,33 +180,31 @@ const PartnerRegistration: React.FC = () => {
         { name: 'Threading', price: 50 }
       ];
 
+      // 1. Skip Signup - Already handled in Step 1
+      
+      // 2. Add Shop to Firestore
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("AUTH_SESSION_FAILURE: User not found after sign-up.");
+      
       const registryPayload = {
-        id: documentId,
+        id: formData.mobile,
         brandName: formData.shopName.trim(),
         ownerName: formData.ownerName.trim(),
         category: formData.category,
         workerQuantity: formData.workerQuantity,
-        mobile: partnerMobile,
+        mobile: formData.mobile,
         services: defaultServices,
-        password: partnerPassword,
+        password: sessionPassword,
         lat: formData.lat,
         lng: formData.lng,
         manualAddress: formData.manualAddress.trim(),
-        uid: '',
+        uid: currentUser.uid,
+        status: 'pending',
         ownerPic: formData.ownerPic ? (formData.ownerPic instanceof File ? `OWNER_PIC: ${formData.ownerPic.name}` : 'OWNER_PIC_ATTACHED') : null,
         shopImages: formData.shopImages.map((img, idx) => img instanceof File ? `SHOP_IMAGE_${idx + 1}: ${img.name}` : null).filter(Boolean),
         workerImages: formData.workerImages.map((img, idx) => img instanceof File ? `WORKER_IMAGE_${idx + 1}: ${img.name}` : null).filter(Boolean),
         govId: formData.govId ? (formData.govId instanceof File ? `GOV_ID: ${formData.govId.name}` : 'GOV_ID_ATTACHED') : null
       };
-
-      // 1. Create Firebase Auth User
-      const email = `${partnerMobile}@bb.net`;
-      await signUp(email, partnerPassword, { name: formData.ownerName.trim(), role: 'partner' });
-
-      // 2. Add Shop to Firestore
-      const currentUser = auth.currentUser;
-      if (!currentUser) throw new Error("AUTH_SESSION_FAILURE: User not found after sign-up.");
-      registryPayload.uid = currentUser.uid;
 
       await addShop(registryPayload);
       
@@ -250,7 +254,7 @@ const PartnerRegistration: React.FC = () => {
     setIsProcessing(true);
     
     try {
-      const exists = await checkExistingUser(partnerMobile);
+      const exists = await checkExistingUser(formData.mobile);
       if (exists) {
         setIsProcessing(false);
         alert("A shop with this mobile number already exists.");
@@ -276,8 +280,8 @@ const PartnerRegistration: React.FC = () => {
               className="w-full max-w-[60rem] bg-white border border-gray-100 p-[2.5rem] md:p-[4rem] rounded-[4rem] shadow-sm mb-[2.5rem]"
             >
               <div className="mb-[4rem] text-center md:text-left">
-                <h1 className="text-[2.5rem] md:text-[3.125rem] font-serif font-bold text-charcoal mb-[1rem] uppercase tracking-tight">Partner Registry</h1>
-                <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.4em]">Establish Professional Identity</p>
+                <h1 className="text-[2.5rem] md:text-[3.125rem] font-serif font-bold text-charcoal mb-[1rem] uppercase tracking-tight">Onboarding Mode</h1>
+                <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.4em]">Finalize Your Professional Hub</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-[5rem]">
@@ -353,6 +357,23 @@ const PartnerRegistration: React.FC = () => {
                             </div>
                           ) : (
                             <svg className="w-6 h-6 text-gray-200 group-hover:text-bbBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4"/></svg>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-[1.5rem]">
+                    <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Shop Showcase (6 Images Preferred)</label>
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                      {formData.shopImages.map((img, idx) => (
+                        <label key={idx} className="aspect-square border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all group">
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'shopImages', idx)} />
+                          {img ? (
+                            <div className="w-full h-full rounded-2xl bg-green-50 flex items-center justify-center text-green-500 overflow-hidden">
+                              <img src={img instanceof File ? URL.createObjectURL(img) : img as string} className="w-full h-full object-cover" alt={`Shop ${idx + 1}`} referrerPolicy="no-referrer" />
+                            </div>
+                          ) : (
+                            <svg className="w-6 h-6 text-gray-200 group-hover:text-bbBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                           )}
                         </label>
                       ))}
