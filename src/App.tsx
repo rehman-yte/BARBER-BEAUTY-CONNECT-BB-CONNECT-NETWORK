@@ -81,9 +81,21 @@ const AppRoutes: React.FC = () => {
       <Route path="/dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       
       {/* Partner Routes */}
-      <Route path="/partner-auth" element={user ? <Navigate to={user.role === 'partner' ? "/partner-dashboard" : "/dashboard"} replace /> : <PartnerAuth />} />
-      <Route path="/partner-signin" element={user ? <Navigate to={user.role === 'partner' ? "/partner-dashboard" : "/dashboard"} replace /> : <PartnerSignIn />} />
-      <Route path="/partner-registration" element={user ? <Navigate to={user.role === 'partner' ? "/partner-dashboard" : "/dashboard"} replace /> : <PartnerRegistration />} />
+      <Route path="/partner-auth" element={user ? <Navigate to={
+        user.role === 'admin' ? "/admin-dashboard" :
+        user.role === 'partner' ? "/partner-dashboard" : 
+        "/dashboard"
+      } replace /> : <PartnerAuth />} />
+      <Route path="/partner-signin" element={user ? <Navigate to={
+        user.role === 'admin' ? "/admin-dashboard" :
+        user.role === 'partner' ? "/partner-dashboard" : 
+        "/dashboard"
+      } replace /> : <PartnerSignIn />} />
+      <Route path="/partner-registration" element={user ? <Navigate to={
+        user.role === 'admin' ? "/admin-dashboard" :
+        user.role === 'partner' ? "/partner-dashboard" : 
+        "/dashboard"
+      } replace /> : <PartnerRegistration />} />
       <Route path="/partner-dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       
       {/* Admin Gateway */}

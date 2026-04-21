@@ -14,8 +14,15 @@ const PartnerSignIn: React.FC = () => {
   const { signIn, user, loading } = useAuth();
 
   useEffect(() => {
-    if (user && !loading && user.role === 'partner') {
-      navigate('/partner-dashboard', { replace: true });
+    if (user && !loading) {
+      if (user.role === 'partner') {
+        navigate('/partner-dashboard', { replace: true });
+      } else if (user.role === 'customer') {
+        setError('Customer account detected. Please use the primary Sign-In link for bookings.');
+        setTimeout(() => navigate('/dashboard', { replace: true }), 3000);
+      } else if (user.role === 'admin') {
+        navigate('/admin-dashboard', { replace: true });
+      }
     }
   }, [user, loading, navigate]);
 
@@ -28,7 +35,15 @@ const PartnerSignIn: React.FC = () => {
       const email = `${mobile}@bb.net`;
       await signIn(email, password);
     } catch (err: any) {
-      setError(err.message);
+      let errMsg = err.message;
+      if (err.code === 'auth/user-not-found') {
+        errMsg = 'Partner account not found. Are you registered as a Merchant?';
+      } else if (err.code === 'auth/wrong-password') {
+        errMsg = 'Incorrect security token. Please try again.';
+      } else if (err.code === 'auth/invalid-credential') {
+        errMsg = 'Invalid credentials. If you are a customer, please use the Header "Sign In" link.';
+      }
+      setError(errMsg);
     } finally {
       setIsSubmitting(false);
     }

@@ -19,7 +19,11 @@ const AuthPage: React.FC = () => {
       if (user.role === 'admin') {
         navigate('/admin-dashboard', { replace: true });
       } else if (user.role === 'partner') {
-        navigate('/partner-dashboard', { replace: true });
+        // Partners should not use the Customer Portal
+        setError('Partner detected. Please login through the Partner Portal at the bottom of the landing page.');
+        console.warn("Blocked Partner Login on Customer Portal");
+        // Optional: Auto redirect after few seconds
+        setTimeout(() => navigate('/partner-signin', { replace: true }), 3000);
       } else {
         console.log("Customer session active:", user.uid);
         navigate('/dashboard', { replace: true });
@@ -55,11 +59,11 @@ const AuthPage: React.FC = () => {
       } else if (err.code === 'auth/invalid-email') {
         errMsg = 'The email address is badly formatted.';
       } else if (err.code === 'auth/user-not-found') {
-        errMsg = 'User not found. Would you like to create an account?';
+        errMsg = 'Customer profile not found. If you are a partner, please use the correct portal.';
       } else if (err.code === 'auth/wrong-password') {
         errMsg = 'Incorrect password. Please try again or reset it.';
       } else if (err.code === 'auth/invalid-credential') {
-        errMsg = 'Invalid credentials. If you are a new user, please click "Create an account" below.';
+        errMsg = 'Invalid credentials. If you are a partner, please use the Partner Link on the Landing Page.';
       }
       
       console.error("AUTH_FAILURE:", errMsg);
