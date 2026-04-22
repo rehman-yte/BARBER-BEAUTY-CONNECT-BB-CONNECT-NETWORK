@@ -64,17 +64,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       if (firebaseUser) {
         try {
-          console.log(`[AUTH AUDIT] Resolving identity for: ${firebaseUser.uid} (${firebaseUser.email})`);
+          console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid}`);
           
-          // 1. MASTER CHECK: partners
+          // STEP A: MASTER CHECK - PARTNERS COLLECTION ONLY
           const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
-            console.log("[AUTH AUDIT] Identity Confirmed: PARTNER");
+            console.log("[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER");
+            
+            // Step B: Check Status for Protocol Redirection
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: partnerData.brandName || partnerData.brand_name || partnerData.ownerName || 'Partner',
+              name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
               status: partnerData.status !== undefined ? partnerData.status : null,
@@ -84,15 +86,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 2. MASTER CHECK: customers
+          // STEP C: ONLY IF NOT FOUND IN PARTNERS, CHECK CUSTOMERS
           const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
           if (customerDoc.exists()) {
             const customerData = customerDoc.data();
-            console.log("[AUTH AUDIT] Identity Confirmed: CUSTOMER");
+            console.log("[AUTH ARCHITECT] Gate C: IDENTITY CONFIRMED -> CUSTOMER");
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: customerData.name || 'Valued Customer',
+              name: customerData.name || 'Customer',
               role: 'customer',
               user_type: 'customer',
               status: 'active',
@@ -102,54 +104,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 3. ADMIN/LEGACY CHECK
+          // ADMIN / LEGACY DISCOVERY (Strict Isolation)
           const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com' || firebaseUser.email === 'rhfarooqui16@gmail.com';
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
             const userData = userDoc.data() as any;
-            const finalRole = isAdmin ? 'admin' : (userData.user_type || userData.role || 'customer');
-            console.log(`[AUTH AUDIT] Legacy Discovery: ${finalRole}`);
+            const role = isAdmin ? 'admin' : (userData.role || userData.user_type || 'customer');
             
+            console.log(`[AUTH ARCHITECT] Discovery Gate: DISCOVERED ROLE -> ${role}`);
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: userData.name || (isAdmin ? 'Master Admin' : 'Network Member'),
-              role: finalRole as any,
-              user_type: finalRole as any,
-              status: userData.status !== undefined ? userData.status : (finalRole === 'partner' ? null : 'active'),
-              photoURL: firebaseUser.photoURL || undefined,
+              name: userData.name || (isAdmin ? 'System Admin' : 'Member'),
+              role: role as any,
+              user_type: role as any,
+              status: userData.status !== undefined ? userData.status : (role === 'partner' ? null : 'active'),
               token: isAdmin ? adminConfig.adminSecret : undefined
             });
           } else {
-             // New User - Check if they intended to be a partner (via local storage or email)
-             const intendedRole = localStorage.getItem('bb_intended_role') || (isAdmin ? 'admin' : 'customer');
-             console.log(`[AUTH AUDIT] New Discovery Intended: ${intendedRole}`);
+             // NEW ADMISSION PROTOCOL
+             const intendedRole = localStorage.getItem('bb_intended_role');
+             console.log(`[AUTH ARCHITECT] New Admission Protocol: INTENTION -> ${intendedRole}`);
              
-             const role = (intendedRole === 'partner') ? 'partner' : (intendedRole === 'admin' ? 'admin' : 'customer');
-             
-             // Initialize intended doc
-             const initData = {
-                name: firebaseUser.displayName || 'Network Member',
-                email: firebaseUser.email,
-                role: role,
-                user_type: role,
-                status: role === 'partner' ? null : 'active',
-                createdAt: new Date().toISOString()
-             };
-             
-             await setDoc(doc(db, role === 'partner' ? 'partners' : (role === 'admin' ? 'users' : 'customers'), firebaseUser.uid), initData);
-             await setDoc(doc(db, 'users', firebaseUser.uid), initData);
-
-             setUser({
-               uid: firebaseUser.uid,
-               email: firebaseUser.email,
-               name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
-               role: role as any,
-               user_type: role as any,
-               status: role === 'partner' ? null : 'active',
-               token: isAdmin ? adminConfig.adminSecret : undefined
-             });
+             if (intendedRole === 'partner' || isAdmin) {
+                const role = isAdmin ? 'admin' : 'partner';
+                const status = role === 'partner' ? null : 'active';
+                
+                const initData = {
+                  email: firebaseUser.email,
+                  name: isAdmin ? 'System Admin' : 'New Partner',
+                  role: role,
+                  user_type: role,
+                  status: status,
+                  createdAt: new Date().toISOString()
+                };
+                
+                await setDoc(doc(db, role === 'partner' ? 'partners' : 'users', firebaseUser.uid), initData);
+                setUser({
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  name: initData.name,
+                  role: role as any,
+                  user_type: role as any,
+                  status: status,
+                  token: isAdmin ? adminConfig.adminSecret : undefined
+                });
+             } else {
+                // DEFAULT TO CUSTOMER ONLY IF NO OTHER SIGNAL EXISTS
+                const initData = {
+                  email: firebaseUser.email,
+                  name: firebaseUser.displayName || 'Customer',
+                  role: 'customer',
+                  user_type: 'customer',
+                  status: 'active',
+                  createdAt: new Date().toISOString()
+                };
+                await setDoc(doc(db, 'customers', firebaseUser.uid), initData);
+                setUser({
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  name: initData.name,
+                  role: 'customer',
+                  user_type: 'customer',
+                  status: 'active'
+                });
+             }
           }
         } catch (err) {
           console.error("Identity resolution error:", err);
@@ -181,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const role = additionalData.role || 'customer';
       const userData = {
         email: firebaseUser.email,
-        name: additionalData.name || 'Network Member',
+        name: additionalData.name || (role === 'partner' ? 'New Partner' : 'Customer'),
         role: role,
         user_type: role,
         status: additionalData.status !== undefined ? additionalData.status : (role === 'partner' ? null : 'active'),
@@ -253,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!customerSnap.exists()) {
         const userData = {
-          name: firebaseUser.displayName || 'Network Member',
+          name: firebaseUser.displayName || 'Customer',
           email: firebaseUser.email,
           role: 'customer',
           user_type: 'customer',
