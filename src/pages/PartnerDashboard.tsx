@@ -8,6 +8,7 @@ import {
   getBookings, 
   updateBookingStatus, 
   updateShop,
+  getShopById,
   calculateSettlements, 
   getWorkerInsights, 
   calculateWaitTime,
@@ -63,54 +64,61 @@ const PartnerDashboard: React.FC = () => {
     if (!user) return;
 
     const fetchData = async () => {
-      const allShops = await getShops();
-      const myShop = allShops.find((s: any) => s.id === user.uid || s.mobile === user.email || s.mobile === user.email?.split('@')[0]);
-      
-      if (myShop) {
-        setProfileData(myShop);
-        // Cache an optimized version (without large base64 images) to save space
-        const optimizedProfile = StorageManager.optimizeData(myShop);
-        PersistenceService.save('partner_profile', optimizedProfile);
+      if (!user?.uid) return;
 
-        if (!hasInitialFetched) {
-          setServices(myShop.services || []);
-          PersistenceService.save('partner_services', myShop.services || []);
-          setHasInitialFetched(true);
-        }
-
-        const allBookings = await getBookings();
-        const myBookings = allBookings.filter((b: any) => b.shopId === myShop.id);
+      try {
+        // Query the 'partners' collection directly for this specific partner
+        const myShop = await getShopById(user.uid);
         
-        // Heavy Sound Notification logic
-        if (hasInitialFetched && myBookings.length > prevRequestCount.current) {
-          audioRef.current?.play().catch(e => console.log("Audio play blocked by browser policy", e));
+        if (myShop) {
+          setProfileData(myShop);
+          // Cache an optimized version
+          const optimizedProfile = StorageManager.optimizeData(myShop);
+          PersistenceService.save('partner_profile', optimizedProfile);
+
+          if (!hasInitialFetched) {
+            setServices(myShop.services || []);
+            PersistenceService.save('partner_services', myShop.services || []);
+            setHasInitialFetched(true);
+          }
+
+          const allBookings = await getBookings();
+          const myBookings = allBookings.filter((b: any) => b.shopId === myShop.id);
+          
+          // Heavy Sound Notification logic
+          if (hasInitialFetched && myBookings.length > prevRequestCount.current) {
+            audioRef.current?.play().catch(e => console.log("Audio play blocked", e));
+          }
+          prevRequestCount.current = myBookings.length;
+          
+          setRequests(myBookings);
+          PersistenceService.save('partner_requests', myBookings);
+
+          // Fetch Logic Engine Data
+          const s = calculateSettlements(myShop.id, allBookings, myShop.upiId);
+          const wi = getWorkerInsights(myShop.id, allBookings, myShop.workers || []);
+          const wt = calculateWaitTime(myShop.id, allBookings);
+          const fs = getFinancialSummary(myShop.id, allBookings);
+          const gp = getGrowthPercentage(myShop.id, allBookings);
+
+          setSettlements(s);
+          setWorkerInsights(wi);
+          setWaitTime(wt);
+          setFinancialSummary(fs);
+          setGrowthPercentage(gp);
+
+          PersistenceService.save('partner_settlements', s);
+          PersistenceService.save('partner_worker_insights', wi);
+          PersistenceService.save('partner_wait_time', wt);
+          PersistenceService.save('partner_financial_summary', fs);
+          PersistenceService.save('partner_growth', gp);
+        } else {
+          console.warn("Registry profile missing for current partner. Check collection: [partners]");
+          // If a partner document does not exist yet for this UID, they must onboard
+          navigate('/onboarding', { replace: true });
         }
-        prevRequestCount.current = myBookings.length;
-        
-        setRequests(myBookings);
-        PersistenceService.save('partner_requests', myBookings);
-
-        // Fetch Logic Engine Data
-        const s = calculateSettlements(myShop.id, allBookings, myShop.upiId);
-        const wi = getWorkerInsights(myShop.id, allBookings, myShop.workers || []);
-        const wt = calculateWaitTime(myShop.id, allBookings);
-        const fs = getFinancialSummary(myShop.id, allBookings);
-        const gp = getGrowthPercentage(myShop.id, allBookings);
-
-        setSettlements(s);
-        setWorkerInsights(wi);
-        setWaitTime(wt);
-        setFinancialSummary(fs);
-        setGrowthPercentage(gp);
-
-        PersistenceService.save('partner_settlements', s);
-        PersistenceService.save('partner_worker_insights', wi);
-        PersistenceService.save('partner_wait_time', wt);
-        PersistenceService.save('partner_financial_summary', fs);
-        PersistenceService.save('partner_growth', gp);
-      } else {
-        console.warn("Registry profile missing for current partner. Redirecting to Onboarding...");
-        navigate('/onboarding', { replace: true });
+      } catch (err) {
+        console.error("Dashboard Sync Error:", err);
       }
     };
 

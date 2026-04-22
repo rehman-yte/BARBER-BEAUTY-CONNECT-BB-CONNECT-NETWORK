@@ -66,20 +66,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid}`);
           
-          // STEP A: MASTER CHECK - PARTNERS COLLECTION ONLY
+          // STEP A: MASTER CHECK - PARTNERS COLLECTION ONLY (STRONGEST SIGNAL)
           const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
             console.log("[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER");
             
             // Step B: Check Status for Protocol Redirection
+            // If status is missing, we treat as null to force onboarding
+            const partnerStatus = partnerData.status !== undefined ? partnerData.status : null;
+            
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: partnerData.status !== undefined ? partnerData.status : null,
+              status: partnerStatus,
               photoURL: firebaseUser.photoURL || undefined
             });
             setLoading(false);
@@ -104,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // ADMIN / LEGACY DISCOVERY (Strict Isolation)
+          // STEP D: ADMIN / LEGACY DISCOVERY (Strict Isolation)
           const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com' || firebaseUser.email === 'rhfarooqui16@gmail.com';
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
@@ -122,54 +125,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               status: userData.status !== undefined ? userData.status : (role === 'partner' ? null : 'active'),
               token: isAdmin ? adminConfig.adminSecret : undefined
             });
-          } else {
-             // NEW ADMISSION PROTOCOL
-             const intendedRole = localStorage.getItem('bb_intended_role');
-             console.log(`[AUTH ARCHITECT] New Admission Protocol: INTENTION -> ${intendedRole}`);
+            setLoading(false);
+            return;
+          }
+
+          // STEP E: NEW ADMISSION PROTOCOL (Fallback if no doc exists yet)
+          const intendedRole = localStorage.getItem('bb_intended_role');
+          console.log(`[AUTH ARCHITECT] New Admission Protocol: INTENTION -> ${intendedRole}`);
+          
+          if (intendedRole === 'partner' || isAdmin) {
+             const role = isAdmin ? 'admin' : 'partner';
+             const status = role === 'partner' ? null : 'active';
              
-             if (intendedRole === 'partner' || isAdmin) {
-                const role = isAdmin ? 'admin' : 'partner';
-                const status = role === 'partner' ? null : 'active';
-                
-                const initData = {
-                  email: firebaseUser.email,
-                  name: isAdmin ? 'System Admin' : 'New Partner',
-                  role: role,
-                  user_type: role,
-                  status: status,
-                  createdAt: new Date().toISOString()
-                };
-                
-                await setDoc(doc(db, role === 'partner' ? 'partners' : 'users', firebaseUser.uid), initData);
-                setUser({
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  name: initData.name,
-                  role: role as any,
-                  user_type: role as any,
-                  status: status,
-                  token: isAdmin ? adminConfig.adminSecret : undefined
-                });
-             } else {
-                // DEFAULT TO CUSTOMER ONLY IF NO OTHER SIGNAL EXISTS
-                const initData = {
-                  email: firebaseUser.email,
-                  name: firebaseUser.displayName || 'Customer',
-                  role: 'customer',
-                  user_type: 'customer',
-                  status: 'active',
-                  createdAt: new Date().toISOString()
-                };
-                await setDoc(doc(db, 'customers', firebaseUser.uid), initData);
-                setUser({
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  name: initData.name,
-                  role: 'customer',
-                  user_type: 'customer',
-                  status: 'active'
-                });
-             }
+             setUser({
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               name: isAdmin ? 'System Admin' : 'New Partner',
+               role: role as any,
+               user_type: role as any,
+               status: status,
+               token: isAdmin ? adminConfig.adminSecret : undefined
+             });
+          } else {
+             // DEFAULT TO CUSTOMER ONLY AS LAST RESORT
+             setUser({
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               name: firebaseUser.displayName || 'Customer',
+               role: 'customer',
+               user_type: 'customer',
+               status: 'active'
+             });
           }
         } catch (err) {
           console.error("Identity resolution error:", err);
