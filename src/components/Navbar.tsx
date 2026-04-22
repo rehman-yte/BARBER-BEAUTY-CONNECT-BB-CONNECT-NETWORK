@@ -408,13 +408,23 @@ const Navbar: React.FC = () => {
                        )}
                     </div>
                     {user?.role === 'customer' && (
-                      <Link 
-                        to="/customer-dashboard" 
-                        onClick={() => setShowDropdown(false)}
-                        className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
-                      >
-                        My Dashboard
-                      </Link>
+                      <>
+                        <Link 
+                          to="/customer-dashboard" 
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
+                        >
+                          My Dashboard
+                        </Link>
+                        <Link 
+                          to="/my-shopping" 
+                          onClick={() => setShowDropdown(false)}
+                          className="flex items-center gap-2 px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors border-t border-gray-50"
+                        >
+                          <ShoppingBag size={14} />
+                          My Shopping
+                        </Link>
+                      </>
                     )}
                     {isPartner && (
                       <>

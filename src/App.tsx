@@ -19,6 +19,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminGateway from './pages/AdminGateway';
 import ShopPage from './pages/ShopPage';
 import CheckoutPage from './pages/CheckoutPage';
+import MyShopping from './pages/MyShopping';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -89,6 +90,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
+      <Route path="/my-shopping" element={<ProtectedRoute allowedRole="customer"><MyShopping /></ProtectedRoute>} />
       <Route path="/dashboard" element={<Navigate to="/customer-dashboard" replace />} />
       
       {/* Partner Routes */}
