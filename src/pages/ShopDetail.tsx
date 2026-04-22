@@ -197,7 +197,7 @@ const ShopDetail: React.FC = () => {
     }
     
     setShowPayment(false);
-    navigate('/dashboard');
+    navigate('/customer-dashboard');
   };
 
   const handleUPILink = (app: string) => {
@@ -249,7 +249,7 @@ const ShopDetail: React.FC = () => {
       setTimeout(() => {
         setIsProcessing(false);
         setShowPayment(false);
-        navigate('/dashboard');
+        navigate('/customer-dashboard');
       }, 1500);
     } catch (err) {
       console.error("Storage Error:", err);

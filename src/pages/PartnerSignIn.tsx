@@ -20,7 +20,7 @@ const PartnerSignIn: React.FC = () => {
         navigate(target, { replace: true });
       } else if (user.role === 'customer') {
         setError('Customer account detected. Please use the primary Sign-In link for bookings.');
-        setTimeout(() => navigate('/dashboard', { replace: true }), 3000);
+        setTimeout(() => navigate('/customer-dashboard', { replace: true }), 3000);
       } else if (user.role === 'admin') {
         navigate('/admin-dashboard', { replace: true });
       }

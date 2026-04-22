@@ -17,6 +17,7 @@ interface AppUser {
   email: string | null;
   name: string;
   role: 'customer' | 'partner' | 'admin';
+  user_type: 'customer' | 'partner' | 'admin';
   status: 'active' | 'pending' | null;
   photoURL?: string;
   token?: string; // For admin API calls
@@ -70,22 +71,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docSnap.exists()) {
             const userData = docSnap.data() as any;
             let finalStatus = userData.status;
+            const finalRole = userData.user_type || userData.role || 'customer';
             
             // ROLE-BASED STATUS LOCK: 
             // If status is missing, partners MUST default to null (onboarding requested)
             // while customers default to 'active'.
             if (finalStatus === undefined) {
-              finalStatus = userData.role === 'partner' ? null : 'active';
+              finalStatus = finalRole === 'partner' ? null : 'active';
             }
 
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: userData.name || 'Network Member',
-              role: userData.role || 'customer',
+              role: finalRole,
+              user_type: finalRole,
               status: finalStatus,
               photoURL: firebaseUser.photoURL || undefined,
-              token: (userData.role === 'admin' || firebaseUser.email === 'haidartheworldking@gmail.com') ? adminConfig.adminSecret : undefined
+              token: (finalRole === 'admin' || firebaseUser.email === 'haidartheworldking@gmail.com') ? adminConfig.adminSecret : undefined
             });
           } else {
             // New user or bypass case
@@ -96,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: firebaseUser.email,
               name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
               role: role,
+              user_type: role,
               status: role === 'partner' ? null : 'active',
               token: isAdmin ? adminConfig.adminSecret : undefined
             });
@@ -130,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData = {
         name: additionalData.name || 'Network Member',
         role: additionalData.role || 'customer',
+        user_type: additionalData.role || 'customer',
         status: additionalData.status !== undefined ? additionalData.status : 'active',
         createdAt: new Date().toISOString()
       };
@@ -163,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: email,
       name: role === 'admin' ? 'Master Admin' : (role === 'partner' ? 'Partner Studio' : 'Active Customer'),
       role: role,
+      user_type: role,
       status: 'active',
       token: role === 'admin' ? adminConfig.adminSecret : undefined
     });

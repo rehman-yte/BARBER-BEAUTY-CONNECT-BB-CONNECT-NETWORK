@@ -60,7 +60,7 @@ const Hero: React.FC = () => {
                 Find a Salon
              </button>
              <button 
-                onClick={() => handleAction('/dashboard')}
+                onClick={() => handleAction('/customer-dashboard')}
                 className="bg-transparent border border-charcoal md:border-2 text-charcoal px-[1.5rem] md:px-[2rem] py-[0.75rem] md:py-[1rem] rounded-full font-bold hover:bg-charcoal hover:text-white transition-all uppercase text-[0.625rem] md:text-[0.75rem] tracking-widest text-center active:scale-95 w-full sm:w-auto"
               >
                 My Bookings

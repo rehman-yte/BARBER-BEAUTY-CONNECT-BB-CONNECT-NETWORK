@@ -244,9 +244,9 @@ const Navbar: React.FC = () => {
               <Link 
                 to={
                   user?.role === 'admin' ? "/admin-dashboard" : 
-                  (isPartner ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/dashboard")
+                  (isPartner ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard")
                 } 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard' || location.pathname === '/onboarding') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/customer-dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard' || location.pathname === '/onboarding') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
               >
                 Dashboard
               </Link>
@@ -409,7 +409,7 @@ const Navbar: React.FC = () => {
                     </div>
                     {user?.role === 'customer' && (
                       <Link 
-                        to="/dashboard" 
+                        to="/customer-dashboard" 
                         onClick={() => setShowDropdown(false)}
                         className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
                       >
@@ -596,7 +596,7 @@ const Navbar: React.FC = () => {
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
         onSuccess={() => {
-          if (location.pathname === '/auth') navigate('/dashboard');
+          if (location.pathname === '/auth') navigate('/customer-dashboard');
         }}
       />
     </nav>

@@ -26,7 +26,7 @@ const AuthPage: React.FC = () => {
         setTimeout(() => navigate('/partner-signin', { replace: true }), 3000);
       } else {
         console.log("Customer session active:", user.uid);
-        navigate('/dashboard', { replace: true });
+        navigate('/customer-dashboard', { replace: true });
       }
     }
   }, [user, loading, navigate]);
@@ -79,7 +79,7 @@ const AuthPage: React.FC = () => {
     setError('');
     try {
       await signInWithGoogle();
-      navigate('/dashboard', { replace: true });
+      navigate('/customer-dashboard', { replace: true });
     } catch (err: any) { 
       const errMsg = err.message;
       console.error("GOOGLE_AUTH_FAILURE:", errMsg);

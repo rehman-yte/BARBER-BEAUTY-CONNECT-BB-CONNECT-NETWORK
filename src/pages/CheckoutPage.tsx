@@ -277,7 +277,7 @@ const CheckoutPage: React.FC = () => {
                     Your premium essentials are being prepared for dispatch. You will receive a tracking link via SMS shortly.
                   </p>
                   <button 
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/customer-dashboard')}
                     className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl"
                   >
                     View My Orders

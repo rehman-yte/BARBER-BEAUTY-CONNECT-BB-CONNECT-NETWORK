@@ -55,7 +55,7 @@ const PartnerDashboard: React.FC = () => {
 
   useEffect(() => {
     if (user && user.role !== 'partner') {
-      navigate('/dashboard', { replace: true });
+      navigate('/customer-dashboard', { replace: true });
     }
   }, [user, navigate]);
 

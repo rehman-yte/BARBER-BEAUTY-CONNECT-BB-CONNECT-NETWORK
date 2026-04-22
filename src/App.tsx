@@ -49,9 +49,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   if (allowedRole && user.role !== allowedRole) {
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
     if (user.role === 'partner') {
+      // STRICT PORTAL BOUNCE: Never allow partner in customer space
       return <Navigate to={user.status === null ? "/onboarding" : "/partner-dashboard"} replace />;
     }
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/customer-dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -67,13 +68,14 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={
         user?.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
         user?.role === 'partner' ? (user.status === null ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
+        user?.role === 'customer' ? <Navigate to="/customer-dashboard" replace /> :
         <LandingPage />
       } />
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin-dashboard" :
           user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
-          "/dashboard"
+          "/customer-dashboard"
         } replace /> : <AuthPage />
       } />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -86,29 +88,30 @@ const AppRoutes: React.FC = () => {
       <Route path="/shop" element={<ProtectedRoute><ShopPage /></ProtectedRoute>} />
       <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute><ShopDetail /></ProtectedRoute>} />
-      <Route path="/dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
+      <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<Navigate to="/customer-dashboard" replace />} />
       
       {/* Partner Routes */}
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerRegistration /></ProtectedRoute>} />
       <Route path="/partner-auth" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
         user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
-        "/dashboard"
+        "/customer-dashboard"
       } replace /> : <PartnerAuth />} />
       <Route path="/partner-signin" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
         user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
-        "/dashboard"
+        "/customer-dashboard"
       } replace /> : <PartnerSignIn />} />
       <Route path="/partner-registration" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
         user.role === 'partner' ? "/onboarding" : 
-        "/dashboard"
+        "/customer-dashboard"
       } replace /> : <PartnerRegistration />} />
       <Route path="/partner-dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       
       {/* Admin Gateway */}
-      <Route path="/admin-login" element={user ? <Navigate to={user.role === 'admin' ? "/admin-dashboard" : "/dashboard"} replace /> : <AdminGateway />} />
+      <Route path="/admin-login" element={user ? <Navigate to={user.role === 'admin' ? "/admin-dashboard" : "/customer-dashboard"} replace /> : <AdminGateway />} />
       <Route path="/admin-dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/404" element={<NotFound />} />
       
