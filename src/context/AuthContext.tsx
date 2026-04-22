@@ -258,15 +258,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const customerSnap = await getDoc(customerRef);
       
       if (!customerSnap.exists()) {
+        const intendedRole = localStorage.getItem('bb_intended_role');
+        const role = intendedRole === 'partner' ? 'partner' : 'customer';
         const userData = {
-          name: firebaseUser.displayName || 'Customer',
+          name: firebaseUser.displayName || (role === 'partner' ? 'New Partner' : 'Customer'),
           email: firebaseUser.email,
-          role: 'customer',
-          user_type: 'customer',
-          status: 'active',
+          role: role,
+          user_type: role,
+          status: role === 'partner' ? null : 'active',
           createdAt: new Date().toISOString()
         };
-        await setDoc(customerRef, userData);
+        
+        if (role === 'partner') {
+          await setDoc(partnerRef, userData);
+        } else {
+          await setDoc(customerRef, userData);
+        }
+        
         // Also sync to legacy users for safety
         await setDoc(doc(db, 'users', firebaseUser.uid), userData);
       }

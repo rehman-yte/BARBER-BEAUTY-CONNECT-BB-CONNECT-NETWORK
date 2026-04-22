@@ -17,6 +17,7 @@ const PartnerOnboarding: React.FC = () => {
   const [formData, setFormData] = useState({
     ownerName: user?.name || '',
     brandName: '',
+    mobileNumber: user?.email || '', // Set default if available
     manualAddress: '',
     category: 'Barber' as 'Barber' | 'Beauty Parlour',
     workerCount: 1,
@@ -102,6 +103,7 @@ const PartnerOnboarding: React.FC = () => {
         uid: user?.uid,
         ownerName: formData.ownerName,
         brandName: formData.brandName,
+        mobileNumber: formData.mobileNumber,
         address: formData.manualAddress,
         category: formData.category,
         workerQuantity: formData.workerCount,
@@ -157,7 +159,7 @@ const PartnerOnboarding: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* DEEP ONBOARDING HEADER */}
-      <div className="bg-charcoal pt-[8rem] pb-[5rem] px-[5%] text-center relative overflow-hidden">
+      <div className="bg-charcoal pt-[4rem] pb-[4rem] px-[5%] text-center relative overflow-hidden">
         <div className="absolute top-0 right-0 w-1/3 h-full bg-bbBlue/5 skew-x-[-20deg] translate-x-20"></div>
         <motion.div
            initial={{ opacity: 0, y: 20 }}
@@ -284,6 +286,18 @@ const PartnerOnboarding: React.FC = () => {
                         value={formData.brandName}
                         onChange={handleInputChange}
                         placeholder="Official shop name as visible to network"
+                        className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-[0.5rem]">
+                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Mobile Contact Registry</label>
+                      <input
+                        required
+                        type="text"
+                        name="mobileNumber"
+                        value={formData.mobileNumber}
+                        onChange={handleInputChange}
+                        placeholder="+91 XXXXX XXXXX"
                         className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all"
                       />
                     </div>
