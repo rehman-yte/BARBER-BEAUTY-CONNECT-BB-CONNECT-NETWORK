@@ -10,7 +10,6 @@ import {
   updateShop 
 } from '../services/logic_engine';
 import { 
-  LayoutDashboard, 
   ClipboardList, 
   UserCircle, 
   Settings, 
@@ -18,10 +17,9 @@ import {
   PowerOff,
   Plus,
   Trash2,
-  Clock,
-  IndianRupee,
   ChevronRight,
-  Bell
+  Bell,
+  LogOut
 } from 'lucide-react';
 
 interface Service {
@@ -31,8 +29,8 @@ interface Service {
 
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'bookings' | 'services'>('overview');
+  const { user, loading: authLoading, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<'bookings' | 'services'>('bookings');
   const [shopData, setShopData] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,13 +125,6 @@ const PartnerDashboard: React.FC = () => {
         
         <nav className="flex-1 p-6 space-y-2">
           <button 
-            onClick={() => setActiveTab('overview')}
-            className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${activeTab === 'overview' ? 'bg-bbBlue text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-          >
-            <LayoutDashboard size={18} />
-            <span className="text-xs font-bold uppercase tracking-widest text-[0.625rem]">Intelligence</span>
-          </button>
-          <button 
             onClick={() => setActiveTab('bookings')}
             className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${activeTab === 'bookings' ? 'bg-bbBlue text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
           >
@@ -145,11 +136,11 @@ const PartnerDashboard: React.FC = () => {
             className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${activeTab === 'services' ? 'bg-bbBlue text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
           >
             <Settings size={18} />
-            <span className="text-xs font-bold uppercase tracking-widest text-[0.625rem]">Service Hub</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[0.625rem]">Service Manager</span>
           </button>
         </nav>
 
-        <div className="p-6 border-t border-white/5">
+        <div className="p-6 border-t border-white/5 space-y-4">
           <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-2xl">
             <div className="w-8 h-8 rounded-full bg-bbBlue flex items-center justify-center text-[0.625rem] font-bold">
               {user?.name?.[0] || 'P'}
@@ -159,6 +150,14 @@ const PartnerDashboard: React.FC = () => {
               <p className="text-[0.5rem] text-gray-500 uppercase tracking-widest truncate">{shopData?.category}</p>
             </div>
           </div>
+          
+          <button 
+            onClick={() => logout && logout().then(() => navigate('/'))}
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-all text-xs font-bold uppercase tracking-widest text-[0.625rem]"
+          >
+            <LogOut size={16} />
+            <span>Secure Logout</span>
+          </button>
         </div>
       </aside>
 
@@ -200,52 +199,6 @@ const PartnerDashboard: React.FC = () => {
 
         {/* Tab Content */}
         <AnimatePresence mode="wait">
-          {activeTab === 'overview' && (
-            <motion.div 
-              key="overview"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-8"
-            >
-              {/* Analytics Cards */}
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm col-span-2">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Revenue Intelligence</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-6 rounded-2xl">
-                    <IndianRupee className="text-bbBlue mb-4" size={24} />
-                    <p className="text-[1.5rem] font-serif font-bold text-charcoal tracking-tight">₹{bookings.reduce((acc, curr) => acc + (curr.price || 0), 0)}</p>
-                    <p className="text-[0.5625rem] text-gray-400 font-bold uppercase tracking-widest mt-1">Gross Settlements</p>
-                  </div>
-                  <div className="bg-gray-50 p-6 rounded-2xl">
-                    <Clock className="text-emerald-500 mb-4" size={24} />
-                    <p className="text-[1.5rem] font-serif font-bold text-charcoal tracking-tight">{bookings.length}</p>
-                    <p className="text-[0.5625rem] text-gray-400 font-bold uppercase tracking-widest mt-1">Total Requests</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-charcoal text-white p-8 rounded-[2.5rem] shadow-xl">
-                 <h3 className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">System Status</h3>
-                 <div className="space-y-6">
-                   <div className="flex justify-between items-center">
-                     <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Verification</span>
-                     <span className="text-[0.5rem] font-bold text-emerald-400 uppercase bg-emerald-400/10 px-2 py-1 rounded">Approved</span>
-                   </div>
-                   <div className="flex justify-between items-center">
-                     <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Gateway</span>
-                     <span className="text-[0.5rem] font-bold text-bbBlue uppercase bg-bbBlue/10 px-2 py-1 rounded">Active</span>
-                   </div>
-                   <div className="pt-6 border-t border-white/5">
-                     <p className="text-[0.5625rem] text-gray-500 font-bold uppercase tracking-tight leading-relaxed">
-                       Your business is currently visible to millions of users in the network explore registry.
-                     </p>
-                   </div>
-                 </div>
-              </div>
-            </motion.div>
-          )}
-
           {activeTab === 'bookings' && (
             <motion.div 
               key="bookings"

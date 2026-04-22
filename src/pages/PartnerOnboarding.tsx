@@ -119,7 +119,7 @@ const PartnerOnboarding: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await addShop(shopPayload);
+      await addShop(shopPayload); // Save to 'partners' collection
 
       // 2. Update local user status to trigger dashboard redirection
       if (updateUser) {
@@ -130,9 +130,9 @@ const PartnerOnboarding: React.FC = () => {
         });
       }
 
-      setIsSuccess(true);
+      setIsSuccess(true); // Trigger 3-sec timer overlay
       setTimeout(() => {
-        navigate('/partner-dashboard', { replace: true });
+        navigate('/partner-dashboard', { replace: true }); // FORCE PARTNER ROUTE ONLY
       }, 3000);
 
     } catch (err: any) {

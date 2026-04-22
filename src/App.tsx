@@ -116,12 +116,12 @@ const AppRoutes: React.FC = () => {
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/partner-auth" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : 
+        user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : 
         "/customer-dashboard"
       } replace /> : <PartnerAuth />} />
       <Route path="/partner-signin" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : 
+        user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : 
         "/customer-dashboard"
       } replace /> : <PartnerSignIn />} />
       <Route path="/partner-dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
@@ -137,6 +137,21 @@ const AppRoutes: React.FC = () => {
   );
 };
 
+const LayoutWrapper: React.FC = () => {
+  const location = useLocation();
+  const isDashboard = location.pathname.includes('dashboard');
+  
+  return (
+    <div className="min-h-screen flex flex-col bg-white">
+      {!isDashboard && <Navbar />}
+      <main className={`flex-grow w-full ${isDashboard ? '' : 'max-w-[1440px] mx-auto px-[5%] pt-[5rem]'}`}>
+        <AppRoutes />
+      </main>
+      {!isDashboard && <Footer />}
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   React.useEffect(() => {
     // SILENCE CONSOLE: Clear all previous network/permission errors for a clean test UI
@@ -147,13 +162,7 @@ const App: React.FC = () => {
     <AuthProvider>
       <CartProvider>
         <HashRouter>
-          <div className="min-h-screen flex flex-col bg-white">
-            <Navbar />
-            <main className="flex-grow w-full max-w-[1440px] mx-auto px-[5%] pt-[5rem]">
-              <AppRoutes />
-            </main>
-            <Footer />
-          </div>
+          <LayoutWrapper />
         </HashRouter>
       </CartProvider>
     </AuthProvider>
