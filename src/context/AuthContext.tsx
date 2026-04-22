@@ -64,15 +64,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       if (firebaseUser) {
         try {
-          // IDENTITY LOCK: Priority Check
-          // 1. Check if they are a Partner
+          // ARCHITECTURE GATEKEEPER: Unified Multi-Collection Check
+          
+          // 1. MASTER CHECK: partners
           const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: partnerData.brand_name || partnerData.brandName || partnerData.owner_name || 'Partner',
+              name: partnerData.brandName || partnerData.brand_name || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
               status: partnerData.status !== undefined ? partnerData.status : null,
@@ -82,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 2. Check if they are in dedicated 'customers' collection
+          // 2. MASTER CHECK: customers
           const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
           if (customerDoc.exists()) {
             const customerData = customerDoc.data();
@@ -99,33 +100,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 3. Fallback to legacy 'users' collection (Admin or mixed roles)
+          // 3. LEGACY/ADMIN CHECK: users
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data() as any;
-            let finalStatus = userData.status;
             const finalRole = userData.user_type || userData.role || 'customer';
             
-            if (finalStatus === undefined) {
-              finalStatus = finalRole === 'partner' ? null : 'active';
+            // Re-sync to specific collections if role is clear but doc is missing
+            if (finalRole === 'partner') {
+               // This shouldn't happen if gatekeeper is perfect, but for legacy support:
+               setUser({
+                 uid: firebaseUser.uid,
+                 email: firebaseUser.email,
+                 name: userData.name || 'Partner',
+                 role: 'partner',
+                 user_type: 'partner',
+                 status: userData.status !== undefined ? userData.status : null,
+                 photoURL: firebaseUser.photoURL || undefined
+               });
+               setLoading(false);
+               return;
             }
 
             const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
+            const role = isAdmin ? 'admin' : 'customer';
 
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: userData.name || (isAdmin ? 'Master Admin' : 'Network Member'),
-              role: finalRole as any,
-              user_type: finalRole as any,
-              status: finalStatus,
+              role: role as any,
+              user_type: role as any,
+              status: 'active',
               photoURL: firebaseUser.photoURL || undefined,
-              token: (finalRole === 'admin' || isAdmin) ? adminConfig.adminSecret : undefined
+              token: (role === 'admin' || isAdmin) ? adminConfig.adminSecret : undefined
             });
           } else {
-            // New User Discovery Path
+            // New User Discovery Path (Default to Customer)
             const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
             const role = isAdmin ? 'admin' : 'customer';
+            
+            // For customers, we initialize the doc automatically
+            if (role === 'customer') {
+              const customerData = {
+                name: firebaseUser.displayName || 'Network Member',
+                email: firebaseUser.email,
+                role: 'customer',
+                user_type: 'customer',
+                status: 'active',
+                createdAt: new Date().toISOString()
+              };
+              await setDoc(doc(db, 'customers', firebaseUser.uid), customerData);
+            }
+
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
@@ -163,19 +190,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
+      const role = additionalData.role || 'customer';
       const userData = {
+        email: firebaseUser.email,
         name: additionalData.name || 'Network Member',
-        role: additionalData.role || 'customer',
-        user_type: additionalData.role || 'customer',
-        status: additionalData.status !== undefined ? additionalData.status : 'active',
+        role: role,
+        user_type: role,
+        status: additionalData.status !== undefined ? additionalData.status : (role === 'partner' ? null : 'active'),
         createdAt: new Date().toISOString()
       };
       
+      // CRITICAL GATE: Route to collection
+      if (role === 'partner') {
+        await setDoc(doc(db, 'partners', firebaseUser.uid), userData);
+      } else {
+        await setDoc(doc(db, 'customers', firebaseUser.uid), userData);
+      }
+      
+      // Sync to legacy for backward compatibility
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
       
       setUser({
         uid: firebaseUser.uid,
-        email: firebaseUser.email,
         ...userData
       } as AppUser);
     } catch (err: any) {
@@ -273,12 +309,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateUser = async (updates: Partial<AppUser>) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !user) return;
     
     try {
-      const docRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(docRef, updates);
-      // Local state will be updated if we trigger a re-fetch or if we manually update it
+      const collections = user.role === 'partner' ? ['partners', 'users'] : ['customers', 'users'];
+      
+      for (const coll of collections) {
+         try {
+           const docRef = doc(db, coll, auth.currentUser.uid);
+           await updateDoc(docRef, updates);
+         } catch (e) {
+           console.warn(`Sync failed for collection ${coll}:`, e);
+         }
+      }
+      
       setUser(prev => prev ? { ...prev, ...updates } : null);
     } catch (err) {
       console.error("Firestore update user error:", err);
