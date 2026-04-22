@@ -34,6 +34,7 @@ const PartnerDashboard: React.FC = () => {
   const [services, setServices] = useState<Service[]>(PersistenceService.load('partner_services') || []);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [profileData, setProfileData] = useState<any>(PersistenceService.load('partner_profile'));
@@ -147,9 +148,27 @@ const PartnerDashboard: React.FC = () => {
       name: newServiceName,
       price: parseFloat(newServicePrice)
     };
-    setServices(prev => [...prev, newService]);
+    
+    if (editingIndex !== null) {
+      const updated = [...services];
+      updated[editingIndex] = newService;
+      setServices(updated);
+      setEditingIndex(null);
+    } else {
+      setServices(prev => [...prev, newService]);
+    }
+    
     setNewServiceName('');
     setNewServicePrice('');
+  };
+
+  const handleEditService = (index: number) => {
+    const s = services[index];
+    setNewServiceName(s.name);
+    setNewServicePrice(s.price.toString());
+    setEditingIndex(index);
+    // Scroll to form
+    window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
   const handleRemoveService = (index: number) => {
@@ -172,12 +191,16 @@ const PartnerDashboard: React.FC = () => {
   const toggleShopStatus = async () => {
     if (!user || !profileData || isStatusUpdating) return;
     
-    const newStatus = profileData.shopStatus === 'open' ? 'closed' : 'open';
+    // RoadMap mandated: Toggle isActive boolean
+    const newActiveState = !(profileData.isActive ?? true);
     setIsStatusUpdating(true);
     
     try {
-      await updateShop(profileData.id, { shopStatus: newStatus });
-      setProfileData((prev: any) => ({ ...prev, shopStatus: newStatus }));
+      await updateShop(profileData.id, { 
+        isActive: newActiveState,
+        shopStatus: newActiveState ? 'open' : 'closed' // Sync for backward compatibility
+      });
+      setProfileData((prev: any) => ({ ...prev, isActive: newActiveState, shopStatus: newActiveState ? 'open' : 'closed' }));
       // Trigger a local event to refresh data immediately if needed
       window.dispatchEvent(new CustomEvent('bb_settings_updated'));
     } catch (err) {
@@ -311,27 +334,29 @@ const PartnerDashboard: React.FC = () => {
                    {isVerified ? 'Approved' : 'Pending Review'}
                 </span>
              </div>
-             <h1 className="text-[2rem] md:text-[2.5rem] font-serif font-bold tracking-tight mb-[0.5rem] uppercase">
-                Partner Business Manager: {profileData?.brandName || profileData?.brand_name || 'Restoring...'}
+              <h1 className="text-[2.5rem] md:text-[3.5rem] font-serif font-bold tracking-tighter mb-[0.5rem] uppercase leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                {profileData?.brandName || profileData?.brand_name || 'Business Station'}
               </h1>
-             <div className="flex flex-col md:flex-row gap-[1.5rem] md:items-center mt-[1.5rem]">
-               <p className="text-[0.625rem] text-gray-500 font-bold uppercase tracking-[0.4em]">Global ID: {user?.uid}</p>
-               
-               {/* Shop Status Toggle */}
-               <div className="flex items-center gap-[1rem] bg-white/5 px-[1.25rem] py-[0.75rem] rounded-2xl border border-white/10">
-                 <div className="flex items-center gap-[0.75rem]">
-                   <div className={`w-[0.625rem] h-[0.625rem] rounded-full animate-pulse ${profileData?.shopStatus === 'open' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`}></div>
-                   <span className="text-[0.625rem] font-bold uppercase tracking-widest text-gray-300">Shop Status: <span className={profileData?.shopStatus === 'open' ? 'text-green-400' : 'text-red-400'}>{profileData?.shopStatus || 'closed'}</span></span>
-                 </div>
-                 <button 
-                   onClick={toggleShopStatus}
-                   disabled={isStatusUpdating}
-                   className={`relative w-[3rem] h-[1.5rem] rounded-full transition-colors duration-300 focus:outline-none ${profileData?.shopStatus === 'open' ? 'bg-green-500/40' : 'bg-gray-600'}`}
-                 >
-                   <div className={`absolute top-[0.1875rem] left-[0.1875rem] w-[1.125rem] h-[1.125rem] bg-white rounded-full transition-transform duration-300 shadow-sm ${profileData?.shopStatus === 'open' ? 'translate-x-[1.5rem]' : 'translate-x-0'}`}></div>
-                 </button>
-               </div>
-             </div>
+              <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.5em] mb-[2rem]">Professional Network Registry: {profileData?.category || 'PRO'}</p>
+              
+              <div className="flex flex-col md:flex-row gap-[1.5rem] md:items-center">
+                <p className="text-[0.5625rem] text-gray-500 font-bold uppercase tracking-[0.4em]">Proprietor: {profileData?.ownerName || 'Verified Member'}</p>
+                <p className="hidden md:block text-gray-700">|</p>
+
+                <div className="flex items-center gap-[1rem] bg-white/5 px-[1.25rem] py-[0.75rem] rounded-2xl border border-white/10">
+                  <div className="flex items-center gap-[0.75rem]">
+                    <div className={`w-[0.625rem] h-[0.625rem] rounded-full animate-pulse ${(profileData?.isActive ?? true) ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`}></div>
+                    <span className="text-[0.625rem] font-bold uppercase tracking-widest text-gray-300">Station Status: <span className={(profileData?.isActive ?? true) ? 'text-green-400' : 'text-red-400'}>{(profileData?.isActive ?? true) ? 'ONLINE' : 'OFFLINE'}</span></span>
+                  </div>
+                  <button 
+                    onClick={toggleShopStatus}
+                    disabled={isStatusUpdating}
+                    className={`relative w-[3rem] h-[1.5rem] rounded-full transition-colors duration-300 focus:outline-none ${(profileData?.isActive ?? true) ? 'bg-green-500/40' : 'bg-gray-600'}`}
+                  >
+                    <div className={`absolute top-[0.1875rem] left-[0.1875rem] w-[1.125rem] h-[1.125rem] bg-white rounded-full transition-transform duration-300 shadow-sm ${(profileData?.isActive ?? true) ? 'translate-x-[1.5rem]' : 'translate-x-0'}`}></div>
+                  </button>
+                </div>
+              </div>
            </div>
            
              <div className="flex flex-wrap gap-[1.5rem] md:gap-[3rem] z-10">
@@ -476,7 +501,9 @@ const PartnerDashboard: React.FC = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-[3rem]">
                      {/* Add New Service */}
                      <div className="bg-white p-[2rem] rounded-[2.5rem] border border-gray-100 shadow-inner space-y-[1.5rem]">
-                        <h3 className="text-[0.6875rem] font-bold text-charcoal uppercase tracking-[0.2em] border-b border-gray-50 pb-[1rem]">Add Network Entry</h3>
+                        <h3 className="text-[0.6875rem] font-bold text-charcoal uppercase tracking-[0.2em] border-b border-gray-50 pb-[1rem]">
+                          {editingIndex !== null ? 'Modify Network Entry' : 'Add Network Entry'}
+                        </h3>
                         <div className="space-y-[1rem]">
                            <div className="flex flex-col gap-[0.5rem]">
                               <label className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest ml-[0.25rem]">Service Designation</label>
@@ -497,12 +524,26 @@ const PartnerDashboard: React.FC = () => {
                                  className="w-full px-[1.5rem] py-[1rem] bg-gray-50 border border-gray-100 rounded-xl text-[0.875rem] focus:border-bbBlue outline-none font-mono" 
                               />
                            </div>
-                           <button 
-                              onClick={handleAddService}
-                              className="w-full py-[1rem] border-2 border-dashed border-gray-100 rounded-2xl text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:border-bbBlue hover:text-bbBlue transition-all"
-                           >
-                              Append to List
-                           </button>
+                           <div className="flex gap-2">
+                             <button 
+                                onClick={handleAddService}
+                                className="flex-1 py-[1rem] bg-bbBlue text-white rounded-2xl text-[0.625rem] font-bold uppercase tracking-widest hover:bg-bbBlue-deep transition-all shadow-lg shadow-bbBlue/10"
+                             >
+                                {editingIndex !== null ? 'Confirm Update' : 'Append to List'}
+                             </button>
+                             {editingIndex !== null && (
+                               <button 
+                                 onClick={() => {
+                                   setEditingIndex(null);
+                                   setNewServiceName('');
+                                   setNewServicePrice('');
+                                 }}
+                                 className="px-6 py-[1rem] border border-gray-100 rounded-2xl text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all"
+                               >
+                                 Cancel
+                               </button>
+                             )}
+                           </div>
                         </div>
                      </div>
 
@@ -518,9 +559,14 @@ const PartnerDashboard: React.FC = () => {
                                      <span className="text-gray-300">—</span>
                                      <span className="text-[0.875rem] font-mono font-bold text-bbBlue">₹{s.price}</span>
                                   </div>
-                                  <button onClick={() => handleRemoveService(idx)} className="text-gray-200 hover:text-red-500 transition-colors p-[0.5rem]">
-                                     <svg className="w-[1rem] h-[1rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  </button>
+                                   <div className="flex items-center gap-[0.5rem]">
+                                     <button onClick={() => handleEditService(idx)} className="text-gray-200 hover:text-bbBlue transition-colors p-[0.5rem]">
+                                        <svg className="w-[1rem] h-[1rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                     </button>
+                                     <button onClick={() => handleRemoveService(idx)} className="text-gray-200 hover:text-red-500 transition-colors p-[0.5rem]">
+                                        <svg className="w-[1rem] h-[1rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                     </button>
+                                   </div>
                                </div>
                              ))
                            ) : (
