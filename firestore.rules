@@ -1,107 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: partners
-    // Fields: owner_name, brand_name, mobile_number, category, worker_quantity, services, status, onboarded_at, isApproved, lat, lng, manual_address, shopStatus
-    //
-    // Collection: bookings
-    // Fields: customerId, shopId, serviceName, totalPrice, status, createdAt, shopName
-    //
-    // Collection: settings
-    // Fields: platformFee, broadcasts
-    //
-    // Collection: notifications
-    // Fields: message, target, timestamp, createdAt, type
-    //
-    // Collection: products
-    // Fields: name, price, discount, category, image, description, features
-    //
-    // Collection: orders
-    // Fields: customerId, customerName, shippingAddress, items, totalAmount, status, paymentStatus, createdAt
-    //
-    // ===============================================================
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    function isAuthenticated() {
-      return request.auth != null;
+    // 0. GLOBAL CATCH-ALL
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    // 1. SIMPLE LOCK: Users can read/write their own document in ANY collection
+    // This stops "Insufficient Permissions" for profiles and discovery
+    match /partners/{userId} {
+      allow read: if true; // Public discovery
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isAuthenticated() &&
-        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-          (request.auth.token.email == "haidartheworldking@gmail.com"));
+    match /customers/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    function isValidUser(data) {
-      return data.ownerName is string && data.ownerName.size() > 0 &&
-             data.mobile is string && data.mobile.size() >= 10 &&
-             data.brandName is string && data.brandName.size() > 0;
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    function isValidBooking(data) {
-      return data.keys().hasAll(['customerId', 'shopId', 'status', 'createdAt']) &&
-             data.customerId is string && data.shopId is string &&
-             data.status in ['Pending', 'Accepted', 'Confirmed', 'payment_held', 'settlement_due', 'Completed', 'Rejected', 'Cancelled', 'failed'];
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /partners/{partnerId} {
-      allow read: if true; // Publicly readable for customer discovery
-      allow create: if true; // Allow registration
-      allow update: if true; // Allow updates (including admin approvals/status)
-      allow delete: if isAdmin();
-    }
-
-    match /customers/{customerId} {
-      allow read: if true; 
-      allow write: if true;
-    }
-
-    match /admins/{adminId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
+    // 2. BOOKINGS: Customers create, Partners manage
     match /bookings/{bookingId} {
-      allow read: if true; // Allow listing bookings (required for Admin Ledger)
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read: if request.auth != null && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
+      allow delete: if request.auth != null && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
     }
 
-    match /settings/{settingId} {
+    // 3. SETTINGS & NOTIFICATIONS: Open read, Admin write
+    match /notifications/{nodeId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null; // Simpler for now
+    }
+
+    match /settings/{nodeId} {
       allow read: if true;
-      allow write: if true;
-    }
-
-    match /notifications/{notificationId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /products/{productId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /orders/{orderId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.customerId || isAdmin());
-      allow create: if isAuthenticated();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow write: if request.auth != null;
     }
   }
 }

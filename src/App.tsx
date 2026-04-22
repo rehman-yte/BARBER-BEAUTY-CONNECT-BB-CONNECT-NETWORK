@@ -43,13 +43,13 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
   }
 
-  // MANDATORY PARTNER GATE: status check
+  // MANDATORY PARTNER GATE
   if (user.role === 'partner') {
-    if (user.status === null || user.status === undefined) {
-      if (location.pathname !== '/onboarding') {
-        return <Navigate to="/onboarding" replace />;
-      }
-    } else if (location.pathname === '/onboarding') {
+    const isNew = !user.brandName; // Sentinel for "UID exists but no data"
+    if (isNew && location.pathname !== '/onboarding') {
+      return <Navigate to="/onboarding" replace />;
+    }
+    if (!isNew && location.pathname === '/onboarding') {
       return <Navigate to="/partner-dashboard" replace />;
     }
   }
@@ -59,11 +59,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
     if (user.role === 'partner') {
        // Partner trying to access customer space
-       return <Navigate to={user.status === null ? "/onboarding" : "/partner-dashboard"} replace />;
+       return <Navigate to={!user.brandName ? "/onboarding" : "/partner-dashboard"} replace />;
     }
     if (user.role === 'customer') {
        // Customer trying to access partner space
        return <Navigate to="/customer-dashboard" replace />;
+    }
+    // Logic for general "/dashboard" or other paths that might lead to customer dashboard
+    if (location.pathname === '/customer-dashboard') {
+       return <Navigate to={!user.brandName ? "/onboarding" : "/partner-dashboard"} replace />;
     }
   }
 
@@ -80,14 +84,14 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={
         !user ? <LandingPage /> :
         user.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
-        user.role === 'partner' ? (user.status === null ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
+        user.role === 'partner' ? (!user.brandName ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
         <Navigate to="/customer-dashboard" replace />
       } />
       
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin-dashboard" :
-          user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
+          user.role === 'partner' ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : 
           "/customer-dashboard"
         } replace /> : <AuthPage />
       } />
@@ -109,12 +113,12 @@ const AppRoutes: React.FC = () => {
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/partner-auth" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
+        user.role === 'partner' ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : 
         "/customer-dashboard"
       } replace /> : <PartnerAuth />} />
       <Route path="/partner-signin" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
+        user.role === 'partner' ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : 
         "/customer-dashboard"
       } replace /> : <PartnerSignIn />} />
       <Route path="/partner-dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />

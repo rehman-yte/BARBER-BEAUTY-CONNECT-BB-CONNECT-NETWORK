@@ -244,7 +244,7 @@ const Navbar: React.FC = () => {
           <button
             onClick={() => {
               const target = user?.role === 'admin' ? "/admin-dashboard" : 
-              (isPartner ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard");
+              (isPartner ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard");
               
               if (isLoggedIn) {
                 navigate(target);
@@ -273,18 +273,20 @@ const Navbar: React.FC = () => {
             </button>
           )}
 
-          <button
-            onClick={() => {
-              if (isLoggedIn) navigate('/shop');
-              else {
-                setPendingPath('/shop');
-                setShowAuthModal(true);
-              }
-            }}
-            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-          >
-            Shop
-          </button>
+          {!isPartner && (
+            <button
+              onClick={() => {
+                if (isLoggedIn) navigate('/shop');
+                else {
+                  setPendingPath('/shop');
+                  setShowAuthModal(true);
+                }
+              }}
+              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+            >
+              Shop Portfolio
+            </button>
+          )}
         </div>
 
         <div className="flex-1 flex justify-end items-center gap-[0.75rem] md:gap-[1.5rem]">

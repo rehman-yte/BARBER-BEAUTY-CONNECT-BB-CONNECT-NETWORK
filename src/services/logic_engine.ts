@@ -125,7 +125,8 @@ export const getApprovedShops = getApprovedPartners;
 // Add a new shop (Production Firebase)
 export const addShop = async (shopData: any) => {
   try {
-    const docId = shopData.id || (shopData.mobile ? String(shopData.mobile) : undefined);
+    // CRITICAL: Document ID must be the User UID for Master Gate routing
+    const docId = shopData.uid || shopData.id || (shopData.mobile ? String(shopData.mobile) : undefined);
     const payload = {
       ...shopData,
       adminApproved: false,
@@ -203,14 +204,31 @@ export const getShopById = async (id: string): Promise<any> => {
 // Fetch bookings (filtered by user if ID provided)
 export const getBookings = async (userId?: string): Promise<any[]> => {
   try {
-    const q = query(collection(db, 'bookings'));
-    const querySnapshot = await getDocs(q);
-    const allBookings = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let q = query(collection(db, 'bookings'));
     
     if (userId) {
-      return allBookings.filter((b: any) => b.customerId === userId || b.shopId === userId);
+      // Create a compound query or just filter by customerId/shopId
+      // Note: Firestore doesn't support 'OR' queries easily without indices
+      // We will perform two queries and combine them if needed, or stick to one if usage is specific
+      
+      const qCustomer = query(collection(db, 'bookings'), where('customerId', '==', userId));
+      const qShop = query(collection(db, 'bookings'), where('shopId', '==', userId));
+      
+      const [snapCustomer, snapShop] = await Promise.all([
+        getDocs(qCustomer),
+        getDocs(qShop)
+      ]);
+      
+      const results = new Map();
+      snapCustomer.docs.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+      snapShop.docs.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+      
+      return Array.from(results.values());
     }
-    return allBookings;
+    
+    // For Admins (No userId provided or admin role checked elsewhere)
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {
     console.error('Firestore getBookings failure:', err);
     throw err;
