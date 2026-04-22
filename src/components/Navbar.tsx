@@ -218,17 +218,17 @@ const Navbar: React.FC = () => {
     <nav className="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-md border-b border-gray-100 h-[5rem] shadow-sm">
       <div className="w-full max-w-[1440px] mx-auto px-[5%] h-full flex justify-between items-center">
         <div className="flex-1 flex justify-start min-w-0">
-            <Link 
-              to={isPartner ? "/partner-dashboard" : "/"} 
-              className="flex flex-col items-start leading-none group truncate"
-            >
-              <span className="text-[0.875rem] sm:text-[1rem] md:text-[1.125rem] font-serif font-bold text-black tracking-tight transition-colors truncate w-full group-hover:text-bbBlue">
-                BARBER & BEAUTY CONNECT
-              </span>
-              <span className="text-[0.45rem] sm:text-[0.5rem] md:text-[0.5625rem] font-bold text-bbBlue uppercase tracking-[0.3em] mt-[0.25rem] truncate w-full">
-                BB CONNECT NETWORK
-              </span>
-            </Link>
+          <Link 
+            to={isPartner ? "#" : "/"} 
+            className={`flex flex-col items-start leading-none group ${isPartner ? 'pointer-events-none' : ''} truncate`}
+          >
+            <span className="text-[0.875rem] sm:text-[1rem] md:text-[1.125rem] font-serif font-bold text-black tracking-tight transition-colors truncate w-full">
+              BARBER & BEAUTY CONNECT
+            </span>
+            <span className="text-[0.45rem] sm:text-[0.5rem] md:text-[0.5625rem] font-bold text-bbBlue uppercase tracking-[0.3em] mt-[0.25rem] truncate w-full">
+              BB CONNECT NETWORK
+            </span>
+          </Link>
         </div>
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
@@ -302,19 +302,17 @@ const Navbar: React.FC = () => {
             </button>
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
-            {!isPartner && (
-              <Link 
-                to="/checkout"
-                className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
-              >
-                <ShoppingBag size={20} />
-                {totalItems > 0 && (
-                  <span className="absolute top-[0.375rem] right-[0.375rem] min-w-[1rem] h-4 bg-bbBlue text-white text-[0.5rem] font-bold flex items-center justify-center rounded-full border-2 border-white px-1">
-                    {totalItems}
-                  </span>
-                )}
-              </Link>
-            )}
+            <Link 
+              to="/checkout"
+              className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
+            >
+              <ShoppingBag size={20} />
+              {totalItems > 0 && (
+                <span className="absolute top-[0.375rem] right-[0.375rem] min-w-[1rem] h-4 bg-bbBlue text-white text-[0.5rem] font-bold flex items-center justify-center rounded-full border-2 border-white px-1">
+                  {totalItems}
+                </span>
+              )}
+            </Link>
 
             <div className="relative" ref={notificationRef}>
               <button 
