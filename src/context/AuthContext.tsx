@@ -21,6 +21,7 @@ interface AppUser {
   status: 'active' | 'pending' | null;
   photoURL?: string;
   brandName?: string;
+  onboardingComplete?: boolean;
   token?: string; // For admin API calls
 }
 
@@ -73,8 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const partnerData = partnerDoc.data();
             console.log("[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER");
             
-            // Step B: Check for brandName to drive onboarding logic (Master Command)
-            const hasBrand = !!partnerData.brandName;
+            // Step B: Check for brandName or onboardingComplete to drive onboarding logic (Master Command)
+            const isComplete = !!partnerData.brandName || !!partnerData.onboardingComplete;
             
             setUser({
               uid: firebaseUser.uid,
@@ -82,9 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: (hasBrand && partnerData.status) ? (partnerData.status as any) : null,
+              status: (isComplete && partnerData.status) ? (partnerData.status as any) : null,
               photoURL: firebaseUser.photoURL || undefined,
-              brandName: partnerData.brandName || undefined
+              brandName: partnerData.brandName || undefined,
+              onboardingComplete: !!partnerData.onboardingComplete
             });
             setLoading(false);
             return;

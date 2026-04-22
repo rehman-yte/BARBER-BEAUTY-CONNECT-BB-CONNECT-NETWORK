@@ -45,7 +45,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 
   // MANDATORY PARTNER GATE: status and brand check
   if (user.role === 'partner') {
-    if (!user.brandName) {
+    const isComplete = !!user.brandName || !!user.onboardingComplete;
+    if (!isComplete) {
       if (location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />;
       }
@@ -59,7 +60,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
     if (user.role === 'partner') {
        // Partner trying to access customer space
-       return <Navigate to={!user.brandName ? "/onboarding" : "/partner-dashboard"} replace />;
+       const isComplete = !!user.brandName || !!user.onboardingComplete;
+       return <Navigate to={!isComplete ? "/onboarding" : "/partner-dashboard"} replace />;
     }
     if (user.role === 'customer') {
        // Customer trying to access partner space
@@ -67,7 +69,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     }
     // Logic for general "/dashboard" or other paths that might lead to customer dashboard
     if (location.pathname === '/customer-dashboard') {
-       return <Navigate to={!user.brandName ? "/onboarding" : "/partner-dashboard"} replace />;
+       const isComplete = !!user.brandName || !!user.onboardingComplete;
+       return <Navigate to={!isComplete ? "/onboarding" : "/partner-dashboard"} replace />;
     }
   }
 
@@ -84,14 +87,14 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={
         !user ? <LandingPage /> :
         user.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
-        user.role === 'partner' ? (!user.brandName ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
+        user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
         <Navigate to="/customer-dashboard" replace />
       } />
       
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin-dashboard" :
-          user.role === 'partner' ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : 
+          user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : 
           "/customer-dashboard"
         } replace /> : <AuthPage />
       } />

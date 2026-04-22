@@ -109,19 +109,23 @@ const PartnerOnboarding: React.FC = () => {
         workerQuantity: formData.workerCount,
         upiId: formData.upiId,
         coords: { lat: formData.lat, lng: formData.lng },
-        status: 'pending'
+        status: 'pending',
+        onboardingComplete: true
       };
 
       await addShop(shopPayload);
 
       // 2. Update local user status to trigger dashboard redirection
       if (updateUser) {
-        await updateUser({ status: 'pending' });
+        await updateUser({ 
+          status: 'pending',
+          brandName: formData.brandName
+        });
       }
 
       setIsSuccess(true);
       setTimeout(() => {
-        navigate('/partner-dashboard');
+        navigate('/partner-dashboard', { replace: true });
       }, 3000);
 
     } catch (err: any) {
@@ -132,24 +136,24 @@ const PartnerOnboarding: React.FC = () => {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-center p-6">
+      <div className="min-h-screen bg-charcoal flex flex-col items-center justify-center text-center p-6">
         <motion.div 
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-xl shadow-emerald-500/20"
+          className="w-24 h-24 bg-bbBlue rounded-full flex items-center justify-center mb-8 shadow-xl shadow-bbBlue/20"
         >
-          <Check className="text-white w-12 h-12" />
+          <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
         </motion.div>
-        <h2 className="text-3xl font-serif font-bold text-charcoal mb-4 uppercase tracking-tighter">Onboarding Terminal Success</h2>
-        <p className="text-gray-500 text-sm font-bold uppercase tracking-[0.2em] max-w-sm">
-          Proprietor Status: Registered. Verification Protocol Initiated.
+        <h2 className="text-3xl font-serif font-bold text-white mb-4 uppercase tracking-tighter">Processing Membership...</h2>
+        <p className="text-bbBlue text-[0.625rem] font-bold uppercase tracking-[0.5em] max-w-sm">
+          Finalizing Partner Registry. 3 Seconds to Terminal Access.
         </p>
-        <div className="mt-12 w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="mt-12 w-64 h-1.5 bg-white/10 rounded-full overflow-hidden">
           <motion.div 
             initial={{ width: 0 }}
             animate={{ width: '100%' }}
-            transition={{ duration: 3 }}
-            className="h-full bg-bbBlue"
+            transition={{ duration: 3, ease: "linear" }}
+            className="h-full bg-bbBlue shadow-[0_0_15px_rgba(42,125,225,0.5)]"
           />
         </div>
       </div>

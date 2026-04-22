@@ -244,7 +244,7 @@ const Navbar: React.FC = () => {
           <button
             onClick={() => {
               const target = user?.role === 'admin' ? "/admin-dashboard" : 
-              (isPartner ? (!user.brandName ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard");
+              (isPartner ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard");
               
               if (isLoggedIn) {
                 navigate(target);
