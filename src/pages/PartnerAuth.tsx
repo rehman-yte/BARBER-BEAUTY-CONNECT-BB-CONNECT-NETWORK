@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const PartnerAuth: React.FC = () => {
   const [mobile, setMobile] = useState('');
-  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,19 +21,19 @@ const PartnerAuth: React.FC = () => {
     try {
       console.log("Partner Auth Initiated: Establishing credentials...");
       
-      const email = `${mobile}@bb.net`;
-      await signUp(email, password, { name: name || 'Elite Partner', role: 'partner' });
+      if (!email) throw new Error("Email Address is required");
+
+      await signUp(email, password, { role: 'partner', mobile: mobile });
       
       console.log("Auth Success: Moving to Deep Onboarding Form...");
       localStorage.setItem('bb_partner_mobile', mobile);
-      localStorage.setItem('bb_partner_name', name || 'Elite Partner');
       localStorage.setItem('bb_partner_password', password);
       
       navigate('/onboarding');
     } catch (err: any) {
       console.error("Partner Signup Failure:", err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('Account already exists with this mobile number. Please Sign-In.');
+        setError('Account already exists with this email address. Please Sign-In.');
       } else {
         setError(err.message || 'Failed to initialize registration. Please try again.');
       }
@@ -57,8 +57,8 @@ const PartnerAuth: React.FC = () => {
         <form onSubmit={handlePartnerAuth} className="space-y-[1.5rem]">
           <div className="space-y-[1rem]">
             <div className="flex flex-col gap-[0.5rem]">
-              <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Full Name</label>
-              <input required type="text" placeholder="Your Name" className="w-full px-[1.5rem] py-[1rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all" value={name} onChange={(e) => setName(e.target.value)} />
+              <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Email Address</label>
+              <input required type="email" placeholder="example@mail.com" className="w-full px-[1.5rem] py-[1rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             
             <div className="flex flex-col gap-[0.5rem]">

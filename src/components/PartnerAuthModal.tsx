@@ -16,7 +16,6 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
-  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,15 +27,16 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
 
     try {
       if (isLogin) {
-        // Partners use mobile-based email login typically in this app
-        const authEmail = email || (mobile ? `${mobile}@bb.net` : '');
+        // Handle both raw email and mobile-mask email for legacy/flexibility
+        const authEmail = email.includes('@') ? email : `${email}@bb.net`;
         if (!authEmail) throw new Error("Email or Mobile is required");
         await signIn(authEmail, password);
         navigate('/onboarding');
       } else {
-        const authEmail = email || `${mobile}@bb.net`;
-        await signUp(authEmail, password, { 
-          name: name || 'Elite Partner', 
+        // Registration now uses explicit Email field
+        if (!email) throw new Error("Email Address is required");
+        
+        await signUp(email, password, { 
           role: 'partner',
           mobile: mobile,
           status: null // SYSTEM DIRECTIVE: Initialize with null
@@ -44,14 +44,17 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
         
         // Persist session data for onboarding form
         localStorage.setItem('bb_partner_mobile', mobile);
-        localStorage.setItem('bb_partner_name', name || 'Elite Partner');
         localStorage.setItem('bb_partner_password', password);
         
         navigate('/onboarding');
       }
       onClose();
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already registered. Please sign in or use a different email.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -91,10 +94,10 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
             <form onSubmit={handlePartnerAuth} className="space-y-[1.25rem]">
               {!isLogin && (
                 <div className="space-y-1">
-                  <label className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest ml-4">Full Owner Name</label>
+                  <label className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest ml-4">Email Address</label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                    <input required type="text" placeholder="Owner Name" className="w-full pl-[3rem] pr-[1.5rem] py-[0.875rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all" value={name} onChange={(e) => setName(e.target.value)} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                    <input required type="email" placeholder="example@mail.com" className="w-full pl-[3rem] pr-[1.5rem] py-[0.875rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all" value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                 </div>
               )}
