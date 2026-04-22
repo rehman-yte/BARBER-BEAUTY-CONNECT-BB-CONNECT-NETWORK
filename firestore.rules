@@ -1,43 +1,155 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. GLOBAL CATCH-ALL
+    
+    // 0. GLOBAL SAFETY NET
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // 1. SIMPLE LOCK: Users can read/write their own document in ANY collection
-    // This stops "Insufficient Permissions" for profiles and discovery
-    match /partners/{userId} {
-      allow read: if true; // Public discovery
-      allow write: if request.auth != null && request.auth.uid == userId;
+    // ---------------------------------------------------------------
+    // HELPER FUNCTIONS
+    // ---------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    match /customers/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "haidartheworldking@gmail.com" || 
+        request.auth.token.email == "rhfarooqui16@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ---------------------------------------------------------------
+    // PARTNERS COLLECTION
+    // ---------------------------------------------------------------
+    match /partners/{partnerId} {
+      function isValidPartner(data) {
+        return data.keys().hasAll(['ownerName', 'brandName', 'status']) &&
+               data.ownerName is string && data.ownerName.size() <= 200 &&
+               data.brandName is string && data.brandName.size() <= 200 &&
+               data.status in ['pending', 'approved', 'rejected', 'active'] &&
+               (data.mobileNumber == null || (data.mobileNumber is string && data.mobileNumber.size() <= 30));
+      }
+
+      // Public profile view & discovery
+      allow get: if true; 
+      allow list: if true; 
+
+      // Creation by the user for themselves
+      allow create: if isOwner(partnerId) && isValidPartner(incoming()) && incoming().status == 'pending';
+
+      // Updates by owner or admin
+      allow update: if (isOwner(partnerId) && isValidPartner(incoming()) && (
+        // Regular partners can only change non-RBAC fields
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'ownerName', 'brandName', 'mobileNumber', 'address', 'category', 'workerQuantity', 
+          'upiId', 'coords', 'services', 'shopStatus', 'updatedAt', 'status', 'adminApproved'
+        ]) &&
+        // Protect status escalation
+        (incoming().status == existing().status || incoming().status == 'pending') &&
+        (incoming().adminApproved == existing().adminApproved || incoming().adminApproved == false)
+      )) || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // CUSTOMERS COLLECTION
+    // ---------------------------------------------------------------
+    match /customers/{customerId} {
+      allow read: if isOwner(customerId) || isAdmin();
+      allow create: if isOwner(customerId);
+      allow update: if isOwner(customerId) || isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // USERS COLLECTION (Legacy/Unified)
+    // ---------------------------------------------------------------
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
     }
 
-    // 2. BOOKINGS: Customers create, Partners manage
+    // ---------------------------------------------------------------
+    // BOOKINGS COLLECTION
+    // ---------------------------------------------------------------
     match /bookings/{bookingId} {
-      allow read: if request.auth != null && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
-      allow delete: if request.auth != null && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
+      // Security Boundary Enforcement
+      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
+      
+      // Rule 8: Secure List Queries
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
+      
+      allow update: if isSignedIn() && (
+        (existing().customerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+        (existing().shopId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
     }
 
-    // 3. SETTINGS & NOTIFICATIONS: Open read, Admin write
-    match /notifications/{nodeId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null; // Simpler for now
+    // ---------------------------------------------------------------
+    // NOTIFICATIONS COLLECTION
+    // ---------------------------------------------------------------
+    match /notifications/{notifId} {
+      // Targeted list queries only
+      allow list: if isSignedIn() && (resource.data.target in ['all', request.auth.uid, 'partners', 'customers', 'admin']);
+      allow get: if isSignedIn();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
-    match /settings/{nodeId} {
+    // ---------------------------------------------------------------
+    // SETTINGS COLLECTION
+    // ---------------------------------------------------------------
+    match /settings/{settingId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // ADMINS COLLECTION
+    // ---------------------------------------------------------------
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // PRODUCTS & ORDERS (Commerce)
+    // ---------------------------------------------------------------
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isOwner(resource.data.customerId) || isAdmin();
+      allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
+      allow update: if isAdmin();
     }
   }
 }

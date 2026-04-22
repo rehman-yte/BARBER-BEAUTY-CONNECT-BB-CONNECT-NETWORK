@@ -43,13 +43,13 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
   }
 
-  // MANDATORY PARTNER GATE
+  // MANDATORY PARTNER GATE: status and brand check
   if (user.role === 'partner') {
-    const isNew = !user.brandName; // Sentinel for "UID exists but no data"
-    if (isNew && location.pathname !== '/onboarding') {
-      return <Navigate to="/onboarding" replace />;
-    }
-    if (!isNew && location.pathname === '/onboarding') {
+    if (!user.brandName) {
+      if (location.pathname !== '/onboarding') {
+        return <Navigate to="/onboarding" replace />;
+      }
+    } else if (location.pathname === '/onboarding') {
       return <Navigate to="/partner-dashboard" replace />;
     }
   }

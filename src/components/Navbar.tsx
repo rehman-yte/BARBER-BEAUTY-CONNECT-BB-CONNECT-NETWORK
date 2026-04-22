@@ -284,7 +284,7 @@ const Navbar: React.FC = () => {
               }}
               className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
             >
-              Shop Portfolio
+              Shop
             </button>
           )}
         </div>

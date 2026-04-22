@@ -65,35 +65,111 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       if (firebaseUser) {
         try {
-          // SIMPLE GATEKEEPER logic
-          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
+          console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid}`);
           
+          // STEP A: MASTER CHECK - PARTNERS COLLECTION ONLY (STRONGEST SIGNAL)
+          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
-            const data = partnerDoc.data();
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: data.brandName || data.ownerName || 'Partner',
-              role: 'partner',
-              user_type: 'partner',
-              status: data.status || 'active',
-              brandName: data.brandName
-            });
-          } else {
-            const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
-            const data = customerDoc.exists() ? customerDoc.data() : {};
+            const partnerData = partnerDoc.data();
+            console.log("[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER");
+            
+            // Step B: Check for brandName to drive onboarding logic (Master Command)
+            const hasBrand = !!partnerData.brandName;
             
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: data.name || firebaseUser.displayName || 'Customer',
+              name: partnerData.brandName || partnerData.ownerName || 'Partner',
+              role: 'partner',
+              user_type: 'partner',
+              status: (hasBrand && partnerData.status) ? (partnerData.status as any) : null,
+              photoURL: firebaseUser.photoURL || undefined,
+              brandName: partnerData.brandName || undefined
+            });
+            setLoading(false);
+            return;
+          }
+
+          // STEP C: ONLY IF NOT FOUND IN PARTNERS, CHECK CUSTOMERS
+          const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
+          if (customerDoc.exists()) {
+            const customerData = customerDoc.data();
+            console.log("[AUTH ARCHITECT] Gate C: IDENTITY CONFIRMED -> CUSTOMER");
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: customerData.name || 'Customer',
               role: 'customer',
               user_type: 'customer',
-              status: 'active'
+              status: 'active',
+              photoURL: firebaseUser.photoURL || undefined
             });
+            setLoading(false);
+            return;
+          }
+
+          // STEP D: ADMIN / LEGACY DISCOVERY (Strict Isolation)
+          const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com' || firebaseUser.email === 'rhfarooqui16@gmail.com';
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as any;
+            const role = isAdmin ? 'admin' : (userData.role || userData.user_type || 'customer');
+            
+            console.log(`[AUTH ARCHITECT] Discovery Gate: DISCOVERED ROLE -> ${role}`);
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: userData.name || (isAdmin ? 'System Admin' : 'Member'),
+              role: role as any,
+              user_type: role as any,
+              status: userData.status !== undefined ? userData.status : (role === 'partner' ? null : 'active'),
+              token: isAdmin ? adminConfig.adminSecret : undefined
+            });
+            setLoading(false);
+            return;
+          }
+
+          // STEP E: NEW ADMISSION PROTOCOL (Fallback if no doc exists yet)
+          const intendedRole = localStorage.getItem('bb_intended_role');
+          console.log(`[AUTH ARCHITECT] New Admission Protocol: INTENTION -> ${intendedRole}`);
+          
+          if (intendedRole === 'partner' || isAdmin) {
+             const role = isAdmin ? 'admin' : 'partner';
+             const status = role === 'partner' ? null : 'active';
+             
+             setUser({
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               name: isAdmin ? 'System Admin' : 'New Partner',
+               role: role as any,
+               user_type: role as any,
+               status: status,
+               token: isAdmin ? adminConfig.adminSecret : undefined
+             });
+          } else {
+             // DEFAULT TO CUSTOMER ONLY AS LAST RESORT
+             setUser({
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               name: firebaseUser.displayName || 'Customer',
+               role: 'customer',
+               user_type: 'customer',
+               status: 'active'
+             });
           }
         } catch (err) {
-          console.error("Auth sync error:", err);
+          console.error("Identity resolution error:", err);
+          // FALLBACK: Use Firebase Auth info if Firestore is restricted
+          const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
+            role: isAdmin ? 'admin' : 'customer',
+            status: 'active',
+            token: isAdmin ? adminConfig.adminSecret : undefined
+          });
         }
       } else {
         setUser(null);
@@ -183,21 +259,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const customerSnap = await getDoc(customerRef);
       
       if (!customerSnap.exists()) {
-        const intendedRole = localStorage.getItem('bb_intended_role') || 'customer';
+        const intendedRole = localStorage.getItem('bb_intended_role');
+        const role = intendedRole === 'partner' ? 'partner' : 'customer';
         const userData = {
-          name: firebaseUser.displayName || (intendedRole === 'partner' ? 'New Partner' : 'Customer'),
+          name: firebaseUser.displayName || (role === 'partner' ? 'New Partner' : 'Customer'),
           email: firebaseUser.email,
-          role: intendedRole,
-          user_type: intendedRole,
-          status: intendedRole === 'partner' ? 'pending' : 'active',
+          role: role,
+          user_type: role,
+          status: role === 'partner' ? null : 'active',
           createdAt: new Date().toISOString()
         };
         
-        if (intendedRole === 'partner') {
+        if (role === 'partner') {
           await setDoc(partnerRef, userData);
         } else {
           await setDoc(customerRef, userData);
         }
+        
+        // Also sync to legacy users for safety
+        await setDoc(doc(db, 'users', firebaseUser.uid), userData);
       }
     } catch (err: any) {
       console.error("Firebase Google Auth error:", err);
