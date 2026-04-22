@@ -46,7 +46,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   }
 
   // Mandatory Onboarding Check for Partners
-  if (user.role === 'partner' && (user.status === null || user.status === undefined) && !window.location.hash.includes('/onboarding') && !window.location.hash.includes('/shop') && !window.location.hash.includes('/checkout')) {
+  if (user.role === 'partner' && (user.status === null || user.status === undefined) && !window.location.hash.includes('/onboarding')) {
     return <Navigate to="/onboarding" replace />;
   }
 
