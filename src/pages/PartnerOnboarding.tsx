@@ -98,7 +98,7 @@ const PartnerOnboarding: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      // 1. Prepare payload (simplified for logic engine)
+      // 1. Prepare payload (save ALL form fields as per Master Command)
       const shopPayload: any = {
         uid: user?.uid,
         ownerName: formData.ownerName,
@@ -110,7 +110,13 @@ const PartnerOnboarding: React.FC = () => {
         upiId: formData.upiId,
         coords: { lat: formData.lat, lng: formData.lng },
         status: 'pending',
-        onboardingComplete: true
+        onboardingComplete: true,
+        // Media fields (storing as strings/placeholders for now)
+        ownerPicture: typeof formData.ownerPicture === 'string' ? formData.ownerPicture : 'pending_upload',
+        govId: typeof formData.govId === 'string' ? formData.govId : 'pending_upload',
+        brandImages: formData.brandImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
+        workerImages: formData.workerImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
+        updatedAt: new Date().toISOString()
       };
 
       await addShop(shopPayload);
@@ -119,7 +125,8 @@ const PartnerOnboarding: React.FC = () => {
       if (updateUser) {
         await updateUser({ 
           status: 'pending',
-          brandName: formData.brandName
+          brandName: formData.brandName,
+          onboardingComplete: true
         });
       }
 
@@ -503,9 +510,19 @@ const PartnerOnboarding: React.FC = () => {
                       disabled={isProcessing}
                       className="flex-[2] py-[1.5rem] bg-bbBlue text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.4em] shadow-2xl shadow-bbBlue/30 hover:bg-bbBlue-deep transition-all active:scale-[0.98] disabled:opacity-30"
                     >
-                      {isProcessing ? 'Syncing with Registry...' : 'Initiate Network Access'}
+                      {isProcessing ? 'Submitting...' : 'Initiate Network Access'}
                     </button>
                   </div>
+
+                  {error && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-6 p-4 bg-red-50 border border-red-100 rounded-xl"
+                    >
+                      <p className="text-red-600 text-[0.625rem] font-bold uppercase truncate">{error}</p>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
