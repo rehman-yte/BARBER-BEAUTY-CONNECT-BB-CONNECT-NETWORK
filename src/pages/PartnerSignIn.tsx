@@ -6,7 +6,7 @@ import { getShops } from '../services/logic_engine';
 import { useAuth } from '../context/AuthContext';
 
 const PartnerSignIn: React.FC = () => {
-  const [mobile, setMobile] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,7 +33,6 @@ const PartnerSignIn: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const email = `${mobile}@bb.net`;
       await signIn(email, password);
     } catch (err: any) {
       let errMsg = err.message;
@@ -65,8 +64,8 @@ const PartnerSignIn: React.FC = () => {
         <form onSubmit={handleSignIn} className="space-y-[1.5rem]">
           <div className="space-y-[1rem]">
             <div className="flex flex-col gap-[0.5rem]">
-              <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Mobile Number</label>
-              <input required type="tel" placeholder="10-digit number" className="w-full px-[1.5rem] py-[1rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all font-mono" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+              <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Email Address</label>
+              <input required type="email" placeholder="example@mail.com" className="w-full px-[1.5rem] py-[1rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             
             <div className="flex flex-col gap-[0.5rem]">

@@ -18,13 +18,15 @@ const PartnerRegistration: React.FC = () => {
   const [formData, setFormData] = useState({
     ownerName: user?.name || '',
     brandName: '',
+    manualAddress: '',
     category: 'Barber' as 'Barber' | 'Beauty Parlour',
     workerCount: 1,
     upiId: '',
     lat: null as number | null,
     lng: null as number | null,
-    shopImages: Array(6).fill(null) as (File | string | null)[],
-    workerImages: Array(1).fill(null) as (File | string | null)[],
+    shopImages: Array(5).fill(null) as (File | string | null)[],
+    workerImages: Array(6).fill(null) as (File | string | null)[],
+    ownerPicture: null as File | string | null,
     govId: null as File | string | null,
   });
 
@@ -34,7 +36,7 @@ const PartnerRegistration: React.FC = () => {
     }
   }, [user, loading, navigate]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -75,7 +77,7 @@ const PartnerRegistration: React.FC = () => {
       },
       (error) => {
         console.error("Location error:", error);
-        alert("Location access denied. GPS coordinates are mandatory for shop assignment.");
+        alert("Location access denied. GPS coordinates are highly recommended, but you can use the manual address below.");
         setIsGeocoding(false);
       }
     );
@@ -89,8 +91,8 @@ const PartnerRegistration: React.FC = () => {
       return;
     }
 
-    if (!formData.lat || !formData.lng) {
-      alert("GPS Location is mandatory.");
+    if (!formData.manualAddress) {
+      alert("Address is mandatory.");
       return;
     }
 
@@ -101,16 +103,17 @@ const PartnerRegistration: React.FC = () => {
         uid: user?.uid,
         ownerName: formData.ownerName,
         brandName: formData.brandName,
+        address: formData.manualAddress,
         category: formData.category,
         workerQuantity: formData.workerCount,
         upiId: formData.upiId,
         lat: formData.lat,
         lng: formData.lng,
         status: 'pending',
-        // In a real app we would upload these to storage
-        // For this task, we record filenames as placeholders/indicators
+        // indicators for validation
         shopImagesCount: formData.shopImages.filter(i => i !== null).length,
         workerImagesCount: formData.workerImages.filter(i => i !== null).length,
+        hasOwnerPicture: !!formData.ownerPicture,
         hasGovId: !!formData.govId,
       };
 
@@ -238,7 +241,7 @@ const PartnerRegistration: React.FC = () => {
             {/* STEP 3: LOCATION */}
             {currentStep === 3 && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-                <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">GPS Location Verification</h3>
+                <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">GPS & Address Verification</h3>
                 <div className="bg-gray-50 p-10 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-6">
                   <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${formData.lat ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/20' : 'bg-white text-gray-300 shadow-sm'}`}>
                     <MapPin className={`w-10 h-10 ${isGeocoding ? 'animate-bounce' : ''}`} />
@@ -261,6 +264,19 @@ const PartnerRegistration: React.FC = () => {
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-3">
+                  <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Manual Shop Address</label>
+                  <textarea 
+                    required 
+                    name="manualAddress" 
+                    value={formData.manualAddress} 
+                    onChange={handleInputChange} 
+                    rows={3}
+                    className="w-full px-8 py-5 bg-gray-50 border border-gray-100 rounded-2xl focus:border-bbBlue outline-none font-sans text-base resize-none" 
+                    placeholder="Enter full shop address (Floor, Building, Area, City)..." 
+                  />
+                </div>
               </motion.div>
             )}
 
@@ -268,38 +284,57 @@ const PartnerRegistration: React.FC = () => {
             {currentStep === 4 && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-12">
                 
-                <div className="space-y-6">
+                <div className="space-y-10">
                   <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">01. Media Uploads</h3>
                   
-                  {/* Shop Images (6) */}
-                  <div className="space-y-4">
-                    <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-widest ml-2">Shop Portfolio (6 Images)</label>
-                    <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                      {formData.shopImages.map((img, idx) => (
-                        <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative">
-                          <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'shopImages', idx)} />
-                          {img ? (
-                            <img src={img instanceof File ? URL.createObjectURL(img) : ''} className="w-full h-full object-cover" alt="Shop" />
-                          ) : (
-                            <Camera className="text-gray-300 w-6 h-6" />
-                          )}
-                          {!img && <span className="absolute bottom-2 text-[0.4rem] font-bold text-gray-300 uppercase tracking-tighter">View {idx+1}</span>}
-                        </label>
-                      ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    {/* Owner Picture */}
+                    <div className="space-y-4">
+                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-widest ml-2">Owner Picture</label>
+                      <label className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative">
+                        <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'ownerPicture')} />
+                        {formData.ownerPicture ? (
+                          <img src={formData.ownerPicture instanceof File ? URL.createObjectURL(formData.ownerPicture) : ''} className="w-full h-full object-cover" alt="Owner" />
+                        ) : (
+                          <User className="text-gray-300 w-10 h-10" />
+                        )}
+                      </label>
+                    </div>
+
+                    {/* Brand Images (5) */}
+                    <div className="space-y-4">
+                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-widest ml-2">Brand Images (5 Portfolio)</label>
+                      <div className="grid grid-cols-5 gap-3">
+                        {formData.shopImages.map((img, idx) => (
+                          <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative">
+                            <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'shopImages', idx)} />
+                            {img ? (
+                              <img src={img instanceof File ? URL.createObjectURL(img) : ''} className="w-full h-full object-cover" alt="Brand" />
+                            ) : (
+                              <Camera className="text-gray-300 w-4 h-4" />
+                            )}
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Worker Image */}
-                  <div className="space-y-4">
-                    <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-widest ml-2">Worker/Expert Image</label>
-                    <label className="w-24 h-24 bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden">
-                      <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'workerImages', 0)} />
-                      {formData.workerImages[0] ? (
-                        <img src={formData.workerImages[0] instanceof File ? URL.createObjectURL(formData.workerImages[0]) : ''} className="w-full h-full object-cover" alt="Worker" />
-                      ) : (
-                        <User className="text-gray-300 w-8 h-8" />
-                      )}
-                    </label>
+                  {/* Worker Images (6) */}
+                  <div className="space-y-6">
+                    <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-widest ml-2">Worker Images (Up to 6 Experts)</label>
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                      {formData.workerImages.map((img, idx) => (
+                        <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative">
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'workerImages', idx)} />
+                          {img ? (
+                            <img src={img instanceof File ? URL.createObjectURL(img) : ''} className="w-full h-full object-cover" alt="Worker" />
+                          ) : (
+                            <ShoppingBag className="text-gray-300 w-6 h-6" />
+                          )}
+                          {!img && <span className="absolute bottom-2 text-[0.4rem] font-bold text-gray-300 uppercase tracking-tighter">Slot {idx+1}</span>}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -344,14 +379,14 @@ const PartnerRegistration: React.FC = () => {
                 disabled={isProcessing}
                 className="flex-1 py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.4em] shadow-xl shadow-bbBlue/20 hover:bg-blue-600 transition-all active:scale-[0.98] disabled:opacity-50"
               >
-                {isProcessing ? 'Syncing Network...' : currentStep < 4 ? 'Continue Next' : 'Request Admisson'}
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </div>
-    </div>
-  );
+    {isProcessing ? 'Syncing Network...' : currentStep < 4 ? 'Continue Next' : 'Proceed'}
+  </button>
+</div>
+</form>
+</motion.div>
+</div>
+</div>
+);
 };
 
 export default PartnerRegistration;

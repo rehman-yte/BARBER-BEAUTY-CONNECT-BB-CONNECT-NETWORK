@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import PartnerAuthModal from './PartnerAuthModal';
 
 const PartnerCTA: React.FC = () => {
+  const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = React.useState(false);
 
   return (
@@ -25,7 +26,7 @@ const PartnerCTA: React.FC = () => {
             Join our elite network of Barbers and Beauty Studios. Get more bookings and manage your shop professionally.
           </p>
           <button
-            onClick={() => setShowAuthModal(true)}
+            onClick={() => navigate('/partner-auth')}
             className="bg-bbBlue-deep text-white px-[2.5rem] py-[1.25rem] rounded-full font-bold uppercase tracking-[0.3em] text-[0.75rem] shadow-xl shadow-bbBlue/20 hover:bg-charcoal transition-all active:scale-95"
           >
             JOIN AS A PARTNER
