@@ -17,7 +17,7 @@ interface AppUser {
   email: string | null;
   name: string;
   role: 'customer' | 'partner' | 'admin';
-  status: 'active';
+  status: 'active' | 'pending' | null;
   photoURL?: string;
   token?: string; // For admin API calls
 }
@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: firebaseUser.email,
               name: userData.name || 'Network Member',
               role: userData.role || 'customer',
-              status: userData.status || 'active',
+              status: userData.status !== undefined ? userData.status : 'active',
               photoURL: firebaseUser.photoURL || undefined,
               token: (userData.role === 'admin' || firebaseUser.email === 'haidartheworldking@gmail.com') ? adminConfig.adminSecret : undefined
             });
@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData = {
         name: additionalData.name || 'Network Member',
         role: additionalData.role || 'customer',
-        status: 'active',
+        status: additionalData.status !== undefined ? additionalData.status : 'active',
         createdAt: new Date().toISOString()
       };
       

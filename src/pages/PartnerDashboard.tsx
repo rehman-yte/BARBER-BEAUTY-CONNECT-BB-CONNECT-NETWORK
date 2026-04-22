@@ -209,7 +209,7 @@ const PartnerDashboard: React.FC = () => {
     isToday(r.createdAt)
   ).length;
 
-  const isVerified = profileData?.isApproved === true || profileData?.adminApproved === true || profileData?.status === 'approved';
+  const isVerified = profileData?.isApproved === true || profileData?.adminApproved === true || profileData?.status === 'approved' || user?.status === 'active';
 
   return (
     <div className="pt-[8rem] pb-[5rem] bg-white min-h-screen">

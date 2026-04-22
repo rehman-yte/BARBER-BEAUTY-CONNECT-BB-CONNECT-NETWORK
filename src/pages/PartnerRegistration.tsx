@@ -7,8 +7,9 @@ import { auth } from '../lib/firebase';
 
 const PartnerRegistration: React.FC = () => {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, updateUser } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
   const [generatedToken, setGeneratedToken] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [error, setError] = useState('');
@@ -161,7 +162,7 @@ const PartnerRegistration: React.FC = () => {
         console.error("Geolocation Error:", error);
         let msg = "Unable to fetch location.";
         if (error.code === error.PERMISSION_DENIED) {
-          msg = "Location is mandatory for assigning experts and listing your shop. Please enable it in your browser settings.";
+          msg = "Location mandatory hai assignment ke liye.";
         }
         alert(msg);
       }
@@ -192,7 +193,10 @@ const PartnerRegistration: React.FC = () => {
         { name: 'Threading', price: 50 }
       ];
 
-      // 1. Skip Signup - Already handled in Step 1
+      // 1. Update User Status to 'pending'
+      if (updateUser) {
+        await updateUser({ status: 'pending' });
+      }
       
       // 2. Add Shop to Firestore
       const currentUser = auth.currentUser;
@@ -239,6 +243,16 @@ const PartnerRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (currentStep < 4) {
+      if (currentStep === 3 && !formData.lat) {
+        alert("Location mandatory hai assignment ke liye.");
+        return;
+      }
+      setCurrentStep(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     const quantity = parseInt(formData.workerQuantity as any);
     if (isNaN(quantity) || quantity < 1 || quantity > 6) {
@@ -291,179 +305,166 @@ const PartnerRegistration: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               className="w-full max-w-[60rem] bg-white border border-gray-100 p-[2.5rem] md:p-[4rem] rounded-[4rem] shadow-sm mb-[2.5rem]"
             >
-              <div className="mb-[4rem] text-center md:text-left">
-                <h1 className="text-[2.5rem] md:text-[3.125rem] font-serif font-bold text-charcoal mb-[1rem] uppercase tracking-tight">Onboarding Mode</h1>
-                <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.4em]">Finalize Your Professional Hub</p>
+              <div className="mb-[4rem] flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-50 pb-8">
+                <div>
+                  <h1 className="text-[2rem] md:text-[2.5rem] font-serif font-bold text-charcoal mb-[0.5rem] uppercase tracking-tight line-height-[1.1]">Onboarding Mode</h1>
+                  <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.4em]">Step {currentStep} of 4: {
+                    currentStep === 1 ? 'Category Selection' :
+                    currentStep === 2 ? 'Brand Details' :
+                    currentStep === 3 ? 'Location Capture' : 'Media & Docs'
+                  }</p>
+                </div>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4].map(s => (
+                    <div key={s} className={`h-1.5 w-8 rounded-full transition-all duration-500 ${s <= currentStep ? 'bg-bbBlue' : 'bg-gray-100'}`}></div>
+                  ))}
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-[5rem]">
+              <form onSubmit={handleSubmit} className="space-y-[4rem]">
                 
-                {/* 01. IDENTITY */}
-                <section className="space-y-[2.5rem]">
-                  <h3 className="text-[0.75rem] font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-[1rem]">01. Identity</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[2.5rem]">
-                    <div className="space-y-[1rem]">
-                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Full Owner Name</label>
-                      <input required name="ownerName" value={formData.ownerName} onChange={handleInputChange} className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue" />
-                    </div>
-                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-3xl p-[1.5rem] cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all group">
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'ownerPic')} />
-                      <div className={`w-[4rem] h-[4rem] rounded-full flex items-center justify-center mb-[1rem] ${formData.ownerPic ? 'bg-green-50 text-green-500' : 'bg-white text-gray-200 group-hover:text-bbBlue'}`}>
-                        <svg className="w-[2rem] h-[2rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                      </div>
-                      <span className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">{formData.ownerPic ? 'Captured' : 'Upload Picture'}</span>
-                    </label>
-                  </div>
-                </section>
-
-                {/* 02. SHOP HUB */}
-                <section className="space-y-[2.5rem]">
-                  <h3 className="text-[0.75rem] font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-[1rem]">02. Shop Hub</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[2.5rem]">
-                    <div className="space-y-[1rem]">
-                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Shop Name</label>
-                      <input required name="shopName" value={formData.shopName} onChange={handleInputChange} className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue" />
-                    </div>
-                    <div className="space-y-[1rem]">
-                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Category</label>
-                      <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] font-bold uppercase tracking-widest text-bbBlue outline-none">
-                         <option value="Barber">Barber</option>
-                         <option value="Beauty Parlour">Beauty Parlour</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[2.5rem]">
-                    <div className="space-y-[1rem]">
-                       <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Worker Quantity</label>
-                       <input 
-                         type="number" 
-                         name="workerQuantity" 
-                         min="1" 
-                         max="6" 
-                         value={formData.workerQuantity} 
-                         onChange={handleWorkerQuantity} 
-                         placeholder="1-6"
-                         className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] font-mono outline-none focus:border-bbBlue" 
-                       />
-                    </div>
-                    <div className="space-y-[1rem]">
-                       <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Mobile Number (Primary Key)</label>
-                       <input 
-                         readOnly 
-                         value={formData.mobile} 
-                         className="w-full px-[1.5rem] py-[1.25rem] bg-gray-100 border border-gray-100 rounded-2xl text-[0.875rem] font-mono outline-none text-gray-400 cursor-not-allowed" 
-                       />
-                    </div>
-                  </div>
-
-                  <div className="space-y-[1.5rem]">
-                    <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Worker Images ({formData.workerQuantity || 0} REQUIRED)</label>
-                    <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                      {formData.workerImages.map((img, idx) => (
-                        <label key={idx} className="aspect-square border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all group">
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'workerImages', idx)} />
-                          {img ? (
-                            <div className="w-full h-full rounded-2xl bg-green-50 flex items-center justify-center text-green-500">
-                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                            </div>
-                          ) : (
-                            <svg className="w-6 h-6 text-gray-200 group-hover:text-bbBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4"/></svg>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-[1.5rem]">
-                    <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Shop Showcase (6 Images Preferred)</label>
-                    <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                      {formData.shopImages.map((img, idx) => (
-                        <label key={idx} className="aspect-square border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all group">
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'shopImages', idx)} />
-                          {img ? (
-                            <div className="w-full h-full rounded-2xl bg-green-50 flex items-center justify-center text-green-500 overflow-hidden">
-                              <img src={img instanceof File ? URL.createObjectURL(img) : img as string} className="w-full h-full object-cover" alt={`Shop ${idx + 1}`} referrerPolicy="no-referrer" />
-                            </div>
-                          ) : (
-                            <svg className="w-6 h-6 text-gray-200 group-hover:text-bbBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-
-                {/* 03. SHOP EXACT ADDRESS */}
-                <section className="space-y-[2.5rem]">
-                  <h3 className="text-[0.75rem] font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-[1rem]">03. Shop Exact Address</h3>
-                  <div className="space-y-[2rem]">
-                    <div className="flex flex-col md:flex-row gap-[2rem] items-start md:items-center">
+                {/* STEP 1: CATEGORY SELECTION */}
+                {currentStep === 1 && (
+                  <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-[2.5rem]">
+                    <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">01. Select Your Category</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <button 
                         type="button"
-                        onClick={getCurrentLocation}
-                        disabled={isGeocoding}
-                        className="px-[2rem] py-[1rem] bg-charcoal text-white rounded-2xl font-bold uppercase text-[0.625rem] tracking-[0.2em] hover:bg-black transition-all flex items-center gap-3 disabled:opacity-50"
+                        onClick={() => setFormData(p => ({ ...p, category: 'Barber' }))}
+                        className={`p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 text-center ${formData.category === 'Barber' ? 'border-bbBlue bg-bbBlue/5' : 'border-gray-50 hover:border-gray-100'}`}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        {isGeocoding ? 'Fetching Address...' : formData.lat ? 'Location Captured' : 'Get Current Location'}
-                      </button>
-                      {formData.lat && (
-                        <div className="flex gap-4 text-[0.625rem] font-mono text-bbBlue font-bold bg-bbBlue/5 px-4 py-2 rounded-xl">
-                          <span>LAT: {formData.lat.toFixed(6)}</span>
-                          <span>LNG: {formData.lng?.toFixed(6)}</span>
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${formData.category === 'Barber' ? 'bg-bbBlue text-white' : 'bg-gray-50 text-gray-300'}`}>
+                           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                         </div>
-                      )}
+                        <span className="text-[0.875rem] font-bold uppercase tracking-widest text-charcoal">Barber Shop</span>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, category: 'Beauty Parlour' }))}
+                        className={`p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 text-center ${formData.category === 'Beauty Parlour' ? 'border-bbBlue bg-bbBlue/5' : 'border-gray-50 hover:border-gray-100'}`}
+                      >
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${formData.category === 'Beauty Parlour' ? 'bg-bbBlue text-white' : 'bg-gray-50 text-gray-300'}`}>
+                           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A8.959 8.959 0 013 12c0-.778.099-1.533.284-2.253"/></svg>
+                        </div>
+                        <span className="text-[0.875rem] font-bold uppercase tracking-widest text-charcoal">Beauty Parlour</span>
+                      </button>
                     </div>
+                  </motion.section>
+                )}
 
-                    <div className="space-y-[1rem]">
-                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">Manual Landmark / Address</label>
-                      <textarea 
-                        required={!formData.lat}
-                        name="manualAddress"
-                        value={formData.manualAddress}
-                        onChange={(e) => setFormData(prev => ({ ...prev, manualAddress: e.target.value }))}
-                        placeholder="Enter full address or landmark details..."
-                        className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue min-h-[8rem] resize-none"
-                      />
-                      <p className="text-[0.5rem] text-gray-400 font-bold uppercase tracking-widest">
-                        * Mandatory: Either GPS coordinates or a full manual address is required.
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 04. SETTLEMENTS */}
-                <section className="space-y-[2.5rem]">
-                  <h3 className="text-[0.75rem] font-bold text-gray-300 uppercase tracking-[0.3em] border-b border-gray-50 pb-[1rem]">04. Settlements</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[2.5rem]">
-                    <div className="space-y-[1rem]">
-                      <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em]">UPI ID for Payments</label>
-                      <input required name="upiId" value={formData.upiId} onChange={handleInputChange} placeholder="brand@upi" className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] font-mono outline-none focus:border-bbBlue" />
-                    </div>
-                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-3xl p-[1.5rem] cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all group">
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'govId')} />
-                      <div className={`w-[4rem] h-[4rem] rounded-2xl flex items-center justify-center mb-[1rem] ${formData.govId ? 'bg-green-50 text-green-500' : 'bg-white text-gray-200 group-hover:text-bbBlue'}`}>
-                        <svg className="w-[2rem] h-[2rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                {/* STEP 2: BRAND DETAILS */}
+                {currentStep === 2 && (
+                  <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-[3rem]">
+                    <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">02. Tell us about your brand</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                      <div className="space-y-2">
+                        <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-2">Owner Name</label>
+                        <input required name="ownerName" value={formData.ownerName} onChange={handleInputChange} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue" placeholder="John Doe" />
                       </div>
-                      <span className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">{formData.govId ? 'ID Scanned' : 'Scan Gov ID'}</span>
-                    </label>
-                  </div>
-                </section>
+                      <div className="space-y-2">
+                        <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-2">Brand Name</label>
+                        <input required name="shopName" value={formData.shopName} onChange={handleInputChange} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue" placeholder="Elite Studio" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-2">Total Workers</label>
+                        <input type="number" name="workerQuantity" min="1" max="6" value={formData.workerQuantity} onChange={handleWorkerQuantity} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue font-mono" />
+                      </div>
+                    </div>
+                  </motion.section>
+                )}
 
-                <button 
-                  type="submit" 
-                  disabled={formData.workerImages.filter(img => img !== null).length < formData.workerQuantity}
-                  className="w-full py-[1.5rem] bg-bbBlue text-white rounded-3xl font-bold uppercase text-[0.75rem] tracking-[0.4em] shadow-2xl shadow-bbBlue/20 hover:bg-bbBlue-deep transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Request Network Admission
-                </button>
+                {/* STEP 3: LOCATION */}
+                {currentStep === 3 && (
+                  <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-[3rem]">
+                    <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">03. Shop Address & GPS</h3>
+                    <div className="space-y-8">
+                       <div className="flex flex-col md:flex-row gap-6 items-start">
+                         <button 
+                           type="button" 
+                           onClick={getCurrentLocation}
+                           className={`px-8 py-5 rounded-2xl font-bold uppercase text-[0.625rem] tracking-[0.2em] transition-all flex items-center gap-3 ${formData.lat ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-charcoal text-white hover:bg-black'}`}
+                         >
+                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                           {isGeocoding ? 'Capturing...' : formData.lat ? 'GPS Captured' : 'Fetch Shop Location'}
+                         </button>
+                         {formData.lat && <p className="text-[0.5rem] font-bold text-emerald-500 uppercase tracking-widest mt-2">{formData.manualAddress ? 'Address Resolved' : 'Coordinates Fixed'}</p>}
+                       </div>
+                       <div className="space-y-4">
+                         <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-2">Manual Landmark / Street (Required for Nav)</label>
+                         <textarea required name="manualAddress" value={formData.manualAddress} onChange={(e) => setFormData(p => ({ ...p, manualAddress: e.target.value }))} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue min-h-[8rem] resize-none" placeholder="Exact address with landmark..." />
+                       </div>
+                    </div>
+                  </motion.section>
+                )}
+
+                {/* STEP 4: MEDIA & DOCS */}
+                {currentStep === 4 && (
+                  <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-[4rem]">
+                    <div className="space-y-[2.5rem]">
+                      <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.1: Shop Media</h3>
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                        {formData.shopImages.map((img, idx) => (
+                          <label key={idx} className="aspect-square border-2 border-dashed border-gray-50 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all overflow-hidden">
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'shopImages', idx)} />
+                            {img ? (
+                               <img src={img instanceof File ? URL.createObjectURL(img) : img as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                               <svg className="w-6 h-6 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4"/></svg>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div className="space-y-6">
+                        <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.2: Settlement Info</h3>
+                        <div className="space-y-4">
+                          <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-2">UPI ID (Payments Gateway)</label>
+                          <input required name="upiId" value={formData.upiId} onChange={handleInputChange} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue font-mono" placeholder="yourname@upi" />
+                        </div>
+                      </div>
+                      <div className="space-y-6">
+                        <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.3: Identity Verification</h3>
+                        <label className="flex items-center gap-4 p-5 bg-gray-50 rounded-2xl border border-dashed border-gray-100 cursor-pointer hover:border-bbBlue/30 transition-all">
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'govId')} />
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${formData.govId ? 'bg-emerald-500 text-white' : 'bg-white text-gray-300'}`}>
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                          </div>
+                          <div>
+                            <p className="text-[0.625rem] font-bold text-charcoal uppercase tracking-widest">{formData.govId ? 'Gov ID Uploaded' : 'Upload Government ID'}</p>
+                            <p className="text-[0.5rem] text-gray-400 font-medium">Clear photo of Aadhaar/PAN</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </motion.section>
+                )}
+
+                <div className="flex gap-4">
+                  {currentStep > 1 && (
+                    <button 
+                      type="button" 
+                      onClick={() => setCurrentStep(prev => prev - 1)}
+                      className="px-8 py-5 border border-gray-100 rounded-2xl font-bold uppercase text-[0.625rem] tracking-[0.3em] hover:bg-gray-50 transition-all text-charcoal"
+                    >
+                      Back
+                    </button>
+                  )}
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-5 bg-bbBlue text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.4em] shadow-xl shadow-bbBlue/20 hover:bg-bbBlue-deep transition-all active:scale-[0.98]"
+                  >
+                    {currentStep < 4 ? 'Continue Next' : 'Request Admission'}
+                  </button>
+                </div>
               </form>
             </motion.div>
           ) : (
             <motion.div key="pending" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-[10rem] text-center">
               <div className="relative w-[8rem] h-[8rem] mb-[3rem]">
                  <div className="absolute inset-0 border-4 border-bbBlue/10 rounded-full"></div>
-                 <div className="absolute inset-0 border-4 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
+                 <div className={`absolute inset-0 border-4 border-bbBlue border-t-transparent rounded-full ${!generatedToken ? 'animate-spin' : 'border-t-bbBlue'}`}></div>
                  <div className="absolute inset-0 flex items-center justify-center text-bbBlue">
                     <svg className="w-[3rem] h-[3rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                  </div>

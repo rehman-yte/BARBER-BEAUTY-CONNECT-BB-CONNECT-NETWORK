@@ -41,9 +41,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     return <Navigate to="/auth" replace />;
   }
 
+  // Mandatory Onboarding Check for Partners
+  if (user.role === 'partner' && user.status === null && !window.location.hash.includes('/onboarding')) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   if (allowedRole && user.role !== allowedRole) {
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
-    return <Navigate to={user.role === 'partner' ? "/partner-dashboard" : "/dashboard"} replace />;
+    return <Navigate to={user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/dashboard"} replace />;
   }
 
   return <>{children}</>;
@@ -58,7 +63,7 @@ const AppRoutes: React.FC = () => {
     <Routes>
       <Route path="/" element={
         user?.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
-        user?.role === 'partner' ? <Navigate to="/partner-dashboard" replace /> : 
+        user?.role === 'partner' ? (user.status === null ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
         <LandingPage />
       } />
       <Route path="/auth" element={
@@ -73,11 +78,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/terms" element={<TermsAndConditions />} />
       <Route path="/cookies" element={<CookiesPolicy />} />
       
-      {/* Customer Routes (LOCKED) */}
+      {/* Shared and Customer Routes */}
       <Route path="/explore" element={<ProtectedRoute allowedRole="customer"><ExplorePage /></ProtectedRoute>} />
-      <Route path="/shop" element={<ProtectedRoute allowedRole="customer"><ShopPage /></ProtectedRoute>} />
-      <Route path="/checkout" element={<ProtectedRoute allowedRole="customer"><CheckoutPage /></ProtectedRoute>} />
-      <Route path="/shop/:id" element={<ProtectedRoute allowedRole="customer"><ShopDetail /></ProtectedRoute>} />
+      <Route path="/shop" element={<ProtectedRoute><ShopPage /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/shop/:id" element={<ProtectedRoute><ShopDetail /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       
       {/* Partner Routes */}

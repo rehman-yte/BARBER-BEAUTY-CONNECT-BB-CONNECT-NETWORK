@@ -231,34 +231,38 @@ const Navbar: React.FC = () => {
         </div>
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
-          {isLoggedIn && !isPartner ? (
+          {isLoggedIn && (
             <>
+              {!isPartner && (
+                <Link 
+                  to="/" 
+                  className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                >
+                  Home
+                </Link>
+              )}
               <Link 
-                to="/" 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-              >
-                Home
-              </Link>
-              <Link 
-                to={user?.role === 'admin' ? "/admin-dashboard" : "/dashboard"} 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/dashboard' || location.pathname === '/admin-dashboard') ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                to={user?.role === 'admin' ? "/admin-dashboard" : (isPartner ? "/partner-dashboard" : "/dashboard")} 
+                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
               >
                 Dashboard
               </Link>
-              <Link 
-                to="/explore" 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-              >
-                Explore
-              </Link>
+              {!isPartner && (
+                <Link 
+                  to="/explore" 
+                  className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                >
+                  Explore
+                </Link>
+              )}
               <Link 
                 to="/shop" 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
               >
                 Shop
               </Link>
             </>
-          ) : null}
+          )}
         </div>
 
         <div className="flex-1 flex justify-end items-center gap-[0.75rem] md:gap-[1.5rem]">
@@ -271,32 +275,30 @@ const Navbar: React.FC = () => {
             </button>
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
-            {(!isPartner || location.pathname === '/partner-dashboard') && (
-              <>
-                <Link 
-                  to="/checkout"
-                  className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
-                >
-                  <ShoppingBag size={20} />
-                  {totalItems > 0 && (
-                    <span className="absolute top-[0.375rem] right-[0.375rem] min-w-[1rem] h-4 bg-bbBlue text-white text-[0.5rem] font-bold flex items-center justify-center rounded-full border-2 border-white px-1">
-                      {totalItems}
-                    </span>
-                  )}
-                </Link>
+            <Link 
+              to="/checkout"
+              className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
+            >
+              <ShoppingBag size={20} />
+              {totalItems > 0 && (
+                <span className="absolute top-[0.375rem] right-[0.375rem] min-w-[1rem] h-4 bg-bbBlue text-white text-[0.5rem] font-bold flex items-center justify-center rounded-full border-2 border-white px-1">
+                  {totalItems}
+                </span>
+              )}
+            </Link>
 
-                <div className="relative" ref={notificationRef}>
-                <button 
-                  onClick={toggleNotifications}
-                  className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
-                >
-                  <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  {hasUnread && (
-                    <span className="absolute top-[0.375rem] right-[0.375rem] w-[0.625rem] h-[0.625rem] bg-red-500 rounded-full border-2 border-white shadow-sm animate-pulse"></span>
-                  )}
-                </button>
+            <div className="relative" ref={notificationRef}>
+              <button 
+                onClick={toggleNotifications}
+                className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
+              >
+                <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {hasUnread && (
+                  <span className="absolute top-[0.375rem] right-[0.375rem] w-[0.625rem] h-[0.625rem] bg-red-500 rounded-full border-2 border-white shadow-sm animate-pulse"></span>
+                )}
+              </button>
 
                 <AnimatePresence>
                   {showNotifications && (
@@ -337,8 +339,6 @@ const Navbar: React.FC = () => {
                   )}
                 </AnimatePresence>
               </div>
-              </>
-            )}
 
             <div className="relative" ref={dropdownRef}>
               <button 

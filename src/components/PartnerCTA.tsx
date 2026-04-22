@@ -3,11 +3,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+import PartnerAuthModal from './PartnerAuthModal';
+
 const PartnerCTA: React.FC = () => {
-  const navigate = useNavigate();
+  const [showAuthModal, setShowAuthModal] = React.useState(false);
 
   return (
-    <section className="py-[6rem] bg-white">
+    <section className="py-[6rem] bg-white text-charcoal">
       <div className="max-w-[1440px] mx-auto px-[5%] text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -23,13 +25,18 @@ const PartnerCTA: React.FC = () => {
             Join our elite network of Barbers and Beauty Studios. Get more bookings and manage your shop professionally.
           </p>
           <button
-            onClick={() => navigate('/partner-auth')}
+            onClick={() => setShowAuthModal(true)}
             className="bg-bbBlue-deep text-white px-[2.5rem] py-[1.25rem] rounded-full font-bold uppercase tracking-[0.3em] text-[0.75rem] shadow-xl shadow-bbBlue/20 hover:bg-charcoal transition-all active:scale-95"
           >
             JOIN AS A PARTNER
           </button>
         </motion.div>
       </div>
+
+      <PartnerAuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+      />
     </section>
   );
 };

@@ -151,6 +151,20 @@ export const updateShop = async (id: string, updates: any) => {
   try {
     const docRef = doc(db, 'partners', id);
     await updateDoc(docRef, updates);
+    
+    // If status is being updated to approved/active, sync with user collection
+    if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
+      try {
+        const userRef = doc(db, 'users', id);
+        await updateDoc(userRef, { 
+          status: 'active',
+          adminApproved: true 
+        });
+      } catch (userErr) {
+        console.warn("Could not sync status to users collection (might be using mobile ID):", userErr);
+      }
+    }
+    
     return true;
   } catch (err) {
     console.error('Firestore updateShop production failure:', err);
