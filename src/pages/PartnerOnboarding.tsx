@@ -151,7 +151,7 @@ const PartnerOnboarding: React.FC = () => {
         >
           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
         </motion.div>
-        <h2 className="text-3xl font-serif font-bold text-white mb-4 uppercase tracking-tighter">Processing Membership...</h2>
+        <h2 className="text-3xl font-serif font-bold text-white mb-4 uppercase tracking-tighter">Preparing your Dashboard...</h2>
         <p className="text-bbBlue text-[0.625rem] font-bold uppercase tracking-[0.5em] max-w-sm">
           Finalizing Partner Registry. 3 Seconds to Terminal Access.
         </p>
