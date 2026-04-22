@@ -4,12 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 
 const AuthPage: React.FC = () => {
-  const { user, signIn, signUp, signInWithGoogle, loading } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
+  const { user, signInWithGoogle, loading } = useAuth();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -23,56 +18,13 @@ const AuthPage: React.FC = () => {
         setError('Partner detected. Please login through the Partner Portal at the bottom of the landing page.');
         console.warn("Blocked Partner Login on Customer Portal");
         // Optional: Auto redirect after few seconds
-        setTimeout(() => navigate('/partner-signin', { replace: true }), 3000);
+        setTimeout(() => navigate('/', { replace: true }), 3000);
       } else {
         console.log("Customer session active:", user.uid);
         navigate('/customer-dashboard', { replace: true });
       }
     }
   }, [user, loading, navigate]);
-
-  const validateEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-      if (isLogin) {
-        await signIn(email, password);
-      } else {
-        await signUp(email, password, { 
-          name: name || 'Valued Customer', 
-          mobile,
-          role: 'customer',
-          user_type: 'customer'
-        });
-      }
-    } catch (err: any) {
-      let errMsg = err.message;
-      if (err.code === 'auth/email-already-in-use') {
-        errMsg = 'This email is already registered. Please sign in instead.';
-      } else if (err.code === 'auth/weak-password') {
-        errMsg = 'The password is too weak. Please use at least 6 characters.';
-      } else if (err.code === 'auth/invalid-email') {
-        errMsg = 'The email address is badly formatted.';
-      } else if (err.code === 'auth/user-not-found') {
-        errMsg = 'Customer profile not found. If you are a partner, please use the correct portal.';
-      } else if (err.code === 'auth/wrong-password') {
-        errMsg = 'Incorrect password. Please try again or reset it.';
-      } else if (err.code === 'auth/invalid-credential') {
-        errMsg = 'Invalid credentials. If you are a partner, please use the Partner Link on the Landing Page.';
-      }
-      
-      console.error("AUTH_FAILURE:", errMsg);
-      setError(errMsg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleGoogleAuth = async () => {
     setIsSubmitting(true);
@@ -115,7 +67,7 @@ const AuthPage: React.FC = () => {
 
         <div className="mt-[2rem] text-center border-t border-gray-50 pt-8">
           <p className="text-[0.5625rem] font-bold text-gray-300 uppercase tracking-[0.4em]">
-            Official Customer Access Gateway
+            Secure Customer Access Gateway
           </p>
         </div>
       </motion.div>

@@ -11,39 +11,9 @@ interface CustomerAuthModalProps {
 }
 
 const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { signIn, signUp, signInWithGoogle } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
+  const { signInWithGoogle } = useAuth();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-      if (isLogin) {
-        await signIn(email, password);
-      } else {
-        await signUp(email, password, { 
-          name: name || 'Valued Customer', 
-          mobile,
-          role: 'customer',
-          user_type: 'customer' // Specific directive requirement
-        });
-      }
-      if (onSuccess) onSuccess();
-      onClose();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleGoogleAuth = async () => {
     setIsSubmitting(true);
@@ -108,7 +78,7 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, 
 
             <div className="mt-[2rem] text-center border-t border-gray-50 pt-6">
               <p className="text-[0.5625rem] font-bold text-gray-300 uppercase tracking-widest">
-                Safe & Verified Customer Entry
+                Safe & Secure Customer Entry
               </p>
             </div>
           </motion.div>

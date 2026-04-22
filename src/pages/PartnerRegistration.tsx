@@ -401,15 +401,38 @@ const PartnerRegistration: React.FC = () => {
                 {currentStep === 4 && (
                   <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-[4rem]">
                     <div className="space-y-[2.5rem]">
-                      <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.1: Shop Media</h3>
+                      <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.1: Shop Media (6 Images)</h3>
                       <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
                         {formData.shopImages.map((img, idx) => (
-                          <label key={idx} className="aspect-square border-2 border-dashed border-gray-50 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all overflow-hidden">
+                          <label key={idx} className="aspect-square border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all overflow-hidden relative group">
                             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'shopImages', idx)} />
                             {img ? (
                                <img src={img instanceof File ? URL.createObjectURL(img) : img as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
-                               <svg className="w-6 h-6 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4"/></svg>
+                               <div className="text-center p-2">
+                                 <svg className="w-6 h-6 text-gray-200 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4v16m8-8H4"/></svg>
+                                 <span className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-tighter">View {idx + 1}</span>
+                               </div>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-[2.5rem]">
+                      <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.2: Expert/Worker Media</h3>
+                      <p className="text-[0.625rem] text-gray-400 -mt-6">Please upload photos of the {formData.workerQuantity} experts you've listed.</p>
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                        {formData.workerImages.map((img, idx) => (
+                          <label key={idx} className="aspect-square border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-50/50 hover:border-bbBlue/30 transition-all overflow-hidden relative">
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'workerImages', idx)} />
+                            {img ? (
+                               <img src={img instanceof File ? URL.createObjectURL(img) : img as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                               <div className="text-center p-2">
+                                 <svg className="w-6 h-6 text-gray-200 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                 <span className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-tighter">Expert {idx + 1}</span>
+                               </div>
                             )}
                           </label>
                         ))}
@@ -418,14 +441,14 @@ const PartnerRegistration: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                       <div className="space-y-6">
-                        <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.2: Settlement Info</h3>
+                        <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.3: Settlement Info</h3>
                         <div className="space-y-4">
                           <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-2">UPI ID (Payments Gateway)</label>
                           <input required name="upiId" value={formData.upiId} onChange={handleInputChange} className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue font-mono" placeholder="yourname@upi" />
                         </div>
                       </div>
                       <div className="space-y-6">
-                        <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.3: Identity Verification</h3>
+                        <h3 className="text-[0.75rem] font-bold text-gray-400 uppercase tracking-[0.3em]">Step 4.4: Identity Verification</h3>
                         <label className="flex items-center gap-4 p-5 bg-gray-50 rounded-2xl border border-dashed border-gray-100 cursor-pointer hover:border-bbBlue/30 transition-all">
                           <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'govId')} />
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${formData.govId ? 'bg-emerald-500 text-white' : 'bg-white text-gray-300'}`}>

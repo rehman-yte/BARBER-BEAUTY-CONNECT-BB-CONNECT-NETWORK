@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { getBookings } from '../services/logic_engine';
@@ -8,9 +8,16 @@ import { PersistenceService } from '../services/PersistenceService';
 
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<any[]>(PersistenceService.load('customer_bookings') || []);
   const [loading, setLoading] = useState(!PersistenceService.load('customer_bookings'));
   const [activeTab, setActiveTab] = useState<'approved' | 'pending' | 'failed'>('approved');
+
+  useEffect(() => {
+    if (user && user.role === 'partner') {
+      navigate(user.status === null ? '/onboarding' : '/partner-dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -55,7 +62,7 @@ const CustomerDashboard: React.FC = () => {
   };
 
   // Sync with actual details
-  const displayName = user?.name || 'Network Member';
+  const displayName = user?.name || 'Valued User';
   const photoURL = user?.photoURL;
 
   return (
