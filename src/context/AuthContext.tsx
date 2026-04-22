@@ -64,12 +64,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       if (firebaseUser) {
         try {
-          // ARCHITECTURE GATEKEEPER: Unified Multi-Collection Check
+          console.log(`[AUTH AUDIT] Resolving identity for: ${firebaseUser.uid} (${firebaseUser.email})`);
           
           // 1. MASTER CHECK: partners
           const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
+            console.log("[AUTH AUDIT] Identity Confirmed: PARTNER");
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
@@ -87,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
           if (customerDoc.exists()) {
             const customerData = customerDoc.data();
+            console.log("[AUTH AUDIT] Identity Confirmed: CUSTOMER");
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
@@ -100,68 +102,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 3. LEGACY/ADMIN CHECK: users
+          // 3. ADMIN/LEGACY CHECK
+          const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com' || firebaseUser.email === 'rhfarooqui16@gmail.com';
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          
           if (userDoc.exists()) {
             const userData = userDoc.data() as any;
-            const finalRole = userData.user_type || userData.role || 'customer';
+            const finalRole = isAdmin ? 'admin' : (userData.user_type || userData.role || 'customer');
+            console.log(`[AUTH AUDIT] Legacy Discovery: ${finalRole}`);
             
-            // Re-sync to specific collections if role is clear but doc is missing
-            if (finalRole === 'partner') {
-               // This shouldn't happen if gatekeeper is perfect, but for legacy support:
-               setUser({
-                 uid: firebaseUser.uid,
-                 email: firebaseUser.email,
-                 name: userData.name || 'Partner',
-                 role: 'partner',
-                 user_type: 'partner',
-                 status: userData.status !== undefined ? userData.status : null,
-                 photoURL: firebaseUser.photoURL || undefined
-               });
-               setLoading(false);
-               return;
-            }
-
-            const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
-            const role = isAdmin ? 'admin' : 'customer';
-
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: userData.name || (isAdmin ? 'Master Admin' : 'Network Member'),
-              role: role as any,
-              user_type: role as any,
-              status: 'active',
+              role: finalRole as any,
+              user_type: finalRole as any,
+              status: userData.status !== undefined ? userData.status : (finalRole === 'partner' ? null : 'active'),
               photoURL: firebaseUser.photoURL || undefined,
-              token: (role === 'admin' || isAdmin) ? adminConfig.adminSecret : undefined
-            });
-          } else {
-            // New User Discovery Path (Default to Customer)
-            const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
-            const role = isAdmin ? 'admin' : 'customer';
-            
-            // For customers, we initialize the doc automatically
-            if (role === 'customer') {
-              const customerData = {
-                name: firebaseUser.displayName || 'Network Member',
-                email: firebaseUser.email,
-                role: 'customer',
-                user_type: 'customer',
-                status: 'active',
-                createdAt: new Date().toISOString()
-              };
-              await setDoc(doc(db, 'customers', firebaseUser.uid), customerData);
-            }
-
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
-              role: role,
-              user_type: role,
-              status: 'active',
               token: isAdmin ? adminConfig.adminSecret : undefined
             });
+          } else {
+             // New User - Check if they intended to be a partner (via local storage or email)
+             const intendedRole = localStorage.getItem('bb_intended_role') || (isAdmin ? 'admin' : 'customer');
+             console.log(`[AUTH AUDIT] New Discovery Intended: ${intendedRole}`);
+             
+             const role = (intendedRole === 'partner') ? 'partner' : (intendedRole === 'admin' ? 'admin' : 'customer');
+             
+             // Initialize intended doc
+             const initData = {
+                name: firebaseUser.displayName || 'Network Member',
+                email: firebaseUser.email,
+                role: role,
+                user_type: role,
+                status: role === 'partner' ? null : 'active',
+                createdAt: new Date().toISOString()
+             };
+             
+             await setDoc(doc(db, role === 'partner' ? 'partners' : (role === 'admin' ? 'users' : 'customers'), firebaseUser.uid), initData);
+             await setDoc(doc(db, 'users', firebaseUser.uid), initData);
+
+             setUser({
+               uid: firebaseUser.uid,
+               email: firebaseUser.email,
+               name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
+               role: role as any,
+               user_type: role as any,
+               status: role === 'partner' ? null : 'active',
+               token: isAdmin ? adminConfig.adminSecret : undefined
+             });
           }
         } catch (err) {
           console.error("Identity resolution error:", err);

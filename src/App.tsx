@@ -8,7 +8,7 @@ import ExplorePage from './pages/ExplorePage';
 import ShopDetail from './pages/ShopDetail';
 import CustomerDashboard from './pages/CustomerDashboard';
 import PartnerDashboard from './pages/PartnerDashboard';
-import PartnerRegistration from './pages/PartnerRegistration';
+import PartnerOnboarding from './pages/PartnerOnboarding';
 import PartnerAuth from './pages/PartnerAuth';
 import PartnerSignIn from './pages/PartnerSignIn';
 import ForgotPassword from './pages/ForgotPassword';
@@ -106,7 +106,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/my-shopping" element={<ProtectedRoute allowedRole="customer"><MyShopping /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL (Strictly locked) */}
-      <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerRegistration /></ProtectedRoute>} />
+      <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/partner-auth" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
         user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 

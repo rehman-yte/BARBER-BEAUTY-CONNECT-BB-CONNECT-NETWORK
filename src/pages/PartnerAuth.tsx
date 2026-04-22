@@ -23,6 +23,8 @@ const PartnerAuth: React.FC = () => {
       
       if (!email) throw new Error("Email Address is required");
 
+      localStorage.setItem('bb_intended_role', 'partner');
+      
       await signUp(email, password, { 
         role: 'partner', 
         mobile: mobile,
