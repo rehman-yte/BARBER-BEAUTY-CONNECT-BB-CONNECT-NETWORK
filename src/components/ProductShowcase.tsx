@@ -6,6 +6,8 @@ import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import CustomerAuthModal from './CustomerAuthModal';
 
 interface Product {
   id: string;
@@ -67,44 +69,42 @@ const GENUINE_PRODUCTS: Product[] = [
 
 const ProductShowcase: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isLoggedIn = !!user;
   const { addToCart } = useCart();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>(GENUINE_PRODUCTS);
   const [loading, setLoading] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
 
-  // FUTURE FIRESTORE INTEGRATION
-  /*
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const querySnapshot = await getDocs(collection(db, "products"));
-        const productsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Product[];
-        setProducts(productsData);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
-  */
+  // ... (keeping existing fetch logic commented out if any)
 
   const closeModal = () => {
     setSelectedProduct(null);
     setIsAdded(false);
+    setPendingPath(null);
   };
 
   const handleAddToCart = () => {
+    if (!isLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
     if (selectedProduct) {
       addToCart(selectedProduct);
       setIsAdded(true);
       setTimeout(() => setIsAdded(false), 2000);
+    }
+  };
+
+  const handleProtectedNavigation = (path: string) => {
+    if (isLoggedIn) {
+      navigate(path);
+    } else {
+      setPendingPath(path);
+      setShowAuthModal(true);
     }
   };
 
@@ -119,7 +119,7 @@ const ProductShowcase: React.FC = () => {
             </h2>
           </div>
           <button 
-            onClick={() => navigate('/shop')}
+            onClick={() => handleProtectedNavigation('/shop')}
             className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-widest hover:text-bbBlue-deep transition-colors border-b border-bbBlue/20 pb-1"
           >
             View All Products
@@ -263,6 +263,14 @@ const ProductShowcase: React.FC = () => {
         )}
       </AnimatePresence>
       
+      <CustomerAuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        onSuccess={() => {
+          if (pendingPath) navigate(pendingPath);
+        }}
+      />
+
       <style dangerouslySetInnerHTML={{ __html: `
         .scrollbar-thin::-webkit-scrollbar {
           height: 4px;

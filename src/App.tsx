@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LandingPage from './pages/LandingPage';
@@ -36,10 +36,13 @@ const NotFound: React.FC = () => (
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'customer' | 'partner' | 'admin' }> = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
   
+  const location = useLocation();
+  
   if (loading) return null; 
   if (!user) {
     if (allowedRole === 'admin') return <Navigate to="/admin-login" replace />;
-    return <Navigate to="/auth" replace />;
+    // Redirect to Landing Page and trigger modal via search param, passing intended path
+    return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
   }
 
   // Mandatory Onboarding Check for Partners

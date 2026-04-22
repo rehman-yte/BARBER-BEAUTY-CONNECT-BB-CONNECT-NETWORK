@@ -19,6 +19,7 @@ const Navbar: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [settingsData, setSettingsData] = useState({ upiId: '', isActive: true });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -231,47 +232,68 @@ const Navbar: React.FC = () => {
         </div>
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
-          {isLoggedIn && (
-            <>
-              {!isPartner && (
-                <Link 
-                  to="/" 
-                  className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-                >
-                  Home
-                </Link>
-              )}
-              <Link 
-                to={
-                  user?.role === 'admin' ? "/admin-dashboard" : 
-                  (isPartner ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard")
-                } 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/customer-dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard' || location.pathname === '/onboarding') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-              >
-                Dashboard
-              </Link>
-              {!isPartner && (
-                <Link 
-                  to="/explore" 
-                  className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-                >
-                  Explore
-                </Link>
-              )}
-              <Link 
-                to="/shop" 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-              >
-                Shop
-              </Link>
-            </>
+          {!isPartner && (
+            <Link 
+              to="/" 
+              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+            >
+              Home
+            </Link>
           )}
+          
+          <button
+            onClick={() => {
+              const target = user?.role === 'admin' ? "/admin-dashboard" : 
+              (isPartner ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard");
+              
+              if (isLoggedIn) {
+                navigate(target);
+              } else {
+                setPendingPath(target);
+                setShowAuthModal(true);
+              }
+            }}
+            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/customer-dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard' || location.pathname === '/onboarding') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+          >
+            Dashboard
+          </button>
+
+          {!isPartner && (
+            <button
+              onClick={() => {
+                if (isLoggedIn) navigate('/explore');
+                else {
+                  setPendingPath('/explore');
+                  setShowAuthModal(true);
+                }
+              }}
+              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+            >
+              Explore
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              if (isLoggedIn) navigate('/shop');
+              else {
+                setPendingPath('/shop');
+                setShowAuthModal(true);
+              }
+            }}
+            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+          >
+            Shop
+          </button>
         </div>
 
         <div className="flex-1 flex justify-end items-center gap-[0.75rem] md:gap-[1.5rem]">
           {!isLoggedIn ? (
             <button 
-              onClick={() => setShowAuthModal(true)}
+              onClick={() => {
+                setPendingPath(null);
+                setShowAuthModal(true);
+              }}
               className="text-[0.625rem] font-bold text-black uppercase tracking-widest hover:text-bbBlue transition-all border-b border-transparent hover:border-bbBlue pb-[0.125rem] whitespace-nowrap"
             >
               Sign In
@@ -606,7 +628,8 @@ const Navbar: React.FC = () => {
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
         onSuccess={() => {
-          if (location.pathname === '/auth') navigate('/customer-dashboard');
+          if (pendingPath) navigate(pendingPath);
+          else if (location.pathname === '/auth') navigate('/customer-dashboard');
         }}
       />
     </nav>

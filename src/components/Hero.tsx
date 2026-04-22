@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import CustomerAuthModal from './CustomerAuthModal';
 
@@ -16,9 +16,23 @@ const Hero: React.FC = () => {
   const { user } = useAuth();
   const isLoggedIn = !!user;
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('auth') === 'true' && !isLoggedIn) {
+      setShowAuthModal(true);
+      // Capture intended path if redirected from ProtectedRoute
+      if (location.state?.from) {
+        setPendingPath(location.state.from);
+      }
+      // Clean up URL
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, isLoggedIn, navigate]);
 
   useEffect(() => {
     const timer = setInterval(() => {

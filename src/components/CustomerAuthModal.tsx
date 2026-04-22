@@ -55,7 +55,7 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, 
 
             <div className="text-center mb-[2rem]">
               <h2 className="text-[1.5rem] font-serif font-bold text-charcoal mb-[0.5rem] uppercase tracking-tight">
-                {isLogin ? 'Customer Login' : 'Create Account'}
+                Customer Portal Access
               </h2>
               <p className="text-[0.5625rem] text-bbBlue font-bold uppercase tracking-[0.4em]">Essential Network Access</p>
             </div>
