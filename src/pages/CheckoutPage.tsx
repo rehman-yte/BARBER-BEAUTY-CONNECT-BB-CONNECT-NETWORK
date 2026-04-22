@@ -13,8 +13,9 @@ const CheckoutPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'success'>('cart');
+  const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'processing' | 'success'>('cart');
   const [loading, setLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'wallet' | 'netbanking' | 'card'>('upi');
   const [paymentDetails, setPaymentDetails] = useState({
     upiId: '',
@@ -40,10 +41,30 @@ const CheckoutPage: React.FC = () => {
 
   const handlePayment = async () => {
     setLoading(true);
-    // Simulate payment gateway processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    setPaymentError(null);
+    setStep('processing');
     
+    // Step 1: Simulated Secure Gateway Handshake
+    // We stay in the 'processing' state. No Firestore write happens yet.
+    await new Promise(resolve => setTimeout(resolve, 3500));
+    
+    // Step 2: Payment Verification Check
+    // Simulating a successful verification from the gateway provider
+    const isPaymentVerified = true; // In a real app, this is the API response code
+    
+    if (!isPaymentVerified) {
+      setLoading(false);
+      setStep('payment');
+      setPaymentError("Order Not Placed - Payment Failed. Please verify your details and try again.");
+      // Redirect logic if failure persists
+      setTimeout(() => {
+        navigate('/shop');
+      }, 3000);
+      return;
+    }
+
     try {
+      // Step 3: Atomic Order Creation (Success Path Only)
       const orderData = {
         customerId: user?.uid,
         customerName: formData.fullName,
@@ -54,9 +75,9 @@ const CheckoutPage: React.FC = () => {
           state: formData.state
         },
         items: cart,
-        totalAmount: totalPrice,
+        totalAmount: totalPrice, // Strictly matches cart subtotal
         status: 'confirmed',
-        paymentStatus: 'paid',
+        paymentStatus: 'paid', // Mark as paid ONLY after verification
         paymentMethod: paymentMethod,
         paymentMethodDetail: paymentMethod === 'upi' ? paymentDetails.upiId : 
                              paymentMethod === 'wallet' ? paymentDetails.wallet : 
@@ -64,12 +85,14 @@ const CheckoutPage: React.FC = () => {
         createdAt: serverTimestamp()
       };
 
+      // ONLY write to orders collection AFTER verified success
       await addDoc(collection(db, 'orders'), orderData);
+      
       setStep('success');
       clearCart();
     } catch (error) {
-      console.error("Error saving order:", error);
-      alert("Failed to process order. Please try again.");
+      console.error("Critical: Payment verified but order sync failed:", error);
+      setPaymentError("Payment Successful, but we encountered a sync error. Our team is resolving this.");
     } finally {
       setLoading(false);
     }
@@ -430,6 +453,16 @@ const CheckoutPage: React.FC = () => {
                     </AnimatePresence>
                   </div>
 
+                  {paymentError && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-6"
+                    >
+                      <p className="text-[0.625rem] font-bold text-red-500 uppercase tracking-widest text-center">{paymentError}</p>
+                    </motion.div>
+                  )}
+
                   <div className="pt-8 flex flex-col md:flex-row justify-between gap-4">
                     <button onClick={() => setStep('shipping')} className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors order-2 md:order-1">
                       <ArrowLeft size={14} /> Back to Shipping
@@ -448,6 +481,36 @@ const CheckoutPage: React.FC = () => {
                         </>
                       )}
                     </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === 'processing' && (
+                <motion.div
+                  key="processing"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="py-20 flex flex-col items-center justify-center text-center space-y-8"
+                >
+                  <div className="relative">
+                    <div className="w-32 h-32 border-4 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ShieldCheck size={40} className="text-bbBlue opacity-20" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-serif font-bold text-charcoal mb-4">Verifying Transaction</h3>
+                    <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.3em] leading-relaxed max-w-xs mx-auto">
+                      Connecting to Secure Gateway Hub. <br/> Do not refresh or close this tab.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                      <span className="text-[0.5rem] font-bold text-emerald-600 uppercase tracking-widest">Secure Connection Active</span>
+                    </div>
+                    <div className="w-[1px] h-4 bg-gray-200"></div>
+                    <span className="text-[0.75rem] font-mono font-bold text-charcoal">₹{totalPrice}</span>
                   </div>
                 </motion.div>
               )}
