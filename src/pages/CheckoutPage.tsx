@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus } from 'lucide-react';
+import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
 
 const CheckoutPage: React.FC = () => {
   const { cart, totalPrice, totalItems, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -15,6 +15,15 @@ const CheckoutPage: React.FC = () => {
   
   const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'success'>('cart');
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'wallet' | 'netbanking' | 'card'>('upi');
+  const [paymentDetails, setPaymentDetails] = useState({
+    upiId: '',
+    wallet: '',
+    bank: '',
+    cardNum: '•••• •••• •••• 4242',
+    expiry: '12 / 28',
+    cvv: '•••'
+  });
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
     email: user?.email || '',
@@ -31,7 +40,7 @@ const CheckoutPage: React.FC = () => {
 
   const handlePayment = async () => {
     setLoading(true);
-    // Mock payment delay
+    // Simulate payment gateway processing
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     try {
@@ -48,6 +57,10 @@ const CheckoutPage: React.FC = () => {
         totalAmount: totalPrice,
         status: 'confirmed',
         paymentStatus: 'paid',
+        paymentMethod: paymentMethod,
+        paymentMethodDetail: paymentMethod === 'upi' ? paymentDetails.upiId : 
+                             paymentMethod === 'wallet' ? paymentDetails.wallet : 
+                             paymentMethod === 'netbanking' ? paymentDetails.bank : 'card',
         createdAt: serverTimestamp()
       };
 
@@ -218,45 +231,222 @@ const CheckoutPage: React.FC = () => {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-8"
                 >
-                  <h3 className="text-2xl font-serif font-bold text-charcoal mb-8">Secure Payment</h3>
-                  <div className="p-8 bg-charcoal rounded-[2.5rem] text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-bbBlue/20 blur-[60px] rounded-full"></div>
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-12">
-                        <CreditCard size={32} className="text-bbBlue" />
-                        <span className="text-[0.5rem] font-bold uppercase tracking-[0.4em] opacity-50">Secure Gateway</span>
-                      </div>
-                      <div className="space-y-6">
-                        <div className="space-y-2">
-                          <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">Card Number</p>
-                          <p className="text-xl font-mono tracking-[0.2em]">•••• •••• •••• 4242</p>
-                        </div>
-                        <div className="flex gap-12">
-                          <div className="space-y-2">
-                            <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">Expiry</p>
-                            <p className="font-mono">12 / 28</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">CVV</p>
-                            <p className="font-mono">•••</p>
-                          </div>
-                        </div>
-                      </div>
+                  <div className="flex justify-between items-center mb-8">
+                    <h3 className="text-2xl font-serif font-bold text-charcoal">Secure Payment</h3>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green-50 rounded-full">
+                      <ShieldCheck size={12} className="text-green-500" />
+                      <span className="text-[0.5rem] font-bold text-green-600 uppercase tracking-widest">256-bit AES Encryption</span>
                     </div>
                   </div>
-                  <div className="pt-8 flex justify-between">
-                    <button onClick={() => setStep('shipping')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* UPI Option */}
+                    <button 
+                      onClick={() => setPaymentMethod('upi')}
+                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'upi' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'upi' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
+                          <Smartphone size={20} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">UPI Payment</p>
+                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Google Pay, PhonePe</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'upi' && <Check size={16} className="text-bbBlue" />}
+                    </button>
+
+                    {/* Card Option */}
+                    <button 
+                      onClick={() => setPaymentMethod('card')}
+                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'card' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'card' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
+                          <CreditCard size={20} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">Credit / Debit Card</p>
+                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Visa, Mastercard, RuPay</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'card' && <Check size={16} className="text-bbBlue" />}
+                    </button>
+
+                    {/* Net Banking */}
+                    <button 
+                      onClick={() => setPaymentMethod('netbanking')}
+                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'netbanking' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'netbanking' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
+                          <Landmark size={20} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">Net Banking</p>
+                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Major Indian Banks</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'netbanking' && <Check size={16} className="text-bbBlue" />}
+                    </button>
+
+                    {/* Wallets */}
+                    <button 
+                      onClick={() => setPaymentMethod('wallet')}
+                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'wallet' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'wallet' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
+                          <Wallet size={20} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">Wallets</p>
+                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Paytm, Amazon Pay</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'wallet' && <Check size={16} className="text-bbBlue" />}
+                    </button>
+                  </div>
+
+                  {/* Method Details Input */}
+                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
+                    <AnimatePresence mode="wait">
+                      {paymentMethod === 'upi' && (
+                        <motion.div
+                          key="upi-input"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="space-y-4"
+                        >
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Enter UPI ID</label>
+                          <div className="relative">
+                            <input 
+                              type="text" 
+                              placeholder="username@bank"
+                              value={paymentDetails.upiId}
+                              onChange={(e) => setPaymentDetails({...paymentDetails, upiId: e.target.value})}
+                              className="w-full px-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono" 
+                            />
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 grayscale brightness-125">
+                              {/* Mock UPI Icons */}
+                              <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-400">G</div>
+                              <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-400">P</div>
+                              <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-400">Pay</div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {paymentMethod === 'card' && (
+                        <motion.div
+                          key="card-input"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                        >
+                          <div className="p-8 bg-charcoal rounded-[2rem] text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-bbBlue/20 blur-[60px] rounded-full"></div>
+                            <div className="relative z-10">
+                              <div className="flex justify-between items-start mb-12">
+                                <CreditCard size={32} className="text-bbBlue" />
+                                <span className="text-[0.5rem] font-bold uppercase tracking-[0.4em] opacity-50">Secure Gateway</span>
+                              </div>
+                              <div className="space-y-6">
+                                <div className="space-y-2">
+                                  <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">Card Number</p>
+                                  <input 
+                                    className="bg-transparent border-none outline-none text-xl font-mono tracking-[0.2em] w-full"
+                                    value={paymentDetails.cardNum}
+                                    onChange={(e) => setPaymentDetails({...paymentDetails, cardNum: e.target.value})}
+                                  />
+                                </div>
+                                <div className="flex gap-12">
+                                  <div className="space-y-2">
+                                    <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">Expiry</p>
+                                    <input 
+                                      className="bg-transparent border-none outline-none font-mono w-20"
+                                      value={paymentDetails.expiry}
+                                      onChange={(e) => setPaymentDetails({...paymentDetails, expiry: e.target.value})}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">CVV</p>
+                                    <input 
+                                      className="bg-transparent border-none outline-none font-mono w-12"
+                                      value={paymentDetails.cvv}
+                                      onChange={(e) => setPaymentDetails({...paymentDetails, cvv: e.target.value})}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {paymentMethod === 'netbanking' && (
+                        <motion.div
+                          key="bank-input"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-4"
+                        >
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Select Your Bank</label>
+                          <select 
+                            value={paymentDetails.bank}
+                            onChange={(e) => setPaymentDetails({...paymentDetails, bank: e.target.value})}
+                            className="w-full px-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all text-[0.875rem] font-bold text-charcoal appearance-none"
+                          >
+                            <option value="">Choose Bank</option>
+                            <option value="sbi">State Bank of India</option>
+                            <option value="hdfc">HDFC Bank</option>
+                            <option value="icici">ICICI Bank</option>
+                            <option value="axis">Axis Bank</option>
+                            <option value="pnb">Punjab National Bank</option>
+                          </select>
+                        </motion.div>
+                      )}
+
+                      {paymentMethod === 'wallet' && (
+                        <motion.div
+                          key="wallet-input"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="grid grid-cols-2 gap-4"
+                        >
+                          {['Paytm', 'Amazon Pay', 'PhonePe Wallet'].map(wallet => (
+                            <button
+                              key={wallet}
+                              onClick={() => setPaymentDetails({...paymentDetails, wallet})}
+                              className={`p-4 rounded-xl border transition-all text-center ${paymentDetails.wallet === wallet ? 'border-bbBlue bg-bbBlue/5 text-bbBlue' : 'border-gray-100 bg-white text-gray-400 hober:border-bbBlue'}`}
+                            >
+                              <span className="text-[0.625rem] font-bold uppercase tracking-widest">{wallet}</span>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="pt-8 flex flex-col md:flex-row justify-between gap-4">
+                    <button onClick={() => setStep('shipping')} className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors order-2 md:order-1">
                       <ArrowLeft size={14} /> Back to Shipping
                     </button>
                     <button 
                       onClick={handlePayment}
-                      disabled={loading}
-                      className="bg-bbBlue text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest shadow-xl shadow-bbBlue/20 hover:bg-blue-600 transition-all flex items-center gap-3 disabled:opacity-50"
+                      disabled={loading || (paymentMethod === 'upi' && !paymentDetails.upiId) || (paymentMethod === 'netbanking' && !paymentDetails.bank) || (paymentMethod === 'wallet' && !paymentDetails.wallet)}
+                      className="bg-bbBlue text-white px-10 py-5 rounded-3xl font-bold uppercase text-[0.75rem] tracking-[0.2em] shadow-2xl shadow-bbBlue/30 hover:bg-blue-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50 order-1 md:order-2"
                     >
                       {loading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : <ShieldCheck size={18} />}
-                      {loading ? 'Processing...' : `Pay ₹${totalPrice}`}
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <ShieldCheck size={20} />
+                          <span>Finalize & Pay ₹{totalPrice}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </motion.div>
