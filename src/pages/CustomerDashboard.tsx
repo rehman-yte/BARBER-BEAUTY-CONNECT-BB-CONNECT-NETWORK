@@ -81,7 +81,6 @@ const CustomerDashboard: React.FC = () => {
            <div className="text-center md:text-left flex-grow">
               <h1 className="text-[2.5rem] md:text-[3.125rem] font-serif font-bold text-charcoal mb-[0.75rem] tracking-tight">Welcome, {displayName}</h1>
               <div className="flex flex-col md:flex-row md:items-center gap-[1rem] mt-[0.5rem]">
-                <span className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.3em] bg-white px-[1.25rem] py-[0.5rem] rounded-full border border-bbBlue/20 shadow-sm inline-block">Official Network Member</span>
                 <p className="text-[0.5625rem] font-mono font-bold text-gray-400 uppercase tracking-widest">
                   Customer Token ID: <span className="text-bbBlue select-all">{user?.uid}</span>
                 </p>

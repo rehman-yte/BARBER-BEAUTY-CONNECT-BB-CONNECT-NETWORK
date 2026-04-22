@@ -63,49 +63,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
-        // Fetch additional user data from Firestore
         try {
-          const docRef = doc(db, 'users', firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
-            const userData = docSnap.data() as any;
+          // IDENTITY LOCK: Priority Check
+          // 1. Check if they are a Partner
+          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
+          if (partnerDoc.exists()) {
+            const partnerData = partnerDoc.data();
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: partnerData.brand_name || partnerData.brandName || partnerData.owner_name || 'Partner',
+              role: 'partner',
+              user_type: 'partner',
+              status: partnerData.status !== undefined ? partnerData.status : null,
+              photoURL: firebaseUser.photoURL || undefined
+            });
+            setLoading(false);
+            return;
+          }
+
+          // 2. Check if they are in dedicated 'customers' collection
+          const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
+          if (customerDoc.exists()) {
+            const customerData = customerDoc.data();
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: customerData.name || 'Valued Customer',
+              role: 'customer',
+              user_type: 'customer',
+              status: 'active',
+              photoURL: firebaseUser.photoURL || undefined
+            });
+            setLoading(false);
+            return;
+          }
+
+          // 3. Fallback to legacy 'users' collection (Admin or mixed roles)
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as any;
             let finalStatus = userData.status;
             const finalRole = userData.user_type || userData.role || 'customer';
             
-            // ROLE-BASED STATUS LOCK: 
-            // If status is missing, partners MUST default to null (onboarding requested)
-            // while customers default to 'active'.
             if (finalStatus === undefined) {
               finalStatus = finalRole === 'partner' ? null : 'active';
             }
 
+            const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
+
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: userData.name || 'Network Member',
-              role: finalRole,
-              user_type: finalRole,
+              name: userData.name || (isAdmin ? 'Master Admin' : 'Network Member'),
+              role: finalRole as any,
+              user_type: finalRole as any,
               status: finalStatus,
               photoURL: firebaseUser.photoURL || undefined,
-              token: (finalRole === 'admin' || firebaseUser.email === 'haidartheworldking@gmail.com') ? adminConfig.adminSecret : undefined
+              token: (finalRole === 'admin' || isAdmin) ? adminConfig.adminSecret : undefined
             });
           } else {
-            // New user or bypass case
+            // New User Discovery Path
             const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
-            const role = isAdmin ? 'admin' : 'customer'; // Default role is customer for new signups
+            const role = isAdmin ? 'admin' : 'customer';
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
               role: role,
               user_type: role,
-              status: role === 'partner' ? null : 'active',
+              status: 'active',
               token: isAdmin ? adminConfig.adminSecret : undefined
             });
           }
         } catch (err) {
-          console.error("Auth sync error (Firestore Permissions):", err);
+          console.error("Identity resolution error:", err);
           // FALLBACK: Use Firebase Auth info if Firestore is restricted
           const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
           setUser({
@@ -181,19 +213,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
       
-      // Check if user exists in Firestore
-      const docRef = doc(db, 'users', firebaseUser.uid);
-      const docSnap = await getDoc(docRef);
+      // IDENTITY LOCK: Double-check collection membership
+      const partnerRef = doc(db, 'partners', firebaseUser.uid);
+      const partnerSnap = await getDoc(partnerRef);
       
-      if (!docSnap.exists()) {
+      if (partnerSnap.exists()) {
+        console.log("Verified Partner Google Login:", firebaseUser.uid);
+        // User is a partner, routing will be handled by App.tsx guards
+        return;
+      }
+
+      // Not a partner, ensure they are in customers collection
+      const customerRef = doc(db, 'customers', firebaseUser.uid);
+      const customerSnap = await getDoc(customerRef);
+      
+      if (!customerSnap.exists()) {
         const userData = {
-          name: firebaseUser.displayName || 'Google User',
+          name: firebaseUser.displayName || 'Network Member',
+          email: firebaseUser.email,
           role: 'customer',
           user_type: 'customer',
           status: 'active',
           createdAt: new Date().toISOString()
         };
-        await setDoc(docRef, userData);
+        await setDoc(customerRef, userData);
+        // Also sync to legacy users for safety
+        await setDoc(doc(db, 'users', firebaseUser.uid), userData);
       }
     } catch (err: any) {
       console.error("Firebase Google Auth error:", err);
