@@ -212,8 +212,52 @@ const PartnerDashboard: React.FC = () => {
   const isVerified = profileData?.isApproved === true || profileData?.adminApproved === true || profileData?.status === 'approved' || user?.status === 'active';
 
   return (
-    <div className="pt-[8rem] pb-[5rem] bg-white min-h-screen">
-      <div className="max-w-[1440px] mx-auto px-[5%]">
+    <div className="flex min-h-screen bg-gray-50/30">
+      {/* PARTNER SIDEBAR */}
+      <aside className="w-[18rem] bg-charcoal text-white flex-shrink-0 hidden xl:flex flex-col border-r border-white/5 pt-[6rem]">
+        <div className="px-[2rem] mb-[3rem]">
+          <p className="text-[0.5625rem] font-bold text-gray-500 uppercase tracking-[0.3em] mb-[1.5rem]">Management Console</p>
+          <nav className="space-y-[0.75rem]">
+            {[
+              { id: 'Intelligence', label: 'Dashboard Overview', icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              )},
+              { id: 'Requests', label: 'Booking Registry', icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              )},
+              { id: 'Registry', label: 'Business Profile', icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              )},
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                className={`w-full flex items-center gap-[1rem] px-[1.25rem] py-[1rem] rounded-2xl text-[0.6875rem] font-bold uppercase tracking-widest transition-all ${activeTab === item.id ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="mt-auto p-[2rem] border-t border-white/5">
+          <p className="text-[0.5625rem] font-bold text-gray-500 uppercase tracking-[0.3em] mb-[1.25rem]">Expansion Portal</p>
+          <button 
+            onClick={() => navigate('/shop')}
+            className="w-full flex items-center justify-between group px-[1.25rem] py-[1.25rem] bg-gold/10 border border-gold/20 rounded-2xl text-gold hover:bg-gold/20 transition-all"
+          >
+            <div className="flex items-center gap-[0.75rem]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+              <span className="text-[0.625rem] font-bold uppercase tracking-[0.2em]">Premium Essentials</span>
+            </div>
+            <svg className="w-3 h-3 transform transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-grow pt-[6rem] pb-[5rem] overflow-y-auto h-screen custom-scrollbar">
+        <div className="max-w-[1200px] mx-auto px-[5%]">
         
         {/* OFFLINE BANNER */}
         {profileData?.isActive === false && (
@@ -266,7 +310,9 @@ const PartnerDashboard: React.FC = () => {
                    {isVerified ? 'Approved' : 'Pending Review'}
                 </span>
              </div>
-             <h1 className="text-[2.5rem] md:text-[3.125rem] font-serif font-bold tracking-tight mb-[0.5rem] uppercase">Welcome, {profileData?.ownerName?.split(' ')[0] || user?.name?.split(' ')[0]}</h1>
+             <h1 className="text-[2rem] md:text-[2.5rem] font-serif font-bold tracking-tight mb-[0.5rem] uppercase">
+                Partner Business Manager: {profileData?.brandName || profileData?.brand_name || 'Restoring...'}
+              </h1>
              <div className="flex flex-col md:flex-row gap-[1.5rem] md:items-center mt-[1.5rem]">
                <p className="text-[0.625rem] text-gray-500 font-bold uppercase tracking-[0.4em]">Global ID: {user?.uid}</p>
                
@@ -497,10 +543,10 @@ const PartnerDashboard: React.FC = () => {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Customer Name</th>
-                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Mobile</th>
-                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Service</th>
-                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Scheduled</th>
+                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Customer</th>
+                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Service Item</th>
+                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Price (INR)</th>
+                        <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Slot Time</th>
                         <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">Status</th>
                         <th className="px-[2rem] py-[1.25rem] text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest text-right">Action</th>
                       </tr>
@@ -509,15 +555,16 @@ const PartnerDashboard: React.FC = () => {
                       {requests.length > 0 ? (
                         requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(req => (
                           <tr key={req.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                            <td className="px-[2rem] py-[1.5rem] text-[0.875rem] font-bold text-charcoal">{req.customerName}</td>
-                            <td className="px-[2rem] py-[1.5rem] text-[0.875rem] font-mono text-gray-500">{req.customerMobile || '9876543210'}</td>
-                            <td className="px-[2rem] py-[1.5rem] text-[0.75rem] font-bold text-bbBlue uppercase">{req.serviceName}</td>
                             <td className="px-[2rem] py-[1.5rem]">
-                              <div className="flex items-center gap-[0.5rem]">
-                                <span className="text-[0.6875rem] font-bold text-charcoal">{new Date(req.createdAt).toLocaleDateString()}</span>
-                                {isFuture(req.createdAt) && (
-                                  <span className="text-[0.5rem] font-bold bg-bbBlue/10 text-bbBlue px-[0.5rem] py-[0.125rem] rounded-full uppercase tracking-widest">Scheduled</span>
-                                )}
+                              <p className="text-[0.875rem] font-bold text-charcoal leading-none mb-1">{req.customerName}</p>
+                              <p className="text-[0.625rem] font-mono text-gray-400">{req.customerMobile || 'Verified Client'}</p>
+                            </td>
+                            <td className="px-[2rem] py-[1.5rem] text-[0.75rem] font-bold text-bbBlue uppercase">{req.serviceName}</td>
+                            <td className="px-[2rem] py-[1.5rem] text-[0.875rem] font-serif font-bold text-charcoal">₹{req.price || '--'}</td>
+                            <td className="px-[2rem] py-[1.5rem]">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[0.6875rem] font-bold text-charcoal uppercase">{new Date(req.createdAt).toLocaleDateString()}</span>
+                                <span className="text-[0.5625rem] font-medium text-gray-400">{new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
                             </td>
                             <td className="px-[2rem] py-[1.5rem]">
@@ -580,10 +627,17 @@ const PartnerDashboard: React.FC = () => {
                             {req.status.replace('_', ' ')}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-end">
                           <div>
-                            <p className="text-[0.625rem] font-bold text-bbBlue uppercase">{req.serviceName}</p>
-                            <p className="text-[0.625rem] text-gray-400">{new Date(req.createdAt).toLocaleDateString()}</p>
+                            <p className="text-[0.625rem] font-bold text-bbBlue uppercase mb-1">{req.serviceName}</p>
+                            <div className="flex flex-col gap-0.5">
+                              <p className="text-[0.5625rem] text-gray-400 font-medium uppercase">{new Date(req.createdAt).toLocaleDateString()}</p>
+                              <p className="text-[0.5rem] text-gray-300 font-mono tracking-widest">{new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                             <p className="text-[0.875rem] font-serif font-bold text-charcoal">₹{req.price || '--'}</p>
+                             <p className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-widest">Price (INR)</p>
                           </div>
                           {req.status === 'payment_held' && (
                             <div className="flex gap-[0.5rem]">
@@ -662,6 +716,7 @@ const PartnerDashboard: React.FC = () => {
         </AnimatePresence>
       </div>
     </div>
+  </div>
   );
 };
 
