@@ -48,7 +48,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 
   if (allowedRole && user.role !== allowedRole) {
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
-    return <Navigate to={user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/dashboard"} replace />;
+    if (user.role === 'partner') {
+      return <Navigate to={user.status === null ? "/onboarding" : "/partner-dashboard"} replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -69,7 +72,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin-dashboard" :
-          user.role === 'partner' ? "/partner-dashboard" : 
+          user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
           "/dashboard"
         } replace /> : <AuthPage />
       } />
@@ -86,15 +89,15 @@ const AppRoutes: React.FC = () => {
       <Route path="/dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       
       {/* Partner Routes */}
-      <Route path="/onboarding" element={<PartnerRegistration />} />
+      <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerRegistration /></ProtectedRoute>} />
       <Route path="/partner-auth" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? "/onboarding" : 
+        user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
         "/dashboard"
       } replace /> : <PartnerAuth />} />
       <Route path="/partner-signin" element={user ? <Navigate to={
         user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? "/onboarding" : 
+        user.role === 'partner' ? (user.status === null ? "/onboarding" : "/partner-dashboard") : 
         "/dashboard"
       } replace /> : <PartnerSignIn />} />
       <Route path="/partner-registration" element={user ? <Navigate to={

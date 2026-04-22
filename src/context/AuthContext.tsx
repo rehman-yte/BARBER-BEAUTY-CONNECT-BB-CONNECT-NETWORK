@@ -69,24 +69,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (docSnap.exists()) {
             const userData = docSnap.data() as any;
+            let finalStatus = userData.status;
+            
+            // ROLE-BASED STATUS LOCK: 
+            // If status is missing, partners MUST default to null (onboarding requested)
+            // while customers default to 'active'.
+            if (finalStatus === undefined) {
+              finalStatus = userData.role === 'partner' ? null : 'active';
+            }
+
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: userData.name || 'Network Member',
               role: userData.role || 'customer',
-              status: userData.status !== undefined ? userData.status : 'active',
+              status: finalStatus,
               photoURL: firebaseUser.photoURL || undefined,
               token: (userData.role === 'admin' || firebaseUser.email === 'haidartheworldking@gmail.com') ? adminConfig.adminSecret : undefined
             });
           } else {
             // New user or bypass case
             const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
+            const role = isAdmin ? 'admin' : 'customer'; // Default role is customer for new signups
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
-              role: isAdmin ? 'admin' : 'customer',
-              status: 'active',
+              role: role,
+              status: role === 'partner' ? null : 'active',
               token: isAdmin ? adminConfig.adminSecret : undefined
             });
           }

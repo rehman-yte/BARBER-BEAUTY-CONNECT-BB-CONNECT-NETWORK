@@ -31,7 +31,7 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
         const authEmail = email.includes('@') ? email : `${email}@bb.net`;
         if (!authEmail) throw new Error("Email or Mobile is required");
         await signIn(authEmail, password);
-        navigate('/onboarding');
+        // REDIRECTION IS NOW HANDLED BY App.tsx GLOBAL GUARDS
       } else {
         // Registration now uses explicit Email field
         if (!email) throw new Error("Email Address is required");
@@ -46,7 +46,7 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
         localStorage.setItem('bb_partner_mobile', mobile);
         localStorage.setItem('bb_partner_password', password);
         
-        navigate('/onboarding');
+        // REDIRECTION IS NOW HANDLED BY App.tsx GLOBAL GUARDS
       }
       onClose();
     } catch (err: any) {

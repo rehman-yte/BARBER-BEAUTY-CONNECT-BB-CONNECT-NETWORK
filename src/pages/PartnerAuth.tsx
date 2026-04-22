@@ -23,13 +23,17 @@ const PartnerAuth: React.FC = () => {
       
       if (!email) throw new Error("Email Address is required");
 
-      await signUp(email, password, { role: 'partner', mobile: mobile });
+      await signUp(email, password, { 
+        role: 'partner', 
+        mobile: mobile,
+        status: null // SYSTEM DIRECTIVE: Initialize with null to force onboarding
+      });
       
       console.log("Auth Success: Moving to Deep Onboarding Form...");
       localStorage.setItem('bb_partner_mobile', mobile);
       localStorage.setItem('bb_partner_password', password);
       
-      navigate('/onboarding');
+      // REDIRECTION IS NOW HANDLED BY App.tsx GLOBAL GUARDS
     } catch (err: any) {
       console.error("Partner Signup Failure:", err);
       if (err.code === 'auth/email-already-in-use') {

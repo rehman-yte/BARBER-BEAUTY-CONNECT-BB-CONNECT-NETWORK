@@ -16,7 +16,8 @@ const PartnerSignIn: React.FC = () => {
   useEffect(() => {
     if (user && !loading) {
       if (user.role === 'partner') {
-        navigate('/partner-dashboard', { replace: true });
+        const target = user.status === null ? '/onboarding' : '/partner-dashboard';
+        navigate(target, { replace: true });
       } else if (user.role === 'customer') {
         setError('Customer account detected. Please use the primary Sign-In link for bookings.');
         setTimeout(() => navigate('/dashboard', { replace: true }), 3000);

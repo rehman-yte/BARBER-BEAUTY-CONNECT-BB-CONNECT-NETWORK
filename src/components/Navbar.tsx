@@ -242,8 +242,11 @@ const Navbar: React.FC = () => {
                 </Link>
               )}
               <Link 
-                to={user?.role === 'admin' ? "/admin-dashboard" : (isPartner ? "/partner-dashboard" : "/dashboard")} 
-                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                to={
+                  user?.role === 'admin' ? "/admin-dashboard" : 
+                  (isPartner ? (user.status === null ? "/onboarding" : "/partner-dashboard") : "/dashboard")
+                } 
+                className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard' || location.pathname === '/onboarding') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
               >
                 Dashboard
               </Link>
