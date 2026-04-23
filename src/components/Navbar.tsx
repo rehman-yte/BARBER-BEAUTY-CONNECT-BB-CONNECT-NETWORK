@@ -213,6 +213,25 @@ const Navbar: React.FC = () => {
   };
 
   const isPartner = user?.role === 'partner';
+  const isOnboarding = location.pathname === '/onboarding';
+
+  // Minimal Navbar for Onboarding to ensure "No Exit" policy
+  if (isOnboarding) {
+    return (
+      <nav className="fixed top-0 left-0 right-0 z-[1000] bg-charcoal border-b border-white/5 h-[5rem] flex items-center px-[5%] justify-between shadow-2xl">
+        <div className="flex flex-col">
+          <span className="text-[1rem] font-serif font-black text-white tracking-widest uppercase">
+            Network <span className="text-bbBlue">Admission</span>
+          </span>
+          <span className="text-[0.5rem] font-bold text-bbBlue/50 uppercase tracking-[0.4em] mt-1">Distraction Free Zone</span>
+        </div>
+        <div className="flex items-center gap-4">
+           <span className="text-[0.625rem] font-bold text-white/30 uppercase tracking-widest">Protocol Active</span>
+           <div className="w-2 h-2 rounded-full bg-bbBlue animate-pulse"></div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-md border-b border-gray-100 h-[5rem] shadow-sm">

@@ -45,7 +45,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 
   // MANDATORY PARTNER GATE: status and brand check
   if (user.role === 'partner') {
-    const isComplete = !!user.brandName || !!user.onboardingComplete;
+    const isComplete = !!user.onboardingComplete;
     if (!isComplete) {
       if (location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />;
@@ -87,14 +87,14 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={
         !user ? <LandingPage /> :
         user.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
-        user.role === 'partner' ? (!user.onboardingComplete ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
+        user.role === 'partner' ? (user.onboardingComplete ? <Navigate to="/partner-dashboard" replace /> : <Navigate to="/onboarding" replace />) : 
         <Navigate to="/customer-dashboard" replace />
       } />
       
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin-dashboard" :
-          user.role === 'partner' ? (!user.onboardingComplete ? "/onboarding" : "/partner-dashboard") : 
+          user.role === 'partner' ? (user.onboardingComplete ? "/partner-dashboard" : "/onboarding") : 
           "/customer-dashboard"
         } replace /> : <AuthPage />
       } />
