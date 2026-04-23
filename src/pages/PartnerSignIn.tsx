@@ -15,15 +15,16 @@ const PartnerSignIn: React.FC = () => {
 
   useEffect(() => {
     if (user && !loading) {
-      if (user.role === 'partner') {
-        const isComplete = !!user.brandName || !!user.onboardingComplete;
-        const target = !isComplete ? '/onboarding' : '/partner-dashboard';
-        navigate(target, { replace: true });
-      } else if (user.role === 'customer') {
-        setError('Customer account detected. Please use the primary Sign-In link for bookings.');
-        setTimeout(() => navigate('/customer-dashboard', { replace: true }), 3000);
-      } else if (user.role === 'admin') {
+      if (user.role === 'admin') {
         navigate('/admin-dashboard', { replace: true });
+      } else if (user.role === 'partner') {
+        if (!user.onboardingComplete) {
+          navigate('/onboarding', { replace: true });
+        } else {
+          navigate('/partner-dashboard', { replace: true });
+        }
+      } else {
+        navigate('/customer-dashboard', { replace: true });
       }
     }
   }, [user, loading, navigate]);

@@ -219,8 +219,8 @@ const Navbar: React.FC = () => {
       <div className="w-full max-w-[1440px] mx-auto px-[5%] h-full flex justify-between items-center">
         <div className="flex-1 flex justify-start min-w-0">
           <Link 
-            to={isPartner ? "#" : "/"} 
-            className={`flex flex-col items-start leading-none group ${isPartner ? 'pointer-events-none' : ''} truncate`}
+            to="/" 
+            className="flex flex-col items-start leading-none group truncate"
           >
             <span className="text-[0.875rem] sm:text-[1rem] md:text-[1.125rem] font-serif font-bold text-black tracking-tight transition-colors truncate w-full">
               BARBER & BEAUTY CONNECT
@@ -232,60 +232,60 @@ const Navbar: React.FC = () => {
         </div>
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
-          {!isPartner && (
-            <Link 
-              to="/" 
-              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-            >
-              Home
-            </Link>
-          )}
-          
-          <button
-            onClick={() => {
-              const target = user?.role === 'admin' ? "/admin-dashboard" : 
-              (isPartner ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : "/customer-dashboard");
-              
-              if (isLoggedIn) {
-                navigate(target);
-              } else {
-                setPendingPath(target);
-                setShowAuthModal(true);
-              }
-            }}
-            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${(location.pathname === '/customer-dashboard' || location.pathname === '/partner-dashboard' || location.pathname === '/admin-dashboard' || location.pathname === '/onboarding') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-          >
-            Dashboard
-          </button>
-
-          {!isPartner && (
-            <button
-              onClick={() => {
-                if (isLoggedIn) navigate('/explore');
-                else {
-                  setPendingPath('/explore');
-                  setShowAuthModal(true);
-                }
-              }}
-              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-            >
-              Explore
-            </button>
-          )}
-
-          {!isPartner && (
-            <button
-              onClick={() => {
-                if (isLoggedIn) navigate('/shop');
-                else {
-                  setPendingPath('/shop');
-                  setShowAuthModal(true);
-                }
-              }}
-              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-            >
-              Shop
-            </button>
+          {/* UBER-STYLE CLEAN HEADER: Center is empty on Landing Page */}
+          {location.pathname !== '/' && (
+            <>
+              {isLoggedIn ? (
+                <>
+                  {user?.role === 'customer' ? (
+                    <>
+                      <Link 
+                        to="/explore" 
+                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                      >
+                        Explore
+                      </Link>
+                      <Link 
+                        to="/customer-dashboard" 
+                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                      >
+                        My Bookings
+                      </Link>
+                    </>
+                  ) : user?.role === 'partner' ? (
+                    <>
+                      <Link 
+                        to="/partner-dashboard" 
+                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/partner-dashboard' && !location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                      >
+                        Dashboard
+                      </Link>
+                      <Link 
+                        to="/partner-dashboard?tab=services" 
+                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                      >
+                        Service Manager
+                      </Link>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <Link 
+                    to="/explore" 
+                    className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                  >
+                    Explore
+                  </Link>
+                  <Link 
+                    to="/shop" 
+                    className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                  >
+                    Shop
+                  </Link>
+                </>
+              )}
+            </>
           )}
         </div>
 

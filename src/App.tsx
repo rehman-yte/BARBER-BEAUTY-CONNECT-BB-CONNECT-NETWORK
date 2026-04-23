@@ -87,14 +87,14 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={
         !user ? <LandingPage /> :
         user.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
-        user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
+        user.role === 'partner' ? (!user.onboardingComplete ? <Navigate to="/onboarding" replace /> : <Navigate to="/partner-dashboard" replace />) : 
         <Navigate to="/customer-dashboard" replace />
       } />
       
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin-dashboard" :
-          user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : 
+          user.role === 'partner' ? (!user.onboardingComplete ? "/onboarding" : "/partner-dashboard") : 
           "/customer-dashboard"
         } replace /> : <AuthPage />
       } />
@@ -138,16 +138,13 @@ const AppRoutes: React.FC = () => {
 };
 
 const LayoutWrapper: React.FC = () => {
-  const location = useLocation();
-  const isDashboard = location.pathname.includes('dashboard');
-  
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {!isDashboard && <Navbar />}
-      <main className={`flex-grow w-full ${isDashboard ? '' : 'max-w-[1440px] mx-auto px-[5%] pt-[5rem]'}`}>
+      <Navbar />
+      <main className="flex-grow w-full max-w-[1440px] mx-auto px-[5%] pt-[5rem]">
         <AppRoutes />
       </main>
-      {!isDashboard && <Footer />}
+      <Footer />
     </div>
   );
 };

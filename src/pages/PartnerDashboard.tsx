@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   getShopById, 
@@ -30,7 +30,10 @@ interface Service {
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'bookings' | 'services'>('bookings');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'bookings' | 'services'>(
+    searchParams.get('tab') === 'services' ? 'services' : 'bookings'
+  );
   const [shopData, setShopData] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

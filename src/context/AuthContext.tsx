@@ -74,8 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const partnerData = partnerDoc.data();
             console.log("[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER");
             
-            // Step B: Check for brandName or onboardingComplete to drive onboarding logic (Master Command)
-            const isComplete = !!partnerData.brandName || !!partnerData.onboardingComplete;
+            // Step B: Resolve Partner Onboarding Status
+            const onboardingComplete = !!partnerData.onboardingComplete;
             
             setUser({
               uid: firebaseUser.uid,
@@ -83,10 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: (isComplete && partnerData.status) ? (partnerData.status as any) : null,
+              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
               photoURL: firebaseUser.photoURL || undefined,
               brandName: partnerData.brandName || undefined,
-              onboardingComplete: !!partnerData.onboardingComplete
+              onboardingComplete: onboardingComplete
             });
             setLoading(false);
             return;

@@ -14,13 +14,12 @@ const AuthPage: React.FC = () => {
       if (user.role === 'admin') {
         navigate('/admin-dashboard', { replace: true });
       } else if (user.role === 'partner') {
-        // Partners should not use the Customer Portal
-        setError('Partner detected. Please login through the Partner Portal at the bottom of the landing page.');
-        console.warn("Blocked Partner Login on Customer Portal");
-        // Optional: Auto redirect after few seconds
-        setTimeout(() => navigate('/', { replace: true }), 3000);
+        if (!user.onboardingComplete) {
+          navigate('/onboarding', { replace: true });
+        } else {
+          navigate('/partner-dashboard', { replace: true });
+        }
       } else {
-        console.log("Customer session active:", user.uid);
         navigate('/customer-dashboard', { replace: true });
       }
     }
@@ -35,7 +34,11 @@ const AuthPage: React.FC = () => {
     } catch (err: any) { 
       const errMsg = err.message;
       console.error("GOOGLE_AUTH_FAILURE:", errMsg);
-      setError(`Google Auth Error: ${errMsg}`); 
+      if (errMsg.includes('auth/unauthorized-domain')) {
+        setError("Firebase Error: Domain not authorized. Please add this domain to the 'Authorized domains' list in the Firebase Console (Auth > Settings).");
+      } else {
+        setError(`Google Auth Error: ${errMsg}`); 
+      }
     } finally {
       setIsSubmitting(false);
     }

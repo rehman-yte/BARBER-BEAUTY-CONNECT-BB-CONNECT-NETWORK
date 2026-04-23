@@ -23,7 +23,12 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, 
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message);
+      const errMsg = err.message;
+      if (errMsg.includes('auth/unauthorized-domain')) {
+        setError("Firebase Error: Domain not authorized. Please add this domain to the 'Authorized domains' list in the Firebase Console (Auth > Settings).");
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setIsSubmitting(false);
     }
