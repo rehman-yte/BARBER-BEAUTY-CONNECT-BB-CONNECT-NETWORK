@@ -162,15 +162,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (err) {
           console.error("Identity resolution error:", err);
-          // FALLBACK: Use Firebase Auth info if Firestore is restricted
+          // SAFER FALLBACK: If Firestore is restricted, don't assume role. 
+          // Stay in loading or use local storage hint
+          const intended = localStorage.getItem('bb_intended_role') as any;
           const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com';
+          
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            name: isAdmin ? 'Master Admin' : (firebaseUser.displayName || 'Network Member'),
-            role: isAdmin ? 'admin' : 'customer',
-            status: 'active',
-            token: isAdmin ? adminConfig.adminSecret : undefined
+            name: firebaseUser.displayName || 'Network Member',
+            role: isAdmin ? 'admin' : (intended || 'customer'),
+            status: isAdmin ? 'active' : null
           });
         }
       } else {

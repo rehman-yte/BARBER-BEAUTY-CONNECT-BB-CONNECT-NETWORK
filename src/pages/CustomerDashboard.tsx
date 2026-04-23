@@ -13,11 +13,23 @@ const CustomerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(!PersistenceService.load('customer_bookings'));
   const [activeTab, setActiveTab] = useState<'approved' | 'pending' | 'failed'>('approved');
 
+  // CRITICAL REDIRECT: Ensure partners never land on Customer Dashboard
   useEffect(() => {
     if (user && user.role === 'partner') {
-      navigate(user.status === null ? '/onboarding' : '/partner-dashboard', { replace: true });
+      console.log("[SECURITY] Partner detected on Customer Hub. Redirecting to Terminal...");
+      navigate(user.onboardingComplete ? '/partner-dashboard' : '/onboarding', { replace: true });
     }
   }, [user, navigate]);
+
+  // Visual Shield: If role is partner, don't even render the UI below
+  if (user?.role === 'partner') {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-10 text-center">
+        <div className="w-16 h-16 border-4 border-bbBlue border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h2 className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.5em]">Synchronizing Partner Terminal...</h2>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!user) return;

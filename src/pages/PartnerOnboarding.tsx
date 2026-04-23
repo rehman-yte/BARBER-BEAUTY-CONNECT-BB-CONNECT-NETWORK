@@ -124,6 +124,7 @@ const PartnerOnboarding: React.FC = () => {
       // 2. Update local user status to trigger dashboard redirection
       if (updateUser) {
         await updateUser({ 
+          role: 'partner', // CRITICAL: Explicitly commit to Partner identity
           status: 'pending',
           brandName: formData.brandName,
           onboardingComplete: true

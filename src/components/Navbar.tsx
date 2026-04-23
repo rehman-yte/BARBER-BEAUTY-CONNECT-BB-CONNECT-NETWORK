@@ -273,17 +273,18 @@ const Navbar: React.FC = () => {
                     </>
                   ) : user?.role === 'partner' ? (
                     <>
+                      {/* PARTNER EXCLUSIVE LINKS */}
                       <Link 
                         to="/partner-dashboard" 
                         className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/partner-dashboard' && !location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
                       >
-                        Dashboard
+                        Terminal
                       </Link>
                       <Link 
                         to="/partner-dashboard?tab=services" 
                         className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
                       >
-                        Service Manager
+                        Services
                       </Link>
                     </>
                   ) : null}
