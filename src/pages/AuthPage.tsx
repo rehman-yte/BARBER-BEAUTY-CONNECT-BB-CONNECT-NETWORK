@@ -9,7 +9,18 @@ const AuthPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // Redirection is handled by App.tsx global routes when user state is non-null
+  useEffect(() => {
+    if (user && !loading) {
+      if (user.role === 'customer') {
+        navigate('/customer-dashboard', { replace: true });
+      } else if (user.role === 'partner') {
+        const path = user.onboardingComplete ? '/partner-dashboard' : '/onboarding';
+        navigate(path, { replace: true });
+      } else if (user.role === 'admin') {
+        navigate('/admin-dashboard', { replace: true });
+      }
+    }
+  }, [user, loading, navigate]);
 
   const handleGoogleAuth = async () => {
     setIsSubmitting(true);

@@ -35,6 +35,7 @@ const Navbar: React.FC = () => {
     const saved = localStorage.getItem('bb_cleared_notifs');
     return saved ? JSON.parse(saved) : [];
   });
+  const [didJustLogIn, setDidJustLogIn] = useState(false);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -132,6 +133,21 @@ const Navbar: React.FC = () => {
       clearInterval(interval);
     };
   }, [user, lastViewed]);
+
+  useEffect(() => {
+    if (didJustLogIn && user) {
+      setDidJustLogIn(false);
+      // Role-based redirection algorithm
+      if (user.role === 'admin') {
+        navigate('/admin-dashboard');
+      } else if (user.role === 'partner') {
+        const path = user.onboardingComplete ? '/partner-dashboard' : '/onboarding';
+        navigate(path);
+      } else {
+        navigate('/customer-dashboard');
+      }
+    }
+  }, [user, didJustLogIn, navigate]);
 
   const notifications = [...broadcastNotifs, ...bookingNotifs]
     .filter(n => !clearedIds.includes(n.id))
@@ -631,8 +647,11 @@ const Navbar: React.FC = () => {
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
         onSuccess={() => {
-          if (pendingPath) navigate(pendingPath);
-          else if (location.pathname === '/auth') navigate('/customer-dashboard');
+          if (pendingPath) {
+            navigate(pendingPath);
+          } else {
+            setDidJustLogIn(true);
+          }
         }}
       />
     </nav>

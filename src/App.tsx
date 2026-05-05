@@ -84,12 +84,7 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
-      <Route path="/" element={
-        !user ? <LandingPage /> :
-        user.role === 'admin' ? <Navigate to="/admin-dashboard" replace /> :
-        user.role === 'partner' ? (user.onboardingComplete ? <Navigate to="/partner-dashboard" replace /> : <Navigate to="/onboarding" replace />) : 
-        <Navigate to="/customer-dashboard" replace />
-      } />
+      <Route path="/" element={<LandingPage />} />
       
       <Route path="/auth" element={
         user ? <Navigate to={

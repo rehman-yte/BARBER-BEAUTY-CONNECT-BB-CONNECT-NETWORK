@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { X, Smartphone, Lock, Mail, User } from 'lucide-react';
@@ -11,7 +11,7 @@ interface PartnerAuthModalProps {
 }
 
 const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -19,6 +19,20 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user && !loading && isOpen) {
+      onClose();
+      if (user.role === 'partner') {
+        const path = user.onboardingComplete ? '/partner-dashboard' : '/onboarding';
+        navigate(path);
+      } else if (user.role === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/customer-dashboard');
+      }
+    }
+  }, [user, loading, isOpen, navigate, onClose]);
 
   const handlePartnerAuth = async (e: React.FormEvent) => {
     e.preventDefault();

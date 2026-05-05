@@ -13,7 +13,18 @@ const PartnerSignIn: React.FC = () => {
   const navigate = useNavigate();
   const { signIn, user, loading } = useAuth();
 
-  // Global redirection handled by App.tsx guards
+  useEffect(() => {
+    if (user && !loading) {
+      if (user.role === 'partner') {
+        const path = user.onboardingComplete ? '/partner-dashboard' : '/onboarding';
+        navigate(path, { replace: true });
+      } else if (user.role === 'admin') {
+        navigate('/admin-dashboard', { replace: true });
+      } else {
+        navigate('/customer-dashboard', { replace: true });
+      }
+    }
+  }, [user, loading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
