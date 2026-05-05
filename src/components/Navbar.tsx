@@ -251,61 +251,42 @@ const Navbar: React.FC = () => {
         </div>
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
-          {/* UBER-STYLE CLEAN HEADER: Center is empty on Landing Page */}
-          {location.pathname !== '/' && (
+          {/* UBER-STYLE CLEAN HEADER */}
+          <Link 
+            to="/explore" 
+            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          >
+            Explore
+          </Link>
+          
+          {isLoggedIn ? (
             <>
-              {isLoggedIn ? (
-                <>
-                  {user?.role === 'customer' ? (
-                    <>
-                      <Link 
-                        to="/explore" 
-                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-                      >
-                        Explore
-                      </Link>
-                      <Link 
-                        to="/customer-dashboard" 
-                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-                      >
-                        My Bookings
-                      </Link>
-                    </>
-                  ) : user?.role === 'partner' ? (
-                    <>
-                      {/* PARTNER EXCLUSIVE LINKS */}
-                      <Link 
-                        to="/partner-dashboard" 
-                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/partner-dashboard' && !location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-                      >
-                        Terminal
-                      </Link>
-                      <Link 
-                        to="/partner-dashboard?tab=services" 
-                        className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-                      >
-                        Services
-                      </Link>
-                    </>
-                  ) : null}
-                </>
-              ) : (
+              {user?.role === 'customer' && (
+                <Link 
+                  to="/customer-dashboard" 
+                  className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+                >
+                  My Bookings
+                </Link>
+              )}
+              {user?.role === 'partner' && (
                 <>
                   <Link 
-                    to="/explore" 
-                    className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+                    to="/partner-dashboard" 
+                    className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/partner-dashboard' && !location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
                   >
-                    Explore
-                  </Link>
-                  <Link 
-                    to="/shop" 
-                    className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/shop' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-                  >
-                    Shop
+                    Terminal
                   </Link>
                 </>
               )}
             </>
+          ) : (
+            <Link 
+              to="/customer-dashboard" 
+              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
+            >
+              My Bookings
+            </Link>
           )}
         </div>
 

@@ -9,28 +9,15 @@ const AuthPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (user && !loading) {
-      if (user.role === 'admin') {
-        navigate('/admin-dashboard', { replace: true });
-      } else if (user.role === 'partner') {
-        if (!user.onboardingComplete) {
-          navigate('/onboarding', { replace: true });
-        } else {
-          navigate('/partner-dashboard', { replace: true });
-        }
-      } else {
-        navigate('/customer-dashboard', { replace: true });
-      }
-    }
-  }, [user, loading, navigate]);
+  // Redirection is handled by App.tsx global routes when user state is non-null
 
   const handleGoogleAuth = async () => {
     setIsSubmitting(true);
     setError('');
     try {
+      localStorage.setItem('bb_intended_role', 'customer');
       await signInWithGoogle();
-      navigate('/customer-dashboard', { replace: true });
+      // No manual navigate here - let App.tsx handle it
     } catch (err: any) { 
       const errMsg = err.message;
       console.error("GOOGLE_AUTH_FAILURE:", errMsg);
