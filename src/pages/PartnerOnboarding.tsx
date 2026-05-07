@@ -85,21 +85,34 @@ const PartnerOnboarding: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
     if (currentStep < 4) {
       setCurrentStep(prev => prev + 1);
       window.scrollTo(0, 0);
       return;
     }
 
+    // Manual Validation for Step 4
     if (!formData.manualAddress) {
       setError("Physical address is mandatory for network registration.");
+      return;
+    }
+
+    if (!formData.upiId) {
+      setError("Settlement endpoint (UPI) is required.");
+      return;
+    }
+
+    if (!formData.ownerPicture || !formData.govId) {
+      setError("Please upload both Proprietor Portrait and Governance ID.");
       return;
     }
 
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     try {
-      // 1. Prepare payload (save ALL form fields as per Master Command)
+      // 1. Prepare payload
       const shopPayload: any = {
         uid: user?.uid,
         ownerName: formData.ownerName,
@@ -112,7 +125,6 @@ const PartnerOnboarding: React.FC = () => {
         coords: { lat: formData.lat, lng: formData.lng },
         status: 'pending',
         onboardingComplete: true,
-        // Media fields (storing as strings/placeholders for now)
         ownerPicture: typeof formData.ownerPicture === 'string' ? formData.ownerPicture : 'pending_upload',
         govId: typeof formData.govId === 'string' ? formData.govId : 'pending_upload',
         brandImages: formData.shopImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
@@ -120,27 +132,33 @@ const PartnerOnboarding: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await addShop(shopPayload); // Save to 'partners' collection
+      // Execute Firestore write
+      await addShop(shopPayload);
 
-      // 2. Update local user status to trigger dashboard redirection
+      // 2. Update local user status
       if (updateUser) {
         await updateUser({ 
-          role: 'partner', // CRITICAL: Explicitly commit to Partner identity
+          role: 'partner',
           status: 'pending',
           brandName: formData.brandName,
           onboardingComplete: true
         });
       }
 
-      setIsSuccess(true); // Trigger 3-sec timer overlay
+      // Success Bridge
+      setIsSuccess(true); 
       setTimeout(() => {
         navigate('/partner-dashboard', { replace: true });
       }, 3000);
       /* LOCKED - END POINT 2 */
 
     } catch (err: any) {
+      console.error("Submission crash:", err);
       setError(err.message || "Submission failed. Please check your network connection.");
       setIsProcessing(false);
+      
+      // Resilient fallback: If write failed but we got this far, try to navigate anyway if it's a minor error
+      // But for now, just let the user see the error.
     }
   };
 
@@ -434,7 +452,7 @@ const PartnerOnboarding: React.FC = () => {
                       <div>
                         <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.4em] mb-4 block">Proprietor Master Portrait</label>
                         <label className="w-full h-[15rem] bg-gray-50 border-2 border-dashed border-gray-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative group bg-white">
-                          <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'ownerPicture')} />
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'ownerPicture')} />
                           {formData.ownerPicture ? (
                             <img src={formData.ownerPicture instanceof File ? URL.createObjectURL(formData.ownerPicture) : (typeof formData.ownerPicture === 'string' ? formData.ownerPicture : '')} className="w-full h-full object-cover" alt="Owner" />
                           ) : (
@@ -451,7 +469,7 @@ const PartnerOnboarding: React.FC = () => {
                         <div className="grid grid-cols-3 gap-[0.75rem]">
                           {formData.shopImages.map((img, idx) => (
                             <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative group bg-white">
-                              <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'shopImages', idx)} />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'shopImages', idx)} />
                               {img ? (
                                 <img src={img instanceof File ? URL.createObjectURL(img) : (typeof img === 'string' ? img : '')} className="w-full h-full object-cover" alt="Portfolio" />
                               ) : (
@@ -469,7 +487,7 @@ const PartnerOnboarding: React.FC = () => {
                       <div className="grid grid-cols-3 md:grid-cols-6 gap-[1rem]">
                         {formData.workerImages.slice(0, formData.workerCount).map((img, idx) => (
                           <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative group bg-white">
-                            <input required type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'workerImages', idx)} />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'workerImages', idx)} />
                             {img ? (
                               <img src={img instanceof File ? URL.createObjectURL(img) : (typeof img === 'string' ? img : '')} className="w-full h-full object-cover shadow-inner" alt="Specialist" />
                             ) : (
@@ -493,7 +511,7 @@ const PartnerOnboarding: React.FC = () => {
                       <div className="space-y-4">
                         <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.4em] ml-2">Governance Validation (ID)</label>
                         <label className="flex items-center gap-4 p-5 bg-gray-50 border border-gray-100 rounded-2xl cursor-pointer hover:border-bbBlue transition-all group bg-white">
-                          <input required type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileChange(e, 'govId')} />
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileChange(e, 'govId')} />
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${formData.govId ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/20' : 'bg-gray-100 text-gray-300 group-hover:bg-gray-200'} shrink-0`}>
                             {formData.govId ? <Check size={24} /> : <Camera size={24} />}
                           </div>
