@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { addShop } from '../services/logic_engine';
 import { useAuth } from '../context/AuthContext';
@@ -96,6 +96,7 @@ const PartnerOnboarding: React.FC = () => {
       return;
     }
 
+    /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     try {
       // 1. Prepare payload (save ALL form fields as per Master Command)
@@ -114,7 +115,7 @@ const PartnerOnboarding: React.FC = () => {
         // Media fields (storing as strings/placeholders for now)
         ownerPicture: typeof formData.ownerPicture === 'string' ? formData.ownerPicture : 'pending_upload',
         govId: typeof formData.govId === 'string' ? formData.govId : 'pending_upload',
-        brandImages: formData.brandImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
+        brandImages: formData.shopImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
         workerImages: formData.workerImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
         updatedAt: new Date().toISOString()
       };
@@ -135,6 +136,7 @@ const PartnerOnboarding: React.FC = () => {
       setTimeout(() => {
         navigate('/partner-dashboard', { replace: true });
       }, 3000);
+      /* LOCKED - END POINT 2 */
 
     } catch (err: any) {
       setError(err.message || "Submission failed. Please check your network connection.");

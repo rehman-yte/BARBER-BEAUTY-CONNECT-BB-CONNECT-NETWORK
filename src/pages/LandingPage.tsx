@@ -4,7 +4,7 @@ import ProductShowcase from '../components/ProductShowcase';
 import Showcase from '../components/Showcase';
 import Security from '../components/Security';
 import PartnerCTA from '../components/PartnerCTA';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 const LandingPage: React.FC = () => {
   return (
