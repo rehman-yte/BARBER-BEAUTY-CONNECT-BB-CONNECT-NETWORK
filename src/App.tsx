@@ -1,28 +1,28 @@
 /* LOCKED - POINT 1 COMPLETE: Auth & Routing Infrastructure */
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
-import LandingPage from "./pages/LandingPage";
-import AuthPage from "./pages/AuthPage";
-import ExplorePage from "./pages/ExplorePage";
-import ShopDetail from "./pages/ShopDetail";
-import CustomerDashboard from "./pages/CustomerDashboard";
-import PartnerDashboard from "./pages/PartnerDashboard";
-import PartnerOnboarding from "./pages/PartnerOnboarding";
-import PartnerAuth from "./pages/PartnerAuth";
-import PartnerSignIn from "./pages/PartnerSignIn";
-import ForgotPassword from "./pages/ForgotPassword";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsAndConditions from "./pages/TermsAndConditions";
-import CookiesPolicy from "./pages/CookiesPolicy";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminGateway from "./pages/AdminGateway";
-import ShopPage from "./pages/ShopPage";
-import CheckoutPage from "./pages/CheckoutPage";
-import MyShopping from "./pages/MyShopping";
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { CartProvider } from './context/CartContext';
+import Navbar from "@/src/components/Navbar.tsx";
+import Footer from "@/src/components/Footer.tsx";
+import LandingPage from "@/src/pages/LandingPage";
+import AuthPage from "@/src/pages/AuthPage";
+import ExplorePage from "@/src/pages/ExplorePage";
+import ShopDetail from "@/src/pages/ShopDetail";
+import CustomerDashboard from "@/src/pages/CustomerDashboard";
+import PartnerDashboard from "@/src/pages/PartnerDashboard";
+import PartnerOnboarding from "@/src/pages/PartnerOnboarding";
+import PartnerAuth from "@/src/pages/PartnerAuth";
+import PartnerSignIn from "@/src/pages/PartnerSignIn";
+import ForgotPassword from "@/src/pages/ForgotPassword";
+import PrivacyPolicy from "@/src/pages/PrivacyPolicy";
+import TermsAndConditions from "@/src/pages/TermsAndConditions";
+import CookiesPolicy from "@/src/pages/CookiesPolicy";
+import AdminDashboard from "@/src/pages/AdminDashboard";
+import AdminGateway from "@/src/pages/AdminGateway";
+import ShopPage from "@/src/pages/ShopPage";
+import CheckoutPage from "@/src/pages/CheckoutPage";
+import MyShopping from "@/src/pages/MyShopping";
+import { AuthProvider, useAuth } from '@/src/context/AuthContext';
+import { CartProvider } from '@/src/context/CartContext';
 
 // --- 404 Component ---
 const NotFound: React.FC = () => (

@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
+import { useAuth } from '@/src/context/AuthContext';
+import { useCart } from '@/src/context/CartContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { getBookings, getShopById, updateShop, subscribeToNotifications } from '../services/logic_engine';
-import { PersistenceService } from '../services/PersistenceService';
+import { getBookings, getShopById, updateShop, subscribeToNotifications } from '@/src/services/logic_engine';
+import { PersistenceService } from '@/src/services/PersistenceService';
 import { ShoppingBag, User } from 'lucide-react';
-import CustomerAuthModal from './CustomerAuthModal';
+import CustomerAuthModal from '@/src/components/CustomerAuthModal.tsx';
 
 /* LOCKED - POINT 1 COMPLETE: Universal Navigation Component */
 const Navbar: React.FC = () => {
