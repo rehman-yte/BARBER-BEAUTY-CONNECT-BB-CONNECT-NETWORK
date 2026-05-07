@@ -8,6 +8,7 @@ import { PersistenceService } from '../services/PersistenceService';
 import { ShoppingBag, User } from 'lucide-react';
 import CustomerAuthModal from './CustomerAuthModal';
 
+/* LOCKED - POINT 1 COMPLETE: Universal Navigation Component */
 const Navbar: React.FC = () => {
   const { user, logout, updateUser } = useAuth();
   const { totalItems } = useCart();
@@ -93,7 +94,7 @@ const Navbar: React.FC = () => {
 
     const target = user.role === 'customer' ? 'customers' : (user.role === 'partner' ? 'partners' : 'all');
     
-    const unsubscribe = subscribeToNotifications(target, (newNotifs) => {
+    const unsubscribe = subscribeToNotifications(target, user.uid, (newNotifs) => {
       setBroadcastNotifs(newNotifs);
       
       if (newNotifs.length > 0) {

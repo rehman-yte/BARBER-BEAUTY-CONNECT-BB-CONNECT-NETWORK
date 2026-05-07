@@ -204,30 +204,26 @@ export const getShopById = async (id: string): Promise<any> => {
 // Fetch bookings (filtered by user if ID provided)
 export const getBookings = async (userId?: string): Promise<any[]> => {
   try {
-    let q = query(collection(db, 'bookings'));
-    
     if (userId) {
-      // Create a compound query or just filter by customerId/shopId
-      // Note: Firestore doesn't support 'OR' queries easily without indices
-      // We will perform two queries and combine them if needed, or stick to one if usage is specific
-      
+      // Create specific queries for Customer and Partner roles to match Security Rules precisely
       const qCustomer = query(collection(db, 'bookings'), where('customerId', '==', userId));
-      const qShop = query(collection(db, 'bookings'), where('shopId', '==', userId));
+      const qPartner = query(collection(db, 'bookings'), where('partnerId', '==', userId));
       
-      const [snapCustomer, snapShop] = await Promise.all([
+      const [snapCustomer, snapPartner] = await Promise.all([
         getDocs(qCustomer),
-        getDocs(qShop)
+        getDocs(qPartner)
       ]);
       
       const results = new Map();
       snapCustomer.docs.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
-      snapShop.docs.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+      snapPartner.docs.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
       
       return Array.from(results.values());
     }
     
-    // For Admins (No userId provided or admin role checked elsewhere)
-    const querySnapshot = await getDocs(q);
+    // For Admins (Strictly controlled by Security Rules)
+    const qAdmin = query(collection(db, 'bookings'));
+    const querySnapshot = await getDocs(qAdmin);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {
     console.error('Firestore getBookings failure:', err);
@@ -312,10 +308,11 @@ export const sendNotification = async (message: string, target: 'all' | 'custome
   }
 };
 
-export const subscribeToNotifications = (target: string, callback: (notifs: any[]) => void) => {
+export const subscribeToNotifications = (target: string, userId: string, callback: (notifs: any[]) => void) => {
+  // Use a query that matches the security rules' 'in' logic exactly
   const q = query(
     collection(db, 'notifications'),
-    where('target', 'in', ['all', target]),
+    where('target', 'in', ['all', target, userId]),
     orderBy('createdAt', 'desc'),
     limit(10)
   );

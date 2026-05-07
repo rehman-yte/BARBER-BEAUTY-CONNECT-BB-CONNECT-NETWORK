@@ -95,15 +95,16 @@ service cloud.firestore {
     // ---------------------------------------------------------------
     match /bookings/{bookingId} {
       // Security Boundary Enforcement
-      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
       
       // Rule 8: Secure List Queries
-      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
 
       allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
       
       allow update: if isSignedIn() && (
         (existing().customerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+        (existing().partnerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
         (existing().shopId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
         isAdmin()
       );

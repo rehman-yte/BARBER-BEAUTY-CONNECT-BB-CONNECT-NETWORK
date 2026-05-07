@@ -1,25 +1,26 @@
+/* LOCKED - POINT 1 COMPLETE: Auth & Routing Infrastructure */
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from "./components/Navbar";
-import Footer from './components/Footer';
-import LandingPage from './pages/LandingPage';
-import AuthPage from './pages/AuthPage';
-import ExplorePage from './pages/ExplorePage';
-import ShopDetail from './pages/ShopDetail';
-import CustomerDashboard from './pages/CustomerDashboard';
-import PartnerDashboard from './pages/PartnerDashboard';
-import PartnerOnboarding from './pages/PartnerOnboarding';
-import PartnerAuth from './pages/PartnerAuth';
-import PartnerSignIn from './pages/PartnerSignIn';
-import ForgotPassword from './pages/ForgotPassword';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsAndConditions from './pages/TermsAndConditions';
-import CookiesPolicy from './pages/CookiesPolicy';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminGateway from './pages/AdminGateway';
-import ShopPage from './pages/ShopPage';
-import CheckoutPage from './pages/CheckoutPage';
-import MyShopping from './pages/MyShopping';
+import Footer from "./components/Footer";
+import LandingPage from "./pages/LandingPage";
+import AuthPage from "./pages/AuthPage";
+import ExplorePage from "./pages/ExplorePage";
+import ShopDetail from "./pages/ShopDetail";
+import CustomerDashboard from "./pages/CustomerDashboard";
+import PartnerDashboard from "./pages/PartnerDashboard";
+import PartnerOnboarding from "./pages/PartnerOnboarding";
+import PartnerAuth from "./pages/PartnerAuth";
+import PartnerSignIn from "./pages/PartnerSignIn";
+import ForgotPassword from "./pages/ForgotPassword";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import CookiesPolicy from "./pages/CookiesPolicy";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminGateway from "./pages/AdminGateway";
+import ShopPage from "./pages/ShopPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import MyShopping from "./pages/MyShopping";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -77,6 +78,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   return <>{children}</>;
 };
 
+/* LOCKED - POINT 1 COMPLETE: Routing Protocol logic */
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
 
@@ -136,7 +138,7 @@ const LayoutWrapper: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
-      <main className="flex-grow w-full max-w-[1440px] mx-auto px-[5%] pt-[5rem]">
+      <main className="flex-grow w-full pt-[5rem]">
         <AppRoutes />
       </main>
       <Footer />
