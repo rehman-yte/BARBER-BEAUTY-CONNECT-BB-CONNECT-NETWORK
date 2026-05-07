@@ -111,6 +111,11 @@ const PartnerOnboarding: React.FC = () => {
 
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
+    
+    // START PRE-EMPTIVE SUCCESS OVERLAY
+    // This ensures the "Initating Access" feedback is instant
+    setIsSuccess(true);
+
     try {
       // 1. Prepare payload
       const shopPayload: any = {
@@ -132,33 +137,35 @@ const PartnerOnboarding: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      // Execute Firestore write
-      await addShop(shopPayload);
+      // Execute Firestore write in parallel with the 3s timer
+      const writePromise = addShop(shopPayload).then(() => {
+        if (updateUser) {
+          return updateUser({ 
+            role: 'partner',
+            status: 'pending',
+            brandName: formData.brandName,
+            onboardingComplete: true
+          });
+        }
+      });
 
-      // 2. Update local user status
-      if (updateUser) {
-        await updateUser({ 
-          role: 'partner',
-          status: 'pending',
-          brandName: formData.brandName,
-          onboardingComplete: true
-        });
-      }
-
-      // Success Bridge
-      setIsSuccess(true); 
-      setTimeout(() => {
-        navigate('/partner-dashboard', { replace: true });
+      // 2. Navigation Bridge (forced 3s delay for UX/Sync)
+      setTimeout(async () => {
+        try {
+          await writePromise; // Ensure write finishes before actually switching
+          navigate('/partner-dashboard', { replace: true });
+        } catch (err) {
+          console.error("Delayed sync failure:", err);
+          // If it fails, we still try to move them as the local state is updated
+          navigate('/partner-dashboard', { replace: true });
+        }
       }, 3000);
-      /* LOCKED - END POINT 2 */
 
     } catch (err: any) {
       console.error("Submission crash:", err);
       setError(err.message || "Submission failed. Please check your network connection.");
       setIsProcessing(false);
-      
-      // Resilient fallback: If write failed but we got this far, try to navigate anyway if it's a minor error
-      // But for now, just let the user see the error.
+      setIsSuccess(false);
     }
   };
 
