@@ -26,6 +26,13 @@ service cloud.firestore {
       );
     }
 
+    function isStaticAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "haidartheworldking@gmail.com" || 
+        request.auth.token.email == "rhfarooqui16@gmail.com"
+      );
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -76,7 +83,8 @@ service cloud.firestore {
     // CUSTOMERS COLLECTION
     // ---------------------------------------------------------------
     match /customers/{customerId} {
-      allow read: if isOwner(customerId) || isAdmin();
+      allow get: if isOwner(customerId) || isAdmin();
+      allow list: if isOwner(customerId) || isStaticAdmin();
       allow create: if isOwner(customerId);
       allow update: if isOwner(customerId) || isAdmin();
     }
@@ -85,7 +93,8 @@ service cloud.firestore {
     // USERS COLLECTION (Legacy/Unified)
     // ---------------------------------------------------------------
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isOwner(userId) || isStaticAdmin();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
     }
@@ -98,7 +107,7 @@ service cloud.firestore {
       allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
       
       // Rule 8: Secure List Queries
-      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isStaticAdmin());
 
       allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
       
@@ -116,8 +125,14 @@ service cloud.firestore {
     // NOTIFICATIONS COLLECTION
     // ---------------------------------------------------------------
     match /notifications/{notifId} {
-      // Targeted list queries only
-      allow list: if isSignedIn() && (resource.data.target in ['all', request.auth.uid, 'partners', 'customers', 'admin']);
+      // Targeted list queries only. Using explicit comparison for query optimization.
+      allow list: if isSignedIn() && (
+        resource.data.target == 'all' || 
+        resource.data.target == request.auth.uid || 
+        resource.data.target == 'partners' || 
+        resource.data.target == 'customers' || 
+        resource.data.target == 'admin'
+      );
       allow get: if isSignedIn();
       allow create: if isAdmin();
       allow update, delete: if isAdmin();
@@ -135,7 +150,8 @@ service cloud.firestore {
     // ADMINS COLLECTION
     // ---------------------------------------------------------------
     match /admins/{adminId} {
-      allow read: if isAdmin();
+      allow get: if isAdmin();
+      allow list: if isStaticAdmin();
       allow write: if isAdmin();
     }
 
@@ -148,7 +164,8 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow read: if isOwner(resource.data.customerId) || isAdmin();
+      allow get: if isOwner(resource.data.customerId) || isAdmin();
+      allow list: if isOwner(resource.data.customerId) || isStaticAdmin();
       allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
       allow update: if isAdmin();
     }
