@@ -69,7 +69,8 @@ service cloud.firestore {
         // Regular partners can only change non-RBAC fields
         incoming().diff(existing()).affectedKeys().hasOnly([
           'ownerName', 'brandName', 'mobileNumber', 'address', 'category', 'workerQuantity', 
-          'upiId', 'coords', 'services', 'shopStatus', 'updatedAt', 'status', 'adminApproved'
+          'upiId', 'coords', 'services', 'shopStatus', 'updatedAt', 'status', 'adminApproved',
+          'onboardingComplete', 'ownerPicture', 'govId', 'brandImages', 'workerImages', 'uid', 'id', 'createdAt'
         ]) &&
         // Protect status escalation
         (incoming().status == existing().status || incoming().status == 'pending') &&
