@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { getBookings, getShopById, updateShop, subscribeToNotifications } from '../services/logic_engine';
 import { PersistenceService } from '../services/PersistenceService';
 import { ShoppingBag, User } from 'lucide-react';
