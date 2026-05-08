@@ -308,7 +308,7 @@ const AdminDashboard: React.FC = () => {
                         <div className="mt-4 space-y-1">
                           <p className="text-[0.6875rem] text-gray-500 font-medium">Owner: {shop.ownerName}</p>
                           <p className="text-[0.6875rem] text-gray-500 font-medium">Mobile: {shop.mobile}</p>
-                          <p className="text-[0.6875rem] text-gray-500 font-medium">Workers: {shop.workerCount || shop.workerQuantity || '1'}</p>
+                          <p className="text-[0.6875rem] text-gray-500 font-medium">Workers: {shop.workerCount}</p>
                         </div>
                       </div>
                       <button className="text-[0.5625rem] font-bold text-[#0056b3] border border-[#0056b3]/10 px-4 py-2 rounded-full hover:bg-[#0056b3]/5 transition-all uppercase tracking-widest">View Docs</button>
@@ -682,13 +682,13 @@ const AdminDashboard: React.FC = () => {
                 <div>
                   <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Government ID Verification</p>
                   <div className="aspect-[1.6/1] bg-gray-50 rounded-[2rem] border border-gray-100 overflow-hidden relative shadow-sm flex items-center justify-center p-4 text-center">
-                    {selectedShopDocs.govtIdUrl || selectedShopDocs.govId ? (
-                      ((selectedShopDocs.govtIdUrl || selectedShopDocs.govId).startsWith('data:image') || (selectedShopDocs.govtIdUrl || selectedShopDocs.govId).startsWith('http')) ? (
-                        <img src={selectedShopDocs.govtIdUrl || selectedShopDocs.govId} alt="Govt ID" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    {selectedShopDocs.govtIdUrl ? (
+                      (selectedShopDocs.govtIdUrl.startsWith('data:image') || selectedShopDocs.govtIdUrl.startsWith('http')) ? (
+                        <img src={selectedShopDocs.govtIdUrl} alt="Govt ID" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
                         <div className="flex flex-col items-center">
                           <svg className="w-12 h-12 text-gray-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                          <span className="text-[10px] font-bold text-bbBlue uppercase">{(selectedShopDocs.govtIdUrl || selectedShopDocs.govId).split(': ')[1] || (selectedShopDocs.govtIdUrl || selectedShopDocs.govId)}</span>
+                          <span className="text-[10px] font-bold text-bbBlue uppercase">{selectedShopDocs.govtIdUrl.split(': ')[1] || selectedShopDocs.govtIdUrl}</span>
                         </div>
                       )
                     ) : (
@@ -710,7 +710,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Staff Count</span>
-                       <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerCount || selectedShopDocs.worker_quantity || selectedShopDocs.workerQuantity} Personnel</span>
+                       <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerCount} Personnel</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Mobile</span>

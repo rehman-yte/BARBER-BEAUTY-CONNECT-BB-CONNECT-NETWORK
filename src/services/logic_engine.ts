@@ -81,11 +81,13 @@ export const getPendingPartners = async (): Promise<any[]> => {
       return {
         id: docSnapshot.id,
         ...data,
-        brandName: data.brand_name || data.brandName,
-        ownerName: data.owner_name || data.ownerName,
-        workerCount: data.workerCount || data.worker_quantity || data.workerQuantity || 1,
-        govtIdUrl: data.govtIdUrl || data.govId || data.gov_id,
-        shopImages: data.shopImages || data.brandImages || []
+        brandName: data.brandName || data.brand_name || 'Unnamed Shop',
+        ownerName: data.ownerName || data.owner_name || 'N/A',
+        workerCount: data.workerCount || data.workerQuantity || data.worker_quantity || 1,
+        govtIdUrl: data.govtIdUrl || data.govId || data.gov_id || 'pending_upload',
+        shopImages: data.shopImages || data.brandImages || [],
+        workerImages: data.workerImages || data.staffImages || [],
+        mobile: data.mobile || data.mobileNumber || 'N/A'
       };
     });
   } catch (err) {
@@ -93,10 +95,20 @@ export const getPendingPartners = async (): Promise<any[]> => {
     // Legacy fallback to partners collection if queue is missing
     const q = query(collection(db, 'partners'), where('status', '==', 'pending'));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data() as any;
+      return {
+        id: doc.id,
+        ...data,
+        brandName: data.brandName || data.brand_name || 'Unnamed Shop',
+        ownerName: data.ownerName || data.owner_name || 'N/A',
+        workerCount: data.workerCount || data.workerQuantity || data.worker_quantity || 1,
+        govtIdUrl: data.govtIdUrl || data.govId || data.gov_id || 'pending_upload',
+        shopImages: data.shopImages || data.brandImages || [],
+        workerImages: data.workerImages || data.staffImages || [],
+        mobile: data.mobile || data.mobileNumber || 'N/A'
+      };
+    });
   }
 };
 
@@ -144,9 +156,12 @@ export const addShop = async (shopData: any) => {
     // Normalize field names according to Roadmap [cite: 2026-01-17]
     const normalizedData = {
       ...shopData,
+      brandName: shopData.brandName || shopData.brand_name,
+      ownerName: shopData.ownerName || shopData.owner_name,
       workerCount: shopData.workerCount || shopData.workerQuantity || 1,
       govtIdUrl: shopData.govtIdUrl || shopData.govId || shopData.gov_id || 'pending_upload',
       shopImages: shopData.shopImages || shopData.brandImages || [],
+      mobile: shopData.mobile || shopData.mobileNumber,
       adminApproved: false,
       status: 'pending',
       createdAt: Timestamp.now()
