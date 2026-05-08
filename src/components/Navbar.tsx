@@ -319,9 +319,9 @@ const Navbar: React.FC = () => {
             </button>
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
-            <button 
-              onClick={() => navigate('/shop')}
-              className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
+            <Link 
+              to="/shop"
+              className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95 flex items-center justify-center"
             >
               <ShoppingBag size={20} />
               {totalItems > 0 && (
@@ -329,7 +329,7 @@ const Navbar: React.FC = () => {
                   {totalItems}
                 </span>
               )}
-            </button>
+            </Link>
 
             <div className="relative" ref={notificationRef}>
               <button 

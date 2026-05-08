@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { ShoppingCart, Filter, Search, ChevronRight, Star, Menu, X, ShoppingBag, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';

@@ -282,6 +282,19 @@ const PartnerDashboard: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-3 bg-gray-50 px-6 py-3 rounded-full border border-gray-100">
+              <button 
+                onClick={() => navigate('/shop')}
+                className="flex items-center gap-2 group"
+              >
+                <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white group-hover:bg-bbBlue transition-colors">
+                  <ShoppingBag size={14} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-[0.45rem] font-bold text-gray-400 uppercase tracking-widest leading-none">Access</span>
+                  <span className="text-[0.5625rem] font-black uppercase tracking-widest text-black group-hover:text-bbBlue transition-colors">Premium Shop</span>
+                </div>
+              </button>
+              <div className="w-px h-6 bg-gray-200 mx-2 hidden md:block"></div>
               <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
                 {isLive ? 'GO OFFLINE' : 'GO LIVE'}
               </span>

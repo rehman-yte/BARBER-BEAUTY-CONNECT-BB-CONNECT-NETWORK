@@ -34,7 +34,7 @@ const NotFound: React.FC = () => (
 );
 
 // --- Protected Route Helper ---
-const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'customer' | 'partner' | 'admin' }> = ({ children, allowedRole }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'customer' | 'partner' | 'admin' | string[] }> = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
@@ -43,6 +43,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     if (allowedRole === 'admin') return <Navigate to="/admin-login" replace />;
     return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
   }
+
+  const isAllowed = !allowedRole || 
+    (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
 
   // MANDATORY PARTNER GATE: status and brand check
   if (user.role === 'partner') {
@@ -57,7 +60,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   }
 
   // ROLE ENFORCEMENT: Block cross-access
-  if (allowedRole && user.role !== allowedRole) {
+  if (allowedRole && !isAllowed) {
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
     if (user.role === 'partner') {
        // Partner trying to access customer space
@@ -101,9 +104,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/terms" element={<TermsAndConditions />} />
       <Route path="/cookies" element={<CookiesPolicy />} />
       
+      {/* SHARED COMMERCE PORTAL */}
+      <Route path="/shop" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopPage /></ProtectedRoute>} />
+      
       {/* CUSTOMER PORTAL (Strictly locked) */}
       <Route path="/explore" element={<ProtectedRoute allowedRole="customer"><ExplorePage /></ProtectedRoute>} />
-      <Route path="/shop" element={<ProtectedRoute allowedRole="customer"><ShopPage /></ProtectedRoute>} />
       <Route path="/checkout" element={<ProtectedRoute allowedRole="customer"><CheckoutPage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute allowedRole="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
