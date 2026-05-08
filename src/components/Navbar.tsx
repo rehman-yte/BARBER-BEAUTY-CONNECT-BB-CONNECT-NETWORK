@@ -269,12 +269,19 @@ const Navbar: React.FC = () => {
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
           {/* UBER-STYLE CLEAN HEADER */}
-          {!isPartner && (
+          <Link 
+            to="/explore" 
+            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.2em] transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          >
+            Explore
+          </Link>
+
+          {isPartner && (
             <Link 
-              to="/explore" 
-              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+              to="/partner-dashboard" 
+              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.2em] transition-all whitespace-nowrap ${location.pathname === '/partner-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
             >
-              Explore
+              Terminal
             </Link>
           )}
           

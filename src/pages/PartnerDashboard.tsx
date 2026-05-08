@@ -232,51 +232,6 @@ const PartnerDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] text-[#111827]">
-      {/* MOBILE HEADER (UBER STYLE) */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-serif font-black overflow-hidden border border-gray-100 uppercase relative group"
-          >
-             {shopData?.ownerPicture && shopData.ownerPicture !== 'pending_upload' ? <img src={shopData.ownerPicture} className="w-full h-full object-cover" /> : shopData?.brandName?.[0] || 'B'}
-             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Plus size={14} />
-             </div>
-          </button>
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleProfileUpload} />
-          <div>
-            <h1 className="text-[0.875rem] font-black uppercase tracking-tight truncate max-w-[150px]">
-              {shopData?.brandName || 'Business Hub'}
-            </h1>
-            <div className="flex items-center gap-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-              <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                {isLive ? 'Accepting Bookings' : 'Offline'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className={`text-[0.5rem] font-black uppercase tracking-widest ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
-              {isLive ? 'GO OFFLINE' : 'GO LIVE'}
-            </span>
-            <button 
-              onClick={handleToggleLive}
-              disabled={isPending}
-              className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPending ? 'bg-gray-100 cursor-not-allowed' : isLive ? 'bg-green-500' : 'bg-gray-300'}`}
-            >
-              <motion.div 
-                animate={{ x: isLive ? 24 : 0 }}
-                className="w-4 h-4 bg-white rounded-full shadow-sm"
-              />
-            </button>
-          </div>
-        </div>
-      </header>
-
       {/* PENDING NOTIFICATION BANNER (UBER TYPE) */}
       {isPending && (
         <div className="bg-[#FFC000] px-6 py-3 flex items-center gap-3 relative overflow-hidden">
@@ -294,6 +249,55 @@ const PartnerDashboard: React.FC = () => {
 
       {/* DASHBOARD CONTENT */}
       <main className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6">
+        
+        {/* LIVE STATUS BAR (RELOCATED FROM HEADER) */}
+        <div className="bg-white px-8 py-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-white font-serif font-black overflow-hidden border border-gray-100 uppercase relative group shrink-0"
+            >
+               {shopData?.ownerPicture && shopData.ownerPicture !== 'pending_upload' ? <img src={shopData.ownerPicture} className="w-full h-full object-cover" /> : shopData?.brandName?.[0] || 'B'}
+               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity font-sans">
+                  <Plus size={16} />
+               </div>
+            </button>
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleProfileUpload} />
+            <div>
+              <h2 className="text-[1rem] font-black uppercase tracking-tight">{shopData?.brandName || 'Partner Hub'}</h2>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                <span className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-[0.2em]">
+                  {isLive ? 'Network Active' : 'Station Offline'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex flex-col text-right mr-4">
+              <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Protocol Status</span>
+              <span className={`text-[0.625rem] font-black uppercase tracking-widest ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
+                {isLive ? 'Ready for Bookings' : 'Suspended'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 bg-gray-50 px-6 py-3 rounded-full border border-gray-100">
+              <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
+                {isLive ? 'GO OFFLINE' : 'GO LIVE'}
+              </span>
+              <button 
+                onClick={handleToggleLive}
+                disabled={isPending}
+                className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPending ? 'bg-gray-100 cursor-not-allowed' : isLive ? 'bg-green-500' : 'bg-gray-300'}`}
+              >
+                <motion.div 
+                  animate={{ x: isLive ? 24 : 0 }}
+                  className="w-4 h-4 bg-white rounded-full shadow-sm"
+                />
+              </button>
+            </div>
+          </div>
+        </div>
         
         {/* STATS GRID (SWIGGY STYLE) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
