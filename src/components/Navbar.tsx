@@ -313,14 +313,7 @@ const Navbar: React.FC = () => {
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
             <button 
-              onClick={() => {
-                if (isPartner) {
-                  // Connect to Premium Essentials in Dashboard
-                  navigate('/partner-dashboard?view=marketplace');
-                } else {
-                  navigate('/checkout');
-                }
-              }}
+              onClick={() => navigate('/shop')}
               className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
             >
               <ShoppingBag size={20} />

@@ -5,7 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { 
   getShopById, 
   updateShop,
-  getBookings 
+  getBookings,
+  addShopService,
+  updateShopService,
+  deleteShopService
 } from '../services/logic_engine';
 import { 
   LayoutDashboard,
@@ -34,7 +37,7 @@ const PartnerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings' | 'marketplace'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings'>('overview');
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -44,9 +47,7 @@ const PartnerDashboard: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
-    if (view === 'marketplace') {
-      setActiveTab('marketplace');
-    } else if (view === 'settings') {
+    if (view === 'settings') {
       setActiveTab('settings');
     }
   }, [window.location.search]);
@@ -180,25 +181,27 @@ const PartnerDashboard: React.FC = () => {
   const handleSaveService = async () => {
     if (!newServiceName || !newServicePrice) return;
     
-    let updatedServices;
-    if (editingServiceId) {
-      updatedServices = shopData.services.map((s: any) => 
-        s.id === editingServiceId 
-          ? { ...s, name: newServiceName, price: Number(newServicePrice), duration: Number(newServiceDuration) }
-          : s
-      );
-    } else {
-      updatedServices = [...(shopData.services || []), { 
-        id: Date.now().toString(),
-        name: newServiceName, 
-        price: Number(newServicePrice),
-        duration: Number(newServiceDuration)
-      }];
-    }
+    const servicePayload = {
+      name: newServiceName,
+      price: Number(newServicePrice),
+      duration: Number(newServiceDuration)
+    };
 
     try {
-      await updateShop(user!.uid, { services: updatedServices });
-      setShopData({ ...shopData, services: updatedServices });
+      if (editingServiceId) {
+        await updateShopService(user!.uid, editingServiceId, servicePayload);
+        const updatedServices = shopData.services.map((s: any) => 
+          s.id === editingServiceId ? { ...s, ...servicePayload } : s
+        );
+        setShopData({ ...shopData, services: updatedServices });
+      } else {
+        const newService = await addShopService(user!.uid, servicePayload);
+        setShopData({ 
+          ...shopData, 
+          services: [...(shopData.services || []), newService] 
+        });
+      }
+
       setNewServiceName('');
       setNewServicePrice('');
       setNewServiceDuration('30');
@@ -218,9 +221,9 @@ const PartnerDashboard: React.FC = () => {
   };
 
   const handleRemoveService = async (serviceId: string) => {
-    const updatedServices = shopData.services.filter((s: any) => s.id !== serviceId);
     try {
-      await updateShop(user!.uid, { services: updatedServices });
+      await deleteShopService(user!.uid, serviceId);
+      const updatedServices = shopData.services.filter((s: any) => s.id !== serviceId);
       setShopData({ ...shopData, services: updatedServices });
     } catch (err) {
       console.error("Asset removal fail:", err);
@@ -503,44 +506,6 @@ const PartnerDashboard: React.FC = () => {
                        <p className="text-[0.5rem] font-bold text-gray-200 uppercase tracking-widest">Register services to start accepting bookings</p>
                     </div>
                   )}
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'marketplace' && (
-              <motion.div 
-                key="marketplace"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="space-y-6"
-              >
-                <div className="px-2">
-                  <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Premium Essentials</h2>
-                  <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Enterprise grade products for your studio</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[
-                    { id: '1', name: 'Ceramic Blade Clipper', price: 4500, img: 'https://images.unsplash.com/photo-1599351431247-f13b3828e23b?auto=format&fit=crop&q=80&w=400' },
-                    { id: '2', name: 'Master Barber Cape', price: 899, img: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=400' },
-                    { id: '3', name: 'Pro Finishing Spray', price: 1200, img: 'https://images.unsplash.com/photo-1592647420148-bfcc175e1599?auto=format&fit=crop&q=80&w=400' }
-                  ].map(product => (
-                    <div key={product.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden group">
-                      <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                        <img src={product.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.name} />
-                        <div className="absolute top-4 right-4 py-1.5 px-4 bg-black/80 backdrop-blur-md text-white text-[0.625rem] font-bold rounded-full">
-                          ₹{product.price}
-                        </div>
-                      </div>
-                      <div className="p-6">
-                        <h4 className="text-[0.875rem] font-black uppercase tracking-tight mb-4">{product.name}</h4>
-                        <button className="w-full py-3 bg-gray-50 hover:bg-black hover:text-white border border-gray-100 rounded-2xl text-[0.5rem] font-bold uppercase tracking-widest transition-all">
-                          Order via Network
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </motion.div>
             )}

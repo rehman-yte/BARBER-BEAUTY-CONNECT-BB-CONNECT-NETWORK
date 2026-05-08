@@ -9,6 +9,7 @@ import {
   query, 
   where, 
   setDoc, 
+  deleteDoc,
   onSnapshot, 
   orderBy, 
   limit, 
@@ -180,9 +181,15 @@ export const getShopById = async (id: string): Promise<any> => {
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
     const data = docSnap.data() as any;
+    
+    // Fetch individual services from sub-collection for precise logic
+    const servicesSnap = await getDocs(collection(db, 'partners', id, 'services'));
+    const services = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
     return {
       id: docSnap.id,
       ...data,
+      services: services.length > 0 ? services : (data.services || []), // Fallback to array for migration
       brandName: data.brand_name || data.brandName,
       ownerName: data.owner_name || data.ownerName,
       mobile: data.mobile_number || data.mobile,
@@ -193,6 +200,44 @@ export const getShopById = async (id: string): Promise<any> => {
     };
   } catch (err) {
     console.error('Firestore getShopById production failure:', err);
+    throw err;
+  }
+};
+
+/**
+ * SERVICE SUB-COLLECTION MANAGEMENT
+ */
+
+export const addShopService = async (partnerId: string, service: any) => {
+  try {
+    const serviceId = service.id || Date.now().toString();
+    const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
+    await setDoc(docRef, { ...service, id: serviceId, createdAt: Timestamp.now() });
+    return { ...service, id: serviceId };
+  } catch (err) {
+    console.error("addShopService fail:", err);
+    throw err;
+  }
+};
+
+export const updateShopService = async (partnerId: string, serviceId: string, updates: any) => {
+  try {
+    const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
+    await updateDoc(docRef, updates);
+    return true;
+  } catch (err) {
+    console.error("updateShopService fail:", err);
+    throw err;
+  }
+};
+
+export const deleteShopService = async (partnerId: string, serviceId: string) => {
+  try {
+    const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.error("deleteShopService fail:", err);
     throw err;
   }
 };

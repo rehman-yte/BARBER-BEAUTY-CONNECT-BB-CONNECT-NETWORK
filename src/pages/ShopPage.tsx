@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Filter, Search, ChevronRight, Star, Menu, X, ShoppingBag } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { ShoppingCart, Filter, Search, ChevronRight, Star, Menu, X, ShoppingBag, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -96,6 +97,7 @@ const SHOP_PRODUCTS = [
 ];
 
 const ShopPage: React.FC = () => {
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState("All Products");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -201,13 +203,20 @@ const ShopPage: React.FC = () => {
 
         {/* Main Product Grid */}
         <main className="flex-grow p-4 md:p-8">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h1 className="text-lg md:text-xl font-serif font-bold text-charcoal uppercase tracking-tight">
               {activeCategory}
               <span className="ml-2 text-xs font-sans font-normal text-gray-400 normal-case tracking-normal">
                 ({filteredProducts.length} items)
               </span>
             </h1>
+
+            {user?.role === 'admin' && (
+              <button className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-xl text-[0.625rem] font-bold uppercase tracking-widest shadow-xl hover:bg-bbBlue transition-all active:scale-95">
+                <Plus size={16} />
+                List New Product
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
