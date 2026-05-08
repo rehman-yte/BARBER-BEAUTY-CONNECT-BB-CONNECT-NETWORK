@@ -112,10 +112,6 @@ const PartnerOnboarding: React.FC = () => {
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     
-    // START PRE-EMPTIVE SUCCESS OVERLAY
-    // This ensures the "Initating Access" feedback is instant
-    setIsSuccess(true);
-
     try {
       // 1. Prepare payload
       const shopPayload: any = {
@@ -137,16 +133,15 @@ const PartnerOnboarding: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      // Execute Firestore write in parallel with the 3s timer
-      const writePromise = addShop(shopPayload);
+      // 2. Execute Firestore write
+      await addShop(shopPayload);
+      
+      // 3. Trigger Success UI
+      setIsSuccess(true);
 
-      // 2. Navigation Bridge (forced 3s delay for UX/Sync)
+      // 4. Navigation Bridge (forced 3s delay for UX/Sync)
       setTimeout(async () => {
         try {
-          await writePromise; // Ensure write finishes before actually switching
-          
-          // CRITICAL: We update the local state ONLY after the timer
-          // This prevents the App.tsx redirect from cutting off our animation
           if (updateUser) {
             await updateUser({ 
               role: 'partner',
@@ -155,11 +150,13 @@ const PartnerOnboarding: React.FC = () => {
               onboardingComplete: true
             });
           }
-
+          
+          // Persistence Lock: Explicitly set bb_intended_role to avoid fallback to customer
+          localStorage.setItem('bb_intended_role', 'partner');
+          
           navigate('/partner-dashboard', { replace: true });
         } catch (err) {
           console.error("Delayed sync failure:", err);
-          // If it fails, we still try to move them as the local state is updated
           navigate('/partner-dashboard', { replace: true });
         }
       }, 3000);

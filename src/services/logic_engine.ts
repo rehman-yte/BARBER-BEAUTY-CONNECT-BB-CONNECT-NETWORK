@@ -74,17 +74,15 @@ export const getShops = async (): Promise<any[]> => {
 // getPendingPartners: For Admin Verification Queue
 export const getPendingPartners = async (): Promise<any[]> => {
   try {
-    const q = query(collection(db, 'partners'), where('status', '==', 'pending'));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(collection(db, 'verification_queue'));
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
+      ...doc.data(),
+      status: 'pending'
     }));
   } catch (err) {
     console.error("getPendingPartners error:", err);
-    // Fallback if index is missing: filter in memory
-    const all = await getShops();
-    return all.filter(s => s.status === 'pending' || !s.adminApproved);
+    return [];
   }
 };
 
@@ -181,23 +179,53 @@ export const addShop = async (shopData: any) => {
 // Update shop details (Production Firebase)
 export const updateShop = async (id: string, updates: any) => {
   try {
-    const docRef = doc(db, 'partners', id);
-    await updateDoc(docRef, updates);
-    
-    // If status is being updated to approved/active, sync with user collection
-    if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
+    // Check if the shop is in the verification queue
+    const queueRef = doc(db, 'verification_queue', id);
+    const queueSnap = await getDoc(queueRef);
+
+    if (queueSnap.exists() && (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true)) {
+      // PROMOTION LOGIC: Move from queue to production collections
+      const data = queueSnap.data() as any;
+      const finalData = { ...data, ...updates, status: 'active', adminApproved: true, approved: true, isLive: true };
+      
+      // Write to partners
+      await setDoc(doc(db, 'partners', id), finalData);
+      // Write to active_shops (Legacy/Registry)
+      await setDoc(doc(db, 'active_shops', id), finalData);
+      // Remove from queue
+      await deleteDoc(queueRef);
+      
+      // Sync to users
       try {
-        const userRef = doc(db, 'users', id);
-        await updateDoc(userRef, { 
-          status: 'active',
-          adminApproved: true 
-        });
-      } catch (userErr) {
-        console.warn("Could not sync status to users collection (might be using mobile ID):", userErr);
+        await updateDoc(doc(db, 'users', id), { status: 'active', adminApproved: true });
+      } catch (e) {}
+      
+      return true;
+    }
+
+    // Standard update for existing partners
+    const docRef = doc(db, 'partners', id);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      await updateDoc(docRef, updates);
+      
+      // If status is being updated to approved/active, sync with user collection
+      if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
+        try {
+          const userRef = doc(db, 'users', id);
+          await updateDoc(userRef, { 
+            status: 'active',
+            adminApproved: true 
+          });
+        } catch (userErr) {
+          console.warn("Could not sync status to users collection:", userErr);
+        }
       }
+      return true;
     }
     
-    return true;
+    return false;
   } catch (err) {
     console.error('Firestore updateShop production failure:', err);
     throw err;
