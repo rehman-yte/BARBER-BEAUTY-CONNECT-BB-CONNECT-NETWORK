@@ -269,14 +269,12 @@ const Navbar: React.FC = () => {
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
           {/* UBER-STYLE CLEAN HEADER */}
-          {!isPartner && (
-            <Link 
-              to="/explore" 
-              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.2em] transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-            >
-              Explore
-            </Link>
-          )}
+          <Link 
+            to="/explore" 
+            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.2em] transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+          >
+            Explore
+          </Link>
 
           {isPartner && (
             <Link 
@@ -321,9 +319,9 @@ const Navbar: React.FC = () => {
             </button>
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
-            <button 
-              onClick={() => navigate('/shop')}
-              className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+            <Link 
+              to="/shop"
+              className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95 flex items-center justify-center"
             >
               <ShoppingBag size={20} />
               {totalItems > 0 && (
@@ -331,7 +329,7 @@ const Navbar: React.FC = () => {
                   {totalItems}
                 </span>
               )}
-            </button>
+            </Link>
 
             <div className="relative" ref={notificationRef}>
               <button 
@@ -450,25 +448,15 @@ const Navbar: React.FC = () => {
                          </button>
                        )}
                     </div>
-                    {(user?.role === 'customer' || user?.role === 'partner') && (
+                    {user?.role === 'customer' && (
                       <>
-                        {user?.role === 'customer' ? (
-                          <Link 
-                            to="/customer-dashboard" 
-                            onClick={() => setShowDropdown(false)}
-                            className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
-                          >
-                            My Dashboard
-                          </Link>
-                        ) : (
-                          <Link 
-                            to="/partner-dashboard" 
-                            onClick={() => setShowDropdown(false)}
-                            className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
-                          >
-                            Partner Hub
-                          </Link>
-                        )}
+                        <Link 
+                          to="/customer-dashboard" 
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
+                        >
+                          My Dashboard
+                        </Link>
                         <Link 
                           to="/my-shopping" 
                           onClick={() => setShowDropdown(false)}
@@ -476,6 +464,17 @@ const Navbar: React.FC = () => {
                         >
                           <ShoppingBag size={14} />
                           My Shopping
+                        </Link>
+                      </>
+                    )}
+                    {isPartner && (
+                      <>
+                        <Link 
+                          to="/partner-dashboard" 
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
+                        >
+                          Partner Dashboard
                         </Link>
                       </>
                     )}
