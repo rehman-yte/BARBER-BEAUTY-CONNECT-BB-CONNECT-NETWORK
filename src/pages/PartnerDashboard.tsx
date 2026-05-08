@@ -32,22 +32,24 @@ const PartnerDashboard: React.FC = () => {
   const [shopData, setShopData] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
+
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings' | 'marketplace'>('overview');
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Derive unique Token ID (First 4 chars of UID uppercase)
-  const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
-
-  // Marketplace check from URL
+  // Marketplace check from URL - reactive to search changes
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('view') === 'marketplace') {
+    const view = params.get('view');
+    if (view === 'marketplace') {
       setActiveTab('marketplace');
+    } else if (view === 'settings') {
+      setActiveTab('settings');
     }
-  }, []);
+  }, [window.location.search]);
 
   // Sync Bridge: Fallback to localStorage for resilient state
   useEffect(() => {
@@ -330,7 +332,6 @@ const PartnerDashboard: React.FC = () => {
             { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} /> },
             { id: 'services', label: 'Services', icon: <Plus size={14} /> },
             { id: 'bookings', label: 'Bookings', icon: <Clock size={14} /> },
-            { id: 'marketplace', label: 'Premium', icon: <ShoppingBag size={14} /> },
             { id: 'settings', label: 'Settings', icon: <Settings size={14} /> }
           ].map(tab => (
             <button
@@ -445,12 +446,11 @@ const PartnerDashboard: React.FC = () => {
                      <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Manage your offerings and pricing</p>
                    </div>
                    <button 
-                    onClick={() => !isPending && setIsAddingService(true)} 
-                    disabled={isPending}
-                    className={`flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-[0.625rem] font-bold uppercase tracking-widest shadow-xl hover:bg-bbBlue transition-all ${isPending && 'opacity-30 grayscale cursor-not-allowed'}`}
+                    onClick={() => setIsAddingService(true)} 
+                    className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-[0.625rem] font-bold uppercase tracking-widest shadow-xl hover:bg-bbBlue transition-all active:scale-95"
                    >
                      <Plus size={16} />
-                     Register Asset
+                     Add New Service
                    </button>
                 </div>
 
@@ -552,9 +552,15 @@ const PartnerDashboard: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-10 max-w-[50rem] mx-auto pb-20"
               >
-                <div className="px-2">
-                  <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Studio Configuration</h2>
-                  <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Master data and core infrastructure settings</p>
+                <div className="px-2 flex justify-between items-end">
+                  <div>
+                    <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Studio Configuration</h2>
+                    <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Master data and core infrastructure settings</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[0.5rem] font-black text-gray-400 uppercase tracking-widest">Network Token ID</p>
+                    <p className="text-[0.75rem] font-black font-mono text-bbBlue">{tokenId}</p>
+                  </div>
                 </div>
 
                 {/* UPI MANAGEMENT */}
