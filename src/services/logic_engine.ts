@@ -74,17 +74,26 @@ export const getShops = async (): Promise<any[]> => {
 // getPendingPartners: For Admin Verification Queue
 export const getPendingPartners = async (): Promise<any[]> => {
   try {
-    const q = query(collection(db, 'partners'), where('status', '==', 'pending'));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    // SYSTEM PROTOCOL: Query verification_queue for pending partners
+    const qv = query(collection(db, 'verification_queue'), where('status', '==', 'pending'));
+    const snapV = await getDocs(qv);
+    const queueData = snapV.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    if (queueData.length > 0) return queueData;
+
+    // Fallback: Check legacy partners collection for pending status
+    const qp = query(collection(db, 'partners'), where('status', '==', 'pending'));
+    const snapP = await getDocs(qp);
+    return snapP.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
   } catch (err) {
     console.error("getPendingPartners error:", err);
-    // Fallback if index is missing: filter in memory
-    const all = await getShops();
-    return all.filter(s => s.status === 'pending' || !s.adminApproved);
+    return [];
   }
 };
 
@@ -181,8 +190,18 @@ export const addShop = async (shopData: any) => {
 // Update shop details (Production Firebase)
 export const updateShop = async (id: string, updates: any) => {
   try {
+    // Check verification_queue first if it's a verification action
+    const vRef = doc(db, 'verification_queue', id);
+    const vSnap = await getDoc(vRef);
+    if (vSnap.exists()) {
+      await updateDoc(vRef, updates);
+    }
+
     const docRef = doc(db, 'partners', id);
-    await updateDoc(docRef, updates);
+    const pSnap = await getDoc(docRef);
+    if (pSnap.exists()) {
+      await updateDoc(docRef, updates);
+    }
     
     // If status is being updated to approved/active, sync with user collection
     if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
@@ -200,6 +219,59 @@ export const updateShop = async (id: string, updates: any) => {
     return true;
   } catch (err) {
     console.error('Firestore updateShop production failure:', err);
+    throw err;
+  }
+};
+
+// approvePartner: Move from queue to partners and active_shops
+export const approvePartner = async (id: string, partnerData: any) => {
+  try {
+    const batchData = {
+      ...partnerData,
+      status: 'approved',
+      adminApproved: true,
+      approved: true,
+      isLive: true,
+      approvedAt: Timestamp.now()
+    };
+
+    // Step 1: Write to 'partners'
+    await setDoc(doc(db, 'partners', id), batchData);
+    
+    // Step 2: Write to 'active_shops' (for Explore Page visibility)
+    await setDoc(doc(db, 'active_shops', id), batchData);
+
+    // Step 3: Delete from 'verification_queue'
+    await deleteDoc(doc(db, 'verification_queue', id));
+
+    // Step 4: Update User Role/Status if exists
+    try {
+      await updateDoc(doc(db, 'users', id), {
+        status: 'active',
+        adminApproved: true,
+        role: 'partner'
+      });
+    } catch (e) {}
+
+    return true;
+  } catch (err) {
+    console.error("Critical Approval Failure:", err);
+    throw err;
+  }
+};
+
+// rejectPartner: Update or Delete from queue
+export const rejectPartner = async (id: string) => {
+  try {
+    // Per protocol: Delete from queue or update status
+    await deleteDoc(doc(db, 'verification_queue', id));
+    // Optional: update legacy partners if exists
+    try {
+      await updateDoc(doc(db, 'partners', id), { status: 'rejected', adminApproved: false });
+    } catch (e) {}
+    return true;
+  } catch (err) {
+    console.error("Critical Rejection Failure:", err);
     throw err;
   }
 };
