@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 import { 
   getShops, 
@@ -32,7 +34,9 @@ const AdminDashboard: React.FC = () => {
   const [isUpdatingFee, setIsUpdatingFee] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast';
+  const [editingPartner, setEditingPartner] = useState<any>(null);
+  const [isSavingPartner, setIsSavingPartner] = useState(false);
+  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'system';
   const navigate = useNavigate();
 
   const setCurrentView = (view: string) => {
@@ -56,7 +60,7 @@ const AdminDashboard: React.FC = () => {
     try {
       let data = [];
       let allBookings = [];
-      let config = { platformFee: 10, broadcasts: [] };
+      let config: any = { platformFee: 10, broadcasts: [], system_config: {} };
 
       try {
         data = await getShops();
@@ -134,7 +138,8 @@ const AdminDashboard: React.FC = () => {
         settlements,
         auditLog: auditLog.sort((a, b) => b.bookingId.localeCompare(a.bookingId)),
         platformFee: configFee,
-        broadcasts: config.broadcasts || []
+        broadcasts: config.broadcasts || [],
+        system_config: config.system_config || {}
       };
 
       setStats(newStats);
@@ -225,6 +230,35 @@ const AdminDashboard: React.FC = () => {
   const handleToggleActive = async (shopId: string, currentStatus: boolean) => {
     await updateShop(shopId, { isActive: !currentStatus });
     fetchStats();
+  };
+
+  const handleSavePartner = async (id: string, updates: any) => {
+    setIsSavingPartner(true);
+    try {
+      await updateShop(id, updates);
+      // Also update active_shops if approved
+      if (updates.adminApproved || stats.allPartners.find((p: any) => p.id === id)?.adminApproved) {
+        await setDoc(doc(db, 'active_shops', id), updates, { merge: true });
+      }
+      setEditingPartner(null);
+      fetchStats();
+    } catch (err) {
+      console.error("Save Partner Hub Failure:", err);
+    } finally {
+      setIsSavingPartner(false);
+    }
+  };
+
+  const handleDeletePartner = async (id: string) => {
+    if (!window.confirm("Are you sure? This will PERMANENTLY remove this partner from the network.")) return;
+    try {
+      await deleteDoc(doc(db, 'partners', id));
+      await deleteDoc(doc(db, 'active_shops', id));
+      await deleteDoc(doc(db, 'verification_queue', id));
+      fetchStats();
+    } catch (err) {
+      console.error("Delete Partner Failure:", err);
+    }
   };
 
   const handleFreezePayout = async (shopId: string, bookingId: string, currentFrozen: boolean) => {
@@ -374,13 +408,27 @@ const AdminDashboard: React.FC = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-5 text-right">
-                          <button 
-                            onClick={() => handleToggleActive(partner.id, partner.isActive)}
-                            className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${partner.isActive ? 'border-red-100 text-red-500 hover:bg-red-50' : 'border-emerald-100 text-emerald-500 hover:bg-emerald-50'}`}
-                          >
-                            {partner.isActive ? 'Force Offline' : 'Restore Online'}
-                          </button>
+                        <td className="px-8 py-5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => setEditingPartner(partner)}
+                              className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border border-gray-100 text-gray-500 hover:border-black hover:text-black transition-all"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleToggleActive(partner.id, partner.isActive)}
+                              className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${partner.isActive ? 'border-red-100 text-red-500 hover:bg-red-50' : 'border-emerald-100 text-emerald-500 hover:bg-emerald-50'}`}
+                            >
+                              {partner.isActive ? 'Suspend' : 'Resume'}
+                            </button>
+                            <button 
+                              onClick={() => handleDeletePartner(partner.id)}
+                              className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border border-red-50/50 text-red-300 hover:text-red-600 transition-all"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -493,10 +541,23 @@ const AdminDashboard: React.FC = () => {
                               {log.timerStatus}
                             </span>
                           </td>
-                          <td className="px-8 py-5 text-right">
-                            <button onClick={() => handleFreezePayout(log.shopId, log.bookingId, log.isFrozen)} className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${log.isFrozen ? 'bg-red-500 text-white border-red-500' : 'border-red-100 text-red-500 hover:bg-red-50'}`}>
-                              {log.isFrozen ? 'Unfreeze' : 'Freeze'}
-                            </button>
+                          <td className="px-8 py-5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => handleFreezePayout(log.shopId, log.bookingId, log.isFrozen)} className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${log.isFrozen ? 'bg-red-500 text-white border-red-500' : 'border-red-100 text-red-500 hover:bg-red-50'}`}>
+                                {log.isFrozen ? 'Unfreeze' : 'Freeze'}
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  if (window.confirm("Void this transaction? This deletes the booking record.")) {
+                                    await deleteDoc(doc(db, 'bookings', log.bookingId));
+                                    fetchStats();
+                                  }
+                                }}
+                                className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border border-red-100 text-red-400 hover:bg-red-50 transition-all"
+                              >
+                                Void
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -578,6 +639,93 @@ const AdminDashboard: React.FC = () => {
             </div>
           </motion.div>
         )}
+
+        {currentView === 'system' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-12 flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-serif font-bold text-black">SYSTEM CUSTOMIZATION</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">White-label & Visual Protocol Control</p>
+              </div>
+              <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back to Overview</button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-6">Identity & Visuals</h3>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Accent Color (HEX)</label>
+                    <div className="flex gap-2">
+                       <input 
+                        type="text" 
+                        value={stats?.system_config?.accentColor || '#0056b3'}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          await updateSettings({ system_config: { ...stats?.system_config, accentColor: val } });
+                          fetchStats();
+                        }}
+                        className="flex-1 bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold font-mono outline-none focus:border-bbBlue"
+                      />
+                      <div className="w-12 h-12 rounded-2xl border border-gray-100" style={{ backgroundColor: stats?.system_config?.accentColor || '#0056b3' }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Platform Name</label>
+                    <input 
+                      type="text" 
+                      value={stats?.system_config?.platformName || 'BB CONNECT'}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        await updateSettings({ system_config: { ...stats?.system_config, platformName: val } });
+                        fetchStats();
+                      }}
+                      className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-6">Service Categories</h3>
+                <div className="space-y-4">
+                  {(stats?.system_config?.categories || ['Barber', 'Beauty Parlour', 'Spa', 'Tattoo']).map((cat: string) => (
+                    <div key={cat} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl group">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-black">{cat}</span>
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={async () => {
+                            const newCats = (stats?.system_config?.categories || ['Barber', 'Beauty Parlour', 'Spa', 'Tattoo']).filter((c: string) => c !== cat);
+                            await updateSettings({ system_config: { ...stats?.system_config, categories: newCats } });
+                            fetchStats();
+                          }}
+                          className="text-red-300 hover:text-red-500 text-[8px] font-bold uppercase opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          Remove
+                        </button>
+                        <span className="text-[8px] text-emerald-500 font-bold uppercase tracking-widest">Active</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                      </div>
+                    </div>
+                  ))}
+                  <button 
+                    onClick={async () => {
+                      const name = window.prompt("Enter New Category Name:");
+                      if (name) {
+                        const newCats = [...(stats?.system_config?.categories || ['Barber', 'Beauty Parlour', 'Spa', 'Tattoo']), name];
+                        await updateSettings({ system_config: { ...stats?.system_config, categories: newCats } });
+                        fetchStats();
+                      }
+                    }}
+                    className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-[10px] font-bold text-gray-300 uppercase tracking-widest hover:border-bbBlue hover:text-bbBlue transition-all"
+                  >
+                    + Add New Category
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </main>
 
       {/* Document Modal (Verification) */}
@@ -640,6 +788,24 @@ const AdminDashboard: React.FC = () => {
 
               <div className="space-y-8">
                 <div>
+                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Owner Verification</p>
+                  <div className="aspect-square bg-gray-50 rounded-[2rem] border border-gray-100 overflow-hidden relative shadow-sm flex items-center justify-center p-4 text-center max-w-[200px] mx-auto">
+                    {selectedShopDocs.ownerPicture ? (
+                      (selectedShopDocs.ownerPicture.startsWith('data:image') || selectedShopDocs.ownerPicture.startsWith('http')) ? (
+                        <img src={selectedShopDocs.ownerPicture} alt="Owner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <svg className="w-12 h-12 text-gray-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                          <span className="text-[10px] font-bold text-bbBlue uppercase">{selectedShopDocs.ownerPicture.split(': ')[1] || selectedShopDocs.ownerPicture}</span>
+                        </div>
+                      )
+                    ) : (
+                      <span className="text-[10px] text-gray-300 font-bold uppercase">No Portrait</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
                   <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Government ID Verification</p>
                   <div className="aspect-[1.6/1] bg-gray-50 rounded-[2rem] border border-gray-100 overflow-hidden relative shadow-sm flex items-center justify-center p-4 text-center">
                     {selectedShopDocs.govId ? (
@@ -687,6 +853,88 @@ const AdminDashboard: React.FC = () => {
             <div className="mt-12 pt-8 border-t border-gray-50 flex justify-end gap-4">
               <button onClick={() => setSelectedShopDocs(null)} className="px-8 py-3 text-[0.625rem] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Close</button>
               <button onClick={() => { handleVerify(selectedShopDocs.id, 'approve'); setSelectedShopDocs(null); }} className="px-10 py-3 bg-[#0056b3] text-white rounded-2xl text-[0.625rem] font-bold uppercase tracking-widest hover:bg-[#004494] transition-all shadow-xl shadow-[#0056b3]/20">Approve Now</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      {/* Edit Partner Modal */}
+      {editingPartner && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[3000] flex items-center justify-center p-6">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-2xl p-10 rounded-[3rem] relative shadow-2xl">
+            <button onClick={() => setEditingPartner(null)} className="absolute top-8 right-8 text-gray-300 hover:text-black">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <h3 className="text-2xl font-serif font-bold text-black mb-8 italic">MASTER EDIT: {editingPartner.brandName}</h3>
+            
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Brand Name</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingPartner.brandName}
+                    id="edit-brand"
+                    className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Owner Name</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingPartner.ownerName}
+                    id="edit-owner"
+                    className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Mobile Number</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingPartner.mobile}
+                    id="edit-mobile"
+                    className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">UPI ID</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingPartner.upiId}
+                    id="edit-upi"
+                    className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-50">
+                <button 
+                  onClick={() => setEditingPartner(null)}
+                  className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black"
+                >
+                  Discard
+                </button>
+                <button 
+                  disabled={isSavingPartner}
+                  onClick={() => {
+                    const brand = (document.getElementById('edit-brand') as HTMLInputElement).value;
+                    const owner = (document.getElementById('edit-owner') as HTMLInputElement).value;
+                    const mobile = (document.getElementById('edit-mobile') as HTMLInputElement).value;
+                    const upi = (document.getElementById('edit-upi') as HTMLInputElement).value;
+                    handleSavePartner(editingPartner.id, {
+                      brandName: brand,
+                      ownerName: owner,
+                      mobile: mobile,
+                      upiId: upi
+                    });
+                  }}
+                  className="px-10 py-4 bg-black text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-gray-800 transition-all"
+                >
+                  {isSavingPartner ? 'Pushing Data...' : 'Commit Changes'}
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>
