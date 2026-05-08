@@ -74,17 +74,29 @@ export const getShops = async (): Promise<any[]> => {
 // getPendingPartners: For Admin Verification Queue
 export const getPendingPartners = async (): Promise<any[]> => {
   try {
+    // Fetch from verification_queue as requested by system protocol
+    const querySnapshot = await getDocs(collection(db, 'verification_queue'));
+    return querySnapshot.docs.map(docSnapshot => {
+      const data = docSnapshot.data() as any;
+      return {
+        id: docSnapshot.id,
+        ...data,
+        brandName: data.brand_name || data.brandName,
+        ownerName: data.owner_name || data.ownerName,
+        workerCount: data.workerCount || data.worker_quantity || data.workerQuantity || 1,
+        govtIdUrl: data.govtIdUrl || data.govId || data.gov_id,
+        shopImages: data.shopImages || data.brandImages || []
+      };
+    });
+  } catch (err) {
+    console.error("getPendingPartners verification_queue error:", err);
+    // Legacy fallback to partners collection if queue is missing
     const q = query(collection(db, 'partners'), where('status', '==', 'pending'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-  } catch (err) {
-    console.error("getPendingPartners error:", err);
-    // Fallback if index is missing: filter in memory
-    const all = await getShops();
-    return all.filter(s => s.status === 'pending' || !s.adminApproved);
   }
 };
 
@@ -128,19 +140,28 @@ export const addShop = async (shopData: any) => {
   try {
     // CRITICAL: Document ID must be the User UID for Master Gate routing
     const docId = shopData.uid || shopData.id || (shopData.mobile ? String(shopData.mobile) : undefined);
-    const payload = {
+    
+    // Normalize field names according to Roadmap [cite: 2026-01-17]
+    const normalizedData = {
       ...shopData,
+      workerCount: shopData.workerCount || shopData.workerQuantity || 1,
+      govtIdUrl: shopData.govtIdUrl || shopData.govId || shopData.gov_id || 'pending_upload',
+      shopImages: shopData.shopImages || shopData.brandImages || [],
       adminApproved: false,
       status: 'pending',
       createdAt: Timestamp.now()
     };
 
     if (docId) {
-      await setDoc(doc(db, 'partners', docId), payload);
-      return { id: docId, ...payload };
+      // Save to main partners collection
+      await setDoc(doc(db, 'partners', docId), normalizedData);
+      // Save to verification_queue collection as requested for Admin Panel
+      await setDoc(doc(db, 'verification_queue', docId), normalizedData);
+      return { id: docId, ...normalizedData };
     } else {
-      const docRef = await addDoc(collection(db, 'partners'), payload);
-      return { id: docRef.id, ...payload };
+      const docRef = await addDoc(collection(db, 'partners'), normalizedData);
+      await setDoc(doc(db, 'verification_queue', docRef.id), normalizedData);
+      return { id: docRef.id, ...normalizedData };
     }
   } catch (err) {
     console.error('Firestore addShop production failure:', err);
@@ -154,6 +175,15 @@ export const updateShop = async (id: string, updates: any) => {
     const docRef = doc(db, 'partners', id);
     await updateDoc(docRef, updates);
     
+    // If shop is approved or rejected, remove from verification_queue
+    if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true || updates.status === 'rejected') {
+      try {
+        await deleteDoc(doc(db, 'verification_queue', id));
+      } catch (deleteErr) {
+        console.debug("Note: verification_queue entry already removed or missing.");
+      }
+    }
+
     // If status is being updated to approved/active, sync with user collection
     if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
       try {

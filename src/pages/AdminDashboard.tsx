@@ -54,7 +54,12 @@ const AdminDashboard: React.FC = () => {
     try {
       let data = [];
       let allBookings = [];
-      let config = { platformFee: 10, broadcasts: [] };
+      let config = { 
+        platformFee: 10, 
+        broadcasts: [] as any[],
+        heroTitle: 'BB Grooming Excellence',
+        heroSubtitle: 'Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.'
+      };
 
       try {
         data = await getShops();
@@ -132,7 +137,9 @@ const AdminDashboard: React.FC = () => {
         settlements,
         auditLog: auditLog.sort((a, b) => b.bookingId.localeCompare(a.bookingId)),
         platformFee: configFee,
-        broadcasts: config.broadcasts || []
+        broadcasts: config.broadcasts || [],
+        heroTitle: config.heroTitle || 'BB Grooming Excellence',
+        heroSubtitle: config.heroSubtitle || 'Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.'
       };
 
       setStats(newStats);
@@ -301,7 +308,7 @@ const AdminDashboard: React.FC = () => {
                         <div className="mt-4 space-y-1">
                           <p className="text-[0.6875rem] text-gray-500 font-medium">Owner: {shop.ownerName}</p>
                           <p className="text-[0.6875rem] text-gray-500 font-medium">Mobile: {shop.mobile}</p>
-                          <p className="text-[0.6875rem] text-gray-500 font-medium">Workers: {shop.workerQuantity || '1'}</p>
+                          <p className="text-[0.6875rem] text-gray-500 font-medium">Workers: {shop.workerCount || shop.workerQuantity || '1'}</p>
                         </div>
                       </div>
                       <button className="text-[0.5625rem] font-bold text-[#0056b3] border border-[#0056b3]/10 px-4 py-2 rounded-full hover:bg-[#0056b3]/5 transition-all uppercase tracking-widest">View Docs</button>
@@ -569,6 +576,43 @@ const AdminDashboard: React.FC = () => {
                     <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mb-1">Last Broadcast</p>
                     <p className="text-[10px] font-bold text-black">{stats?.broadcasts?.[0]?.timestamp ? new Date(stats.broadcasts[0].timestamp).toLocaleString() : 'None'}</p>
                   </div>
+                  
+                  <div className="pt-6 border-t border-gray-100">
+                    <h4 className="text-[8px] font-bold text-black uppercase tracking-[0.2em] mb-4">Site Branding</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Hero Title</label>
+                        <input 
+                          type="text" 
+                          value={stats?.heroTitle || 'BB Grooming Excellence'}
+                          onChange={(e) => setStats({...stats, heroTitle: e.target.value})}
+                          className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-[10px] font-bold outline-none focus:border-[#0056b3]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Hero Subtitle</label>
+                        <textarea 
+                          value={stats?.heroSubtitle || 'Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.'}
+                          onChange={(e) => setStats({...stats, heroSubtitle: e.target.value})}
+                          className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-[10px] font-bold outline-none focus:border-[#0056b3] h-20 resize-none"
+                        />
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          setIsUpdatingFee(true);
+                          await updateSettings({ 
+                            heroTitle: stats.heroTitle, 
+                            heroSubtitle: stats.heroSubtitle 
+                          });
+                          setIsUpdatingFee(false);
+                          fetchStats();
+                        }} 
+                        className="w-full bg-black text-white py-3 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-gray-900 transition-all"
+                      >
+                        Push Style Update
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -638,13 +682,13 @@ const AdminDashboard: React.FC = () => {
                 <div>
                   <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Government ID Verification</p>
                   <div className="aspect-[1.6/1] bg-gray-50 rounded-[2rem] border border-gray-100 overflow-hidden relative shadow-sm flex items-center justify-center p-4 text-center">
-                    {selectedShopDocs.govId ? (
-                      (selectedShopDocs.govId.startsWith('data:image') || selectedShopDocs.govId.startsWith('http')) ? (
-                        <img src={selectedShopDocs.govId} alt="Govt ID" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    {selectedShopDocs.govtIdUrl || selectedShopDocs.govId ? (
+                      ((selectedShopDocs.govtIdUrl || selectedShopDocs.govId).startsWith('data:image') || (selectedShopDocs.govtIdUrl || selectedShopDocs.govId).startsWith('http')) ? (
+                        <img src={selectedShopDocs.govtIdUrl || selectedShopDocs.govId} alt="Govt ID" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
                         <div className="flex flex-col items-center">
                           <svg className="w-12 h-12 text-gray-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                          <span className="text-[10px] font-bold text-bbBlue uppercase">{selectedShopDocs.govId.split(': ')[1] || selectedShopDocs.govId}</span>
+                          <span className="text-[10px] font-bold text-bbBlue uppercase">{(selectedShopDocs.govtIdUrl || selectedShopDocs.govId).split(': ')[1] || (selectedShopDocs.govtIdUrl || selectedShopDocs.govId)}</span>
                         </div>
                       )
                     ) : (
@@ -666,7 +710,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Staff Count</span>
-                       <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerQuantity} Personnel</span>
+                       <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerCount || selectedShopDocs.worker_quantity || selectedShopDocs.workerQuantity} Personnel</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Mobile</span>

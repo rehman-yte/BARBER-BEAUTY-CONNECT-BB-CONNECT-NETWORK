@@ -20,6 +20,20 @@ const Hero: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { getSettings } = await import('../services/logic_engine');
+        const data = await getSettings();
+        setSettings(data);
+      } catch (err) {
+        console.debug("Settings fetch deferred or failed.");
+      }
+    };
+    fetchSettings();
+  }, []);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -60,10 +74,14 @@ const Hero: React.FC = () => {
           className="flex flex-col gap-[1rem] md:gap-[1.5rem] text-left items-start w-full"
         >
           <h1 className="text-[1rem] sm:text-[1.25rem] md:text-[1.5rem] lg:text-[1.75rem] font-serif font-bold leading-tight tracking-tight">
-            <span className="text-bbBlue-deep">BB</span> <span className="text-charcoal uppercase">Grooming Excellence</span>
+            {settings?.heroTitle || (
+              <>
+                <span className="text-bbBlue-deep">BB</span> <span className="text-charcoal uppercase">Grooming Excellence</span>
+              </>
+            )}
           </h1>
           <p className="text-[0.625rem] sm:text-[0.75rem] md:text-[1rem] text-gray-500 max-w-[31.25rem] leading-relaxed font-medium">
-            Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.
+            {settings?.heroSubtitle || "Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery."}
           </p>
           
           <div className="flex flex-col sm:flex-row gap-[1rem] mt-[1rem] md:mt-[1.5rem] w-full sm:w-auto">
