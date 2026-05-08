@@ -70,19 +70,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // STEP A: MASTER CHECK - PARTNERS COLLECTION ONLY (STRONGEST SIGNAL)
           const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
-          let partnerData = partnerDoc.exists() ? partnerDoc.data() : null;
-          let inVerificationQueue = false;
-
-          if (!partnerData) {
-            const queueDoc = await getDoc(doc(db, 'verification_queue', firebaseUser.uid));
-            if (queueDoc.exists()) {
-              partnerData = queueDoc.data();
-              inVerificationQueue = true;
-            }
-          }
-
-          if (partnerData) {
-            console.log(`[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER ${inVerificationQueue ? '(PENDING QUEUE)' : '(ACTIVE)'}`);
+          if (partnerDoc.exists()) {
+            const partnerData = partnerDoc.data();
+            console.log("[AUTH ARCHITECT] Gate A: IDENTITY CONFIRMED -> PARTNER");
             
             // Step B: Resolve Partner Onboarding Status
             const onboardingComplete = !!partnerData.onboardingComplete;
@@ -93,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : (inVerificationQueue ? 'pending' : null),
+              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
               photoURL: firebaseUser.photoURL || undefined,
               brandName: partnerData.brandName || undefined,
               onboardingComplete: onboardingComplete
@@ -329,21 +319,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!auth.currentUser || !user) return;
     
     try {
-      // Determine collections based on current state and role
-      const collections = [];
-      if (user.role === 'partner') {
-        collections.push('partners', 'users', 'verification_queue');
-      } else {
-        collections.push('customers', 'users');
-      }
+      const collections = user.role === 'partner' ? ['partners', 'users'] : ['customers', 'users'];
       
       for (const coll of collections) {
          try {
            const docRef = doc(db, coll, auth.currentUser.uid);
-           const docSnap = await getDoc(docRef);
-           if (docSnap.exists()) {
-             await updateDoc(docRef, updates);
-           }
+           await updateDoc(docRef, updates);
          } catch (e) {
            console.warn(`Sync failed for collection ${coll}:`, e);
          }

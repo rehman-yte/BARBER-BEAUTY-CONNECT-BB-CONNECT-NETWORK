@@ -74,80 +74,56 @@ export const getShops = async (): Promise<any[]> => {
 // getPendingPartners: For Admin Verification Queue
 export const getPendingPartners = async (): Promise<any[]> => {
   try {
-    const querySnapshot = await getDocs(collection(db, 'verification_queue'));
+    const q = query(collection(db, 'partners'), where('status', '==', 'pending'));
+    const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data(),
-      status: 'pending'
+      ...doc.data()
     }));
   } catch (err) {
     console.error("getPendingPartners error:", err);
-    return [];
+    // Fallback if index is missing: filter in memory
+    const all = await getShops();
+    return all.filter(s => s.status === 'pending' || !s.adminApproved);
   }
 };
 
 // getApprovedPartners: For Customer Explore Page
 export const getApprovedPartners = async (category?: string): Promise<any[]> => {
   try {
-    // SYSTEM PROTOCOL: Fetch only from active_shops where isLive === true and approved === true
-    let q = query(
-      collection(db, 'active_shops'), 
-      where('approved', '==', true), 
-      where('isLive', '==', true)
-    );
-    
+    let q = query(collection(db, 'partners'), where('status', '==', 'approved'));
     if (category) {
-      q = query(
-        collection(db, 'active_shops'), 
-        where('approved', '==', true), 
-        where('isLive', '==', true), 
-        where('category', '==', category)
-      );
+      q = query(collection(db, 'partners'), where('status', '==', 'approved'), where('category', '==', category));
     }
-    
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(docSnapshot => {
       const data = docSnapshot.data() as any;
       return { 
         id: docSnapshot.id, 
         ...data,
-        brandName: data.brandName || data.brand_name,
-        ownerName: data.ownerName || data.owner_name,
-        mobile: data.mobile || data.mobile_number,
-        shopStatus: data.isLive ? 'open' : 'closed',
-        adminApproved: true 
+        brandName: data.brand_name || data.brandName,
+        ownerName: data.owner_name || data.ownerName,
+        mobile: data.mobile_number || data.mobile,
+        adminApproved: data.adminApproved || data.status === 'approved' || data.status === 'active'
       };
     });
   } catch (err) {
     console.error("getApprovedPartners error:", err);
-    // Fallback: Check both legacy and new collections if needed, but per protocol we focus on active_shops
-    const shopsFullSnapshot = await getDocs(collection(db, 'active_shops'));
-    return shopsFullSnapshot.docs
-      .map(d => {
-        const shop = d.data() as any;
-        return {
-          id: d.id,
-          ...shop,
-          brandName: shop.brandName || shop.brand_name,
-          ownerName: shop.ownerName || shop.owner_name,
-          mobile: shop.mobile || shop.mobile_number,
-          shopStatus: shop.isLive ? 'open' : 'closed',
-          adminApproved: true
-        };
-      })
-      .filter(shop => {
-        const isApproved = shop.approved === true && shop.isLive === true;
-        if (!isApproved) return false;
-        if (category && shop.category !== category) return false;
-        return true;
-      });
+    // Fallback if index/composite index is missing: filter in memory
+    const all = await getShops();
+    return all.filter(shop => {
+      const isApproved = shop.status === 'approved' || shop.adminApproved === true;
+      if (!isApproved) return false;
+      if (category && shop.category !== category) return false;
+      return true;
+    });
   }
 };
 
 // Legacy alias for compatibility
 export const getApprovedShops = getApprovedPartners;
 
-// Add a new shop (Onboarding -> Verification Queue)
+// Add a new shop (Production Firebase)
 export const addShop = async (shopData: any) => {
   try {
     // CRITICAL: Document ID must be the User UID for Master Gate routing
@@ -156,22 +132,18 @@ export const addShop = async (shopData: any) => {
       ...shopData,
       adminApproved: false,
       status: 'pending',
-      createdAt: Timestamp.now(),
-      // Ensure specific fields requested in the queue protocol
-      isLive: false,
-      approved: false
+      createdAt: Timestamp.now()
     };
 
     if (docId) {
-      // Writing to verification_queue as per SYSTEM PROTOCOL
-      await setDoc(doc(db, 'verification_queue', docId), payload);
+      await setDoc(doc(db, 'partners', docId), payload);
       return { id: docId, ...payload };
     } else {
-      const docRef = await addDoc(collection(db, 'verification_queue'), payload);
+      const docRef = await addDoc(collection(db, 'partners'), payload);
       return { id: docRef.id, ...payload };
     }
   } catch (err) {
-    console.error('Firestore addShop (Verification Queue) failure:', err);
+    console.error('Firestore addShop production failure:', err);
     throw err;
   }
 };
@@ -179,96 +151,52 @@ export const addShop = async (shopData: any) => {
 // Update shop details (Production Firebase)
 export const updateShop = async (id: string, updates: any) => {
   try {
-    // Check if the shop is in the verification queue
-    const queueRef = doc(db, 'verification_queue', id);
-    const queueSnap = await getDoc(queueRef);
-
-    if (queueSnap.exists() && (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true)) {
-      // PROMOTION LOGIC: Move from queue to production collections
-      const data = queueSnap.data() as any;
-      const finalData = { ...data, ...updates, status: 'active', adminApproved: true, approved: true, isLive: true };
-      
-      // Write to partners
-      await setDoc(doc(db, 'partners', id), finalData);
-      // Write to active_shops (Legacy/Registry)
-      await setDoc(doc(db, 'active_shops', id), finalData);
-      // Remove from queue
-      await deleteDoc(queueRef);
-      
-      // Sync to users
-      try {
-        await updateDoc(doc(db, 'users', id), { status: 'active', adminApproved: true });
-      } catch (e) {}
-      
-      return true;
-    }
-
-    // Standard update for existing partners
     const docRef = doc(db, 'partners', id);
-    const docSnap = await getDoc(docRef);
+    await updateDoc(docRef, updates);
     
-    if (docSnap.exists()) {
-      await updateDoc(docRef, updates);
-      
-      // If status is being updated to approved/active, sync with user collection
-      if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
-        try {
-          const userRef = doc(db, 'users', id);
-          await updateDoc(userRef, { 
-            status: 'active',
-            adminApproved: true 
-          });
-        } catch (userErr) {
-          console.warn("Could not sync status to users collection:", userErr);
-        }
+    // If status is being updated to approved/active, sync with user collection
+    if (updates.status === 'approved' || updates.status === 'active' || updates.adminApproved === true) {
+      try {
+        const userRef = doc(db, 'users', id);
+        await updateDoc(userRef, { 
+          status: 'active',
+          adminApproved: true 
+        });
+      } catch (userErr) {
+        console.warn("Could not sync status to users collection (might be using mobile ID):", userErr);
       }
-      return true;
     }
     
-    return false;
+    return true;
   } catch (err) {
     console.error('Firestore updateShop production failure:', err);
     throw err;
   }
 };
 
-// Fetch a single shop by ID (Checks partners, active_shops, and verification_queue)
+// Fetch a single shop by ID (Production Firebase)
 export const getShopById = async (id: string): Promise<any> => {
   try {
-    // Try primary partners collection
-    let docRef = doc(db, 'partners', id);
-    let docSnap = await getDoc(docRef);
-    
-    // If not found, check verification_queue (for pending partners)
-    if (!docSnap.exists()) {
-      docRef = doc(db, 'verification_queue', id);
-      docSnap = await getDoc(docRef);
-    }
-
-    // If still not found, check active_shops
-    if (!docSnap.exists()) {
-      docRef = doc(db, 'active_shops', id);
-      docSnap = await getDoc(docRef);
-    }
-
+    const docRef = doc(db, 'partners', id);
+    const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
     const data = docSnap.data() as any;
     
-    // Fetch individual services from sub-collection
-    const servicesSnap = await getDocs(collection(db, docRef.parent.id, id, 'services'));
+    // Fetch individual services from sub-collection for precise logic
+    const servicesSnap = await getDocs(collection(db, 'partners', id, 'services'));
     const services = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     return {
       id: docSnap.id,
       ...data,
-      services: services.length > 0 ? services : (data.services || []),
-      brandName: data.brandName || data.brand_name,
-      ownerName: data.ownerName || data.owner_name,
-      mobile: data.mobile || data.mobile_number,
-      upiId: data.upiId || data.upi_id,
-      workerQuantity: data.workerQuantity || data.worker_quantity,
+      services: services.length > 0 ? services : (data.services || []), // Fallback to array for migration
+      brandName: data.brand_name || data.brandName,
+      ownerName: data.owner_name || data.ownerName,
+      mobile: data.mobile_number || data.mobile,
+      upiId: data.upi_id || data.upiId,
+      workerQuantity: data.worker_quantity || data.workerQuantity,
       status: data.status || 'pending',
-      adminApproved: data.adminApproved || data.approved || data.status === 'approved'
+      adminApproved: data.adminApproved || data.status === 'approved'
     };
   } catch (err) {
     console.error('Firestore getShopById production failure:', err);
