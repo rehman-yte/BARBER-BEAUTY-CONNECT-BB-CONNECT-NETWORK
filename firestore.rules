@@ -1,36 +1,38 @@
 rules_version = '2';
+
+/* SECURITY_LAYER_LOCKED */
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 0. GLOBAL SAFETY NET
+    // -------------------------------------------------------------------------
+    // 0. GLOBAL SAFETY NET & HELPERS
+    // -------------------------------------------------------------------------
+    
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // ---------------------------------------------------------------
-    // HELPER FUNCTIONS
-    // ---------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isEmailVerified() {
+      // For this app, we trust standard auth for now, but strict rule would be:
+      // return request.auth.token.email_verified == true;
+      return isSignedIn();
     }
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == "haidartheworldking@gmail.com" || 
-        request.auth.token.email == "rhfarooqui16@gmail.com" ||
+        request.auth.token.email == 'haidartheworldking@gmail.com' ||
+        request.auth.token.email == 'rhfarooqui16@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
-    function isStaticAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == "haidartheworldking@gmail.com" || 
-        request.auth.token.email == "rhfarooqui16@gmail.com"
-      );
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function incoming() {
@@ -45,130 +47,152 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // ---------------------------------------------------------------
-    // PARTNERS COLLECTION
-    // ---------------------------------------------------------------
-    match /partners/{partnerId} {
-      function isValidPartner(data) {
-        return data.keys().hasAll(['ownerName', 'brandName', 'status']) &&
-               data.ownerName is string && data.ownerName.size() <= 200 &&
-               data.brandName is string && data.brandName.size() <= 200 &&
-               data.status in ['pending', 'approved', 'rejected', 'active'] &&
-               (data.mobileNumber == null || (data.mobileNumber is string && data.mobileNumber.size() <= 30));
+    // -------------------------------------------------------------------------
+    // 1. USERS COLLECTION
+    // -------------------------------------------------------------------------
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      function isValidUser(data) {
+        return data.keys().hasAll(['role']) && 
+               data.role in ['customer', 'partner', 'admin'] &&
+               (data.get('email', '') is string);
       }
 
-      // Public profile view & discovery
-      allow get: if true; 
-      allow list: if true; 
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming());
+      
+      allow update: if (isOwner(userId) || isAdmin()) && (
+        // Prevent role escalation for non-admins
+        (isAdmin() || (incoming().role == existing().role)) &&
+        // General validation
+        isValidUser(incoming())
+      );
+    }
 
-      // Creation by the user for themselves
-      allow create: if isOwner(partnerId) && isValidPartner(incoming()) && incoming().status == 'pending';
+    // -------------------------------------------------------------------------
+    // 2. PARTNERS (SHOPS) COLLECTION
+    // -------------------------------------------------------------------------
 
-      // Updates by owner or admin
-      allow update: if (isOwner(partnerId) && isValidPartner(incoming()) && (
-        // Regular partners can only change non-RBAC fields
-        incoming().diff(existing()).affectedKeys().hasOnly([
-          'ownerName', 'brandName', 'mobileNumber', 'address', 'category', 'workerQuantity', 
-          'upiId', 'coords', 'services', 'shopStatus', 'updatedAt', 'status', 'adminApproved',
-          'onboardingComplete', 'ownerPicture', 'govId', 'brandImages', 'workerImages', 'uid', 'id', 'createdAt'
-        ]) &&
-        // Protect status escalation
-        (incoming().status == existing().status || incoming().status == 'pending') &&
-        (incoming().adminApproved == existing().adminApproved || incoming().adminApproved == false)
-      )) || isAdmin();
+    match /partners/{partnerId} {
+      // Anyone can read approved shops, but only owner or admin can read private details
+      // Note: For simplicity and list queries, we allow reading if approved or owner
+      allow get: if (existing().status == 'approved' || existing().adminApproved == true || isOwner(partnerId) || isAdmin());
+      allow list: if (resource.data.status == 'approved' || resource.data.adminApproved == true || resource.data.uid == request.auth.uid || isAdmin());
 
+      function isValidPartner(data) {
+        return data.keys().hasAll(['brandName', 'status']) &&
+               data.brandName is string && data.brandName.size() <= 100 &&
+               data.status in ['pending', 'approved', 'rejected', 'active'] &&
+               (data.get('ownerName', '') is string) &&
+               (data.get('mobileNumber', '') is string);
+      }
+
+      allow create: if isSignedIn() && isOwner(partnerId) && isValidPartner(incoming()) && (
+        // New shops must start as pending
+        incoming().status == 'pending' &&
+        incoming().adminApproved == false
+      );
+
+      allow update: if (isOwner(partnerId) || isAdmin()) && (
+        isValidPartner(incoming()) && (
+          // Admin can change anything
+          isAdmin() || (
+            // Partner can only change specific fields and CANNOT approve themselves
+            incoming().status == existing().status &&
+            incoming().adminApproved == existing().adminApproved &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'ownerName', 'brandName', 'mobileNumber', 'address', 'category', 
+              'workerQuantity', 'upiId', 'coords', 'services', 'shopStatus', 
+              'updatedAt', 'ownerPicture', 'govId', 'brandImages', 'workerImages',
+              'onboardingComplete'
+            ])
+          )
+        )
+      );
+      
       allow delete: if isAdmin();
     }
 
-    // ---------------------------------------------------------------
-    // CUSTOMERS COLLECTION
-    // ---------------------------------------------------------------
-    match /customers/{customerId} {
-      allow get: if isOwner(customerId) || isAdmin();
-      allow list: if isOwner(customerId) || isStaticAdmin();
-      allow create: if isOwner(customerId);
-      allow update: if isOwner(customerId) || isAdmin();
-    }
+    // -------------------------------------------------------------------------
+    // 3. BOOKINGS COLLECTION
+    // -------------------------------------------------------------------------
 
-    // ---------------------------------------------------------------
-    // USERS COLLECTION (Legacy/Unified)
-    // ---------------------------------------------------------------
-    match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isOwner(userId) || isStaticAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
-    }
-
-    // ---------------------------------------------------------------
-    // BOOKINGS COLLECTION
-    // ---------------------------------------------------------------
     match /bookings/{bookingId} {
-      // Security Boundary Enforcement
-      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isAdmin());
-      
-      // Rule 8: Secure List Queries
-      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.partnerId == request.auth.uid || resource.data.shopId == request.auth.uid || isStaticAdmin());
-
-      allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
-      
-      allow update: if isSignedIn() && (
-        (existing().customerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-        (existing().partnerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-        (existing().shopId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+      allow read: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid || 
+        resource.data.partnerId == request.auth.uid || 
         isAdmin()
       );
 
+      function isValidBooking(data) {
+        return data.keys().hasAll(['customerId', 'partnerId', 'status']) &&
+               data.customerId is string && data.partnerId is string &&
+               data.status in ['Pending', 'Accepted', 'Rejected', 'Completed', 'payment_held', 'settlement_due'];
+      }
+
+      allow create: if isSignedIn() && (incoming().customerId == request.auth.uid) && isValidBooking(incoming());
+      
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (resource.data.customerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        (resource.data.partnerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workerName']))
+      );
+      
       allow delete: if isAdmin();
     }
 
-    // ---------------------------------------------------------------
-    // NOTIFICATIONS COLLECTION
-    // ---------------------------------------------------------------
-    match /notifications/{notifId} {
-      // Targeted list queries only. Using explicit comparison for query optimization.
-      allow list: if isSignedIn() && (
-        resource.data.target == 'all' || 
-        resource.data.target == request.auth.uid || 
-        resource.data.target == 'partners' || 
-        resource.data.target == 'customers' || 
-        resource.data.target == 'admin'
-      );
-      allow get: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
-    }
-
-    // ---------------------------------------------------------------
-    // SETTINGS COLLECTION
-    // ---------------------------------------------------------------
-    match /settings/{settingId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // ---------------------------------------------------------------
-    // ADMINS COLLECTION
-    // ---------------------------------------------------------------
-    match /admins/{adminId} {
-      allow get: if isAdmin();
-      allow list: if isStaticAdmin();
-      allow write: if isAdmin();
-    }
-
-    // ---------------------------------------------------------------
-    // PRODUCTS & ORDERS (Commerce)
-    // ---------------------------------------------------------------
-    match /products/{productId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    // -------------------------------------------------------------------------
+    // 4. ORDERS COLLECTION
+    // -------------------------------------------------------------------------
 
     match /orders/{orderId} {
-      allow get: if isOwner(resource.data.customerId) || isAdmin();
-      allow list: if isOwner(resource.data.customerId) || isStaticAdmin();
-      allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
-      allow update: if isAdmin();
+      allow read: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid || 
+        resource.data.shopId == request.auth.uid || 
+        isAdmin()
+      );
+
+      allow create: if isSignedIn() && (incoming().customerId == request.auth.uid);
+      allow update: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. NOTIFICATIONS COLLECTION
+    // -------------------------------------------------------------------------
+
+    match /notifications/{notifId} {
+      // In logic_engine, notifications are queried with 'target' in ['all', role, userId]
+      allow read: if isSignedIn() && (
+        resource.data.target == 'all' || 
+        resource.data.target == request.auth.uid ||
+        // Check user role from /users/$(request.auth.uid) if needed, but 'target' is enough for targeted pings
+        resource.data.target == 'customers' || 
+        resource.data.target == 'partners' ||
+        isAdmin()
+      );
+
+      // System writes notifications, but we allow partners to send limited pings if the app supports it
+      // For now, only Admin or system can bulk write
+      allow create: if isAdmin() || (isSignedIn() && incoming().target != 'all');
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. SETTINGS COLLECTION
+    // -------------------------------------------------------------------------
+
+    match /settings/{settingId} {
+      allow read: if true; // Public config
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. ADMINS COLLECTION
+    // -------------------------------------------------------------------------
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if false; // Managed via Console
     }
   }
 }

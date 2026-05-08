@@ -1,10 +1,26 @@
 {
   "entities": {
+    "User": {
+      "title": "User",
+      "description": "Unified user profile for Customers, Partners, and Admins",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "partner", "admin"] },
+        "status": { "type": "string", "enum": ["active", "pending", "inactive"] },
+        "onboardingComplete": { "type": "boolean" },
+        "brandName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
     "Partner": {
       "title": "Partner",
       "description": "Business partner (salon/barber) information",
       "type": "object",
       "properties": {
+        "uid": { "type": "string" },
         "ownerName": { "type": "string" },
         "brandName": { "type": "string" },
         "mobileNumber": { "type": "string" },
@@ -12,23 +28,15 @@
         "workerQuantity": { "type": "integer" },
         "address": { "type": "string" },
         "upiId": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "coords": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "active"] },
+        "adminApproved": { "type": "boolean" },
         "shopStatus": { "type": "string", "enum": ["open", "closed"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "services": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["ownerName", "brandName", "status"]
-    },
-    "Customer": {
-      "title": "Customer",
-      "description": "User information for customers",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["customer"] },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
+      "required": ["brandName", "status"]
     },
     "Booking": {
       "title": "Booking",
@@ -36,38 +44,71 @@
       "type": "object",
       "properties": {
         "customerId": { "type": "string" },
+        "partnerId": { "type": "string" },
         "shopId": { "type": "string" },
         "serviceName": { "type": "string" },
         "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Accepted", "Rejected", "Completed", "payment_held", "settlement_due"] },
+        "workerName": { "type": "string" },
+        "appointmentDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerId", "partnerId", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders/purchases",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "shopId": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
         "status": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or user notifications",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "target": { "type": "string" },
+        "type": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "createdAt": { "type": "string" }
       }
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Unified user profiles"
+    },
     "/partners/{partnerId}": {
       "schema": "Partner",
-      "description": "Salon/Barber business profiles"
-    },
-    "/customers/{customerId}": {
-      "schema": "Customer",
-      "description": "Customer profiles"
-    },
-    "/users/{userId}": {
-      "schema": "Customer",
-      "description": "Legacy/Unified user profiles"
+      "description": "Business profiles (Shops)"
     },
     "/bookings/{bookingId}": {
       "schema": "Booking",
       "description": "Service appointments"
     },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders"
+    },
     "/notifications/{notifId}": {
-      "schema": { "type": "object", "properties": { "message": { "type": "string" }, "target": { "type": "string" } } },
-      "description": "System notifications"
+      "schema": "Notification",
+      "description": "System-wide and targeted notifications"
     },
     "/settings/{settingId}": {
       "schema": { "type": "object" },
-      "description": "Global application settings"
+      "description": "Global config like platform fees"
+    },
+    "/admins/{adminId}": {
+      "schema": { "type": "object", "properties": { "email": { "type": "string" } } },
+      "description": "Authorized administrators"
     }
   }
 }

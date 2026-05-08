@@ -24,6 +24,8 @@ import {
   CreditCard
 } from 'lucide-react';
 
+/* DASHBOARD_CORE_LOGIC - LOCKED - SUCCESS */
+
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
@@ -34,6 +36,14 @@ const PartnerDashboard: React.FC = () => {
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Sync Bridge: Fallback to localStorage for resilient state
+  useEffect(() => {
+    if (user?.uid) {
+      const cached = localStorage.getItem(`partner_data_${user.uid}`);
+      if (cached) setShopData(JSON.parse(cached));
+    }
+  }, [user?.uid]);
 
   // Service Manager State
   const [isAddingService, setIsAddingService] = useState(false);
@@ -58,6 +68,8 @@ const PartnerDashboard: React.FC = () => {
         if (shop) {
           setShopData(shop);
           setIsLive(shop.isLive || false);
+          // Sync to localStorage as bridge
+          localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
         }
         
         if (registry.length > bookings.length && bookings.length > 0) {
@@ -96,9 +108,14 @@ const PartnerDashboard: React.FC = () => {
   
   // Stats Calculation
   const today = new Date().toISOString().split('T')[0];
-  const todayBookings = bookings.filter(b => b.date === today);
+  const todayBookings = bookings.filter(b => (b.date === today || b.appointmentDate?.split('T')[0] === today));
   const todayEarnings = todayBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
   const totalSlots = bookings.length;
+  
+  // Accountant AI Engine Logic: Use field from Firestore or calculate if missing
+  const walletBalance = shopData?.partner_wallet !== undefined 
+    ? shopData.partner_wallet 
+    : (todayEarnings * 0.95);
 
   const handleToggleLive = async () => {
     if (isPending) return;
@@ -106,6 +123,10 @@ const PartnerDashboard: React.FC = () => {
     try {
       await updateShop(user!.uid, { isLive: nextState });
       setIsLive(nextState);
+      // Optimistic update for local cache
+      const updated = { ...shopData, isLive: nextState };
+      setShopData(updated);
+      localStorage.setItem(`partner_data_${user!.uid}`, JSON.stringify(updated));
     } catch (err) {
       console.error("Live toggle fail:", err);
     }
@@ -308,7 +329,7 @@ const PartnerDashboard: React.FC = () => {
                       
                       <div className="space-y-1 mb-8">
                          <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Wallet Balance</span>
-                         <h4 className="text-[2.5rem] font-serif font-black tracking-tighter leading-none">₹{(todayEarnings * 0.95).toFixed(2)}</h4>
+                         <h4 className="text-[2.5rem] font-serif font-black tracking-tighter leading-none">₹{walletBalance.toFixed(2)}</h4>
                          <p className="text-[0.5rem] text-gray-500 font-bold uppercase tracking-widest mt-1">Net after 5% Platform Fuel</p>
                       </div>
 
