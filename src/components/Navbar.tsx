@@ -269,12 +269,14 @@ const Navbar: React.FC = () => {
 
         <div className="flex flex-none justify-center items-center gap-[0.75rem] sm:gap-[1.5rem] md:gap-[2.5rem] px-[0.5rem] sm:px-[1rem]">
           {/* UBER-STYLE CLEAN HEADER */}
-          <Link 
-            to="/explore" 
-            className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
-          >
-            Explore
-          </Link>
+          {!isPartner && (
+            <Link 
+              to="/explore" 
+              className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}
+            >
+              Explore
+            </Link>
+          )}
           
           {isLoggedIn ? (
             <>
@@ -285,16 +287,6 @@ const Navbar: React.FC = () => {
                 >
                   My Bookings
                 </Link>
-              )}
-              {user?.role === 'partner' && (
-                <>
-                  <Link 
-                    to="/partner-dashboard" 
-                    className={`text-[0.5625rem] sm:text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${location.pathname === '/partner-dashboard' && !location.search.includes('services') ? 'text-bbBlue' : 'text-charcoal hover:text-bbBlue'}`}
-                  >
-                    Terminal
-                  </Link>
-                </>
               )}
             </>
           ) : (
@@ -320,8 +312,15 @@ const Navbar: React.FC = () => {
             </button>
           ) : (
           <div className="flex items-center gap-[0.75rem] sm:gap-[1.25rem] relative">
-            <Link 
-              to="/checkout"
+            <button 
+              onClick={() => {
+                if (isPartner) {
+                  // Connect to Premium Essentials in Dashboard
+                  navigate('/partner-dashboard?view=marketplace');
+                } else {
+                  navigate('/checkout');
+                }
+              }}
               className="relative p-[0.5rem] text-gray-400 hover:text-bbBlue transition-all active:scale-95"
             >
               <ShoppingBag size={20} />
@@ -330,7 +329,7 @@ const Navbar: React.FC = () => {
                   {totalItems}
                 </span>
               )}
-            </Link>
+            </button>
 
             <div className="relative" ref={notificationRef}>
               <button 
@@ -477,12 +476,6 @@ const Navbar: React.FC = () => {
                         >
                           Partner Dashboard
                         </Link>
-                        <button 
-                          onClick={handleOpenSettings}
-                          className="w-full text-left block px-[1.25rem] py-[0.875rem] text-[0.625rem] font-bold uppercase tracking-widest text-black hover:bg-gray-50 hover:text-bbBlue transition-colors"
-                        >
-                          Settings
-                        </button>
                       </>
                     )}
                     {user?.role === 'admin' && (
@@ -536,79 +529,6 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* SETTINGS MODAL */}
-      <AnimatePresence>
-        {showSettings && (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-[1.5rem]">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowSettings(false)}
-              className="absolute inset-0 bg-charcoal/60 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-[32rem] bg-white rounded-[3rem] shadow-2xl overflow-hidden"
-            >
-              <div className="p-[2.5rem] md:p-[3.5rem]">
-                <div className="flex justify-between items-center mb-[2.5rem]">
-                  <h2 className="text-[1.5rem] font-serif font-bold text-charcoal uppercase tracking-tight">Partner Settings Hub</h2>
-                  <button onClick={() => setShowSettings(false)} className="text-gray-300 hover:text-charcoal transition-colors">
-                    <svg className="w-[1.5rem] h-[1.5rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-
-                <div className="space-y-[2rem]">
-                  {/* SHOP STATUS TOGGLE */}
-                  <div className="flex justify-between items-center p-[1.5rem] bg-gray-50 rounded-2xl border border-gray-100">
-                    <div>
-                      <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-widest mb-[0.25rem]">SHOP STATUS</p>
-                      <p className="text-[0.5625rem] text-gray-400 font-medium uppercase tracking-widest">
-                        {settingsData.isActive ? 'ONLINE' : 'OFFLINE'}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={() => setSettingsData(prev => ({ ...prev, isActive: !prev.isActive }))}
-                      className={`w-[3.5rem] h-[1.75rem] rounded-full relative transition-all duration-500 ${settingsData.isActive ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                    >
-                      <motion.div 
-                        animate={{ x: settingsData.isActive ? '1.75rem' : '0.25rem' }}
-                        className="absolute top-[0.25rem] w-[1.25rem] h-[1.25rem] bg-white rounded-full shadow-sm"
-                      />
-                    </button>
-                  </div>
-
-                  {/* UPI ID UPDATE */}
-                  <div>
-                    <p className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest mb-[0.75rem]">PAYMENT SETTINGS (UPI ID)</p>
-                    <input 
-                      type="text"
-                      value={settingsData.upiId}
-                      onChange={(e) => setSettingsData(prev => ({ ...prev, upiId: e.target.value }))}
-                      placeholder="merchant@upi"
-                      className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-200 rounded-2xl text-[0.875rem] font-mono font-bold text-charcoal focus:border-bbBlue focus:bg-white outline-none transition-all"
-                    />
-                    <p className="text-[0.5rem] text-gray-400 mt-[0.5rem] uppercase font-bold tracking-widest">Funds will be settled to this ID every 12 hours.</p>
-                  </div>
-
-                  <div className="pt-[1rem]">
-                    <button 
-                      onClick={handleSaveSettings}
-                      disabled={isSavingSettings}
-                      className="w-full py-[1.25rem] bg-bbBlue text-white rounded-2xl text-[0.625rem] font-bold uppercase tracking-widest hover:bg-bbBlue/90 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-bbBlue/20"
-                    >
-                      {isSavingSettings ? 'Syncing with Network...' : 'SAVE CHANGES'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
       {/* GLOBAL BROADCAST TOAST */}
       <AnimatePresence>
         {activeToast && (

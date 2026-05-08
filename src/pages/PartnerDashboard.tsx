@@ -24,18 +24,30 @@ import {
   CreditCard
 } from 'lucide-react';
 
-/* DASHBOARD_CORE_LOGIC - LOCKED - SUCCESS */
+/* PARTNER_PORTAL_V2 - LOCKED - SUCCESS */
 
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, updateUser } = useAuth();
   const [shopData, setShopData] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings' | 'marketplace'>('overview');
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Derive unique Token ID (First 4 chars of UID uppercase)
+  const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
+
+  // Marketplace check from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('view') === 'marketplace') {
+      setActiveTab('marketplace');
+    }
+  }, []);
 
   // Sync Bridge: Fallback to localStorage for resilient state
   useEffect(() => {
@@ -47,6 +59,7 @@ const PartnerDashboard: React.FC = () => {
 
   // Service Manager State
   const [isAddingService, setIsAddingService] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration, setNewServiceDuration] = useState('30');
@@ -132,23 +145,74 @@ const PartnerDashboard: React.FC = () => {
     }
   };
 
-  const handleAddService = async () => {
+  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        await updateShop(user.uid, { ownerPicture: base64String });
+        setShopData({ ...shopData, ownerPicture: base64String });
+        if (updateUser) updateUser({ photoURL: base64String });
+        localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify({ ...shopData, ownerPicture: base64String }));
+      } catch (err) {
+        console.error("Profile sync fail:", err);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUpdateMasterData = async (field: string, value: any) => {
+    try {
+      await updateShop(user!.uid, { [field]: value });
+      const updated = { ...shopData, [field]: value };
+      setShopData(updated);
+      localStorage.setItem(`partner_data_${user!.uid}`, JSON.stringify(updated));
+    } catch (err) {
+      console.error(`Master data update fail (${field}):`, err);
+    }
+  };
+
+  const handleSaveService = async () => {
     if (!newServiceName || !newServicePrice) return;
-    const updatedServices = [...(shopData.services || []), { 
-      id: Date.now().toString(),
-      name: newServiceName, 
-      price: Number(newServicePrice),
-      duration: Number(newServiceDuration)
-    }];
+    
+    let updatedServices;
+    if (editingServiceId) {
+      updatedServices = shopData.services.map((s: any) => 
+        s.id === editingServiceId 
+          ? { ...s, name: newServiceName, price: Number(newServicePrice), duration: Number(newServiceDuration) }
+          : s
+      );
+    } else {
+      updatedServices = [...(shopData.services || []), { 
+        id: Date.now().toString(),
+        name: newServiceName, 
+        price: Number(newServicePrice),
+        duration: Number(newServiceDuration)
+      }];
+    }
+
     try {
       await updateShop(user!.uid, { services: updatedServices });
       setShopData({ ...shopData, services: updatedServices });
       setNewServiceName('');
       setNewServicePrice('');
+      setNewServiceDuration('30');
       setIsAddingService(false);
+      setEditingServiceId(null);
     } catch (err) {
-      console.error("Asset registration fail:", err);
+      console.error("Asset sync fail:", err);
     }
+  };
+
+  const handleEditService = (service: any) => {
+    setEditingServiceId(service.id);
+    setNewServiceName(service.name);
+    setNewServicePrice(service.price.toString());
+    setNewServiceDuration(service.duration?.toString() || '30');
+    setIsAddingService(true);
   };
 
   const handleRemoveService = async (serviceId: string) => {
@@ -166,9 +230,16 @@ const PartnerDashboard: React.FC = () => {
       {/* MOBILE HEADER (UBER STYLE) */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-serif font-black overflow-hidden border border-gray-100 uppercase">
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-serif font-black overflow-hidden border border-gray-100 uppercase relative group"
+          >
              {shopData?.ownerPicture && shopData.ownerPicture !== 'pending_upload' ? <img src={shopData.ownerPicture} className="w-full h-full object-cover" /> : shopData?.brandName?.[0] || 'B'}
-          </div>
+             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <Plus size={14} />
+             </div>
+          </button>
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleProfileUpload} />
           <div>
             <h1 className="text-[0.875rem] font-black uppercase tracking-tight truncate max-w-[150px]">
               {shopData?.brandName || 'Business Hub'}
@@ -254,17 +325,18 @@ const PartnerDashboard: React.FC = () => {
         </div>
 
         {/* TAB NAVIGATION */}
-        <div className="flex gap-2 p-1 bg-white rounded-full border border-gray-100 shadow-sm w-fit">
+        <div className="flex gap-2 p-1 bg-white rounded-full border border-gray-100 shadow-sm w-fit overflow-x-auto no-scrollbar">
           {[
             { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} /> },
             { id: 'services', label: 'Services', icon: <Plus size={14} /> },
             { id: 'bookings', label: 'Bookings', icon: <Clock size={14} /> },
+            { id: 'marketplace', label: 'Premium', icon: <ShoppingBag size={14} /> },
             { id: 'settings', label: 'Settings', icon: <Settings size={14} /> }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[0.625rem] font-bold uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-charcoal'}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-charcoal'}`}
             >
               {tab.icon}
               {tab.label}
@@ -346,16 +418,13 @@ const PartnerDashboard: React.FC = () => {
                   </div>
 
                   <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
-                    <h3 className="text-[0.625rem] font-black uppercase tracking-[0.2em] mb-4">Quick Actions</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                       <button onClick={() => setActiveTab('services')} className="flex flex-col items-center gap-2 p-4 bg-gray-50 rounded-[1.5rem] hover:bg-bbBlue/5 transition-all group">
-                         <Plus size={18} className="text-gray-300 group-hover:text-bbBlue" />
-                         <span className="text-[0.5rem] font-bold uppercase tracking-widest">Add Service</span>
-                       </button>
-                       <button onClick={() => logout && logout().then(() => navigate('/'))} className="flex flex-col items-center gap-2 p-4 bg-gray-50 rounded-[1.5rem] hover:bg-red-50 transition-all group">
-                         <LogOut size={18} className="text-gray-300 group-hover:text-red-500" />
-                         <span className="text-[0.5rem] font-bold uppercase tracking-widest">Logout</span>
-                       </button>
+                    <h3 className="text-[0.625rem] font-black uppercase tracking-[0.2em] mb-4">Identity Hub</h3>
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-[1.5rem]">
+                       <div className="flex flex-col">
+                         <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Network Token ID</span>
+                         <span className="text-[0.75rem] font-black font-mono">{tokenId}</span>
+                       </div>
+                       <ShieldCheck size={18} className="text-bbBlue" />
                     </div>
                   </div>
                 </div>
@@ -388,7 +457,13 @@ const PartnerDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {shopData?.services?.map((service: any) => (
                     <div key={service.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative group overflow-hidden">
-                       <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                         <button 
+                          onClick={() => handleEditService(service)}
+                          className="w-10 h-10 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-lg"
+                         >
+                           <Settings size={16} />
+                         </button>
                          <button 
                           onClick={() => handleRemoveService(service.id)}
                           className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg"
@@ -432,6 +507,137 @@ const PartnerDashboard: React.FC = () => {
               </motion.div>
             )}
 
+            {activeTab === 'marketplace' && (
+              <motion.div 
+                key="marketplace"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="space-y-6"
+              >
+                <div className="px-2">
+                  <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Premium Essentials</h2>
+                  <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Enterprise grade products for your studio</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[
+                    { id: '1', name: 'Ceramic Blade Clipper', price: 4500, img: 'https://images.unsplash.com/photo-1599351431247-f13b3828e23b?auto=format&fit=crop&q=80&w=400' },
+                    { id: '2', name: 'Master Barber Cape', price: 899, img: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=400' },
+                    { id: '3', name: 'Pro Finishing Spray', price: 1200, img: 'https://images.unsplash.com/photo-1592647420148-bfcc175e1599?auto=format&fit=crop&q=80&w=400' }
+                  ].map(product => (
+                    <div key={product.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden group">
+                      <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                        <img src={product.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.name} />
+                        <div className="absolute top-4 right-4 py-1.5 px-4 bg-black/80 backdrop-blur-md text-white text-[0.625rem] font-bold rounded-full">
+                          ₹{product.price}
+                        </div>
+                      </div>
+                      <div className="p-6">
+                        <h4 className="text-[0.875rem] font-black uppercase tracking-tight mb-4">{product.name}</h4>
+                        <button className="w-full py-3 bg-gray-50 hover:bg-black hover:text-white border border-gray-100 rounded-2xl text-[0.5rem] font-bold uppercase tracking-widest transition-all">
+                          Order via Network
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'settings' && (
+              <motion.div 
+                key="settings"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-10 max-w-[50rem] mx-auto pb-20"
+              >
+                <div className="px-2">
+                  <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Studio Configuration</h2>
+                  <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Master data and core infrastructure settings</p>
+                </div>
+
+                {/* UPI MANAGEMENT */}
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm space-y-8">
+                   <div className="flex items-center gap-4 border-l-4 border-bbBlue pl-6">
+                      <CreditCard className="text-bbBlue" />
+                      <div>
+                        <h3 className="text-[0.875rem] font-black uppercase tracking-tight">Settlement Infrastructure</h3>
+                        <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Wallet funds will be wired to this identity</p>
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                     <label className="text-[0.5rem] font-black text-gray-400 uppercase tracking-widest ml-4">Merchant VPA / UPI ID</label>
+                     <div className="flex gap-4">
+                        <input 
+                          value={shopData?.upiId || ''}
+                          onChange={(e) => setShopData({...shopData, upiId: e.target.value})}
+                          placeholder="merchant@upi"
+                          className="flex-1 px-8 py-5 bg-gray-50 border border-gray-100 rounded-[1.5rem] focus:border-bbBlue outline-none text-sm font-mono font-bold uppercase tracking-tight transition-all"
+                        />
+                        <button 
+                          onClick={() => handleUpdateMasterData('upiId', shopData.upiId)}
+                          className="px-10 bg-black text-white rounded-[1.5rem] text-[0.625rem] font-bold uppercase tracking-widest shadow-xl shadow-black/20 hover:bg-bbBlue transition-all"
+                        >
+                          Sync
+                        </button>
+                     </div>
+                   </div>
+                </div>
+
+                {/* MASTER DATA */}
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm space-y-8">
+                   <div className="flex items-center gap-4 border-l-4 border-bbBlue pl-6">
+                      <LayoutDashboard className="text-bbBlue" />
+                      <div>
+                        <h3 className="text-[0.875rem] font-black uppercase tracking-tight">Studio Metadata</h3>
+                        <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Business profile as seen in the public registry</p>
+                      </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {[
+                        { label: 'Brand Name', key: 'brandName', type: 'text' },
+                        { label: 'Owner Identity', key: 'ownerName', type: 'text' },
+                        { label: 'Mobile Comms', key: 'mobileNumber', type: 'text' },
+                        { label: 'Worker Quota', key: 'workerQuantity', type: 'number' },
+                        { label: 'Address Registry', key: 'address', type: 'text' },
+                        { label: 'Studio Category', key: 'category', type: 'text' }
+                      ].map(field => (
+                        <div key={field.key} className="space-y-2">
+                           <label className="text-[0.5rem] font-black text-gray-400 uppercase tracking-widest ml-4">{field.label}</label>
+                           <div className="flex gap-2">
+                             <input 
+                               type={field.type}
+                               value={shopData?.[field.key] || ''}
+                               onChange={(e) => setShopData({...shopData, [field.key]: e.target.value})}
+                               className="flex-1 px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-bbBlue outline-none text-[0.75rem] font-bold uppercase tracking-tight transition-all"
+                             />
+                             <button 
+                               onClick={() => handleUpdateMasterData(field.key, shopData[field.key])}
+                               className="w-10 h-10 bg-gray-50 flex items-center justify-center rounded-2xl text-gray-400 hover:bg-black hover:text-white transition-all shadow-sm"
+                             >
+                                <Plus size={14} />
+                             </button>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="pt-10 flex flex-col items-center gap-4">
+                   <button 
+                    onClick={() => logout && logout().then(() => navigate('/'))}
+                    className="flex items-center gap-3 px-10 py-5 bg-red-50 text-red-500 rounded-full text-[0.625rem] font-bold uppercase tracking-[0.4em] hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+                   >
+                     <LogOut size={16} />
+                     Terminate Session
+                   </button>
+                   <p className="text-[0.5rem] text-gray-300 font-bold uppercase tracking-widest">Protocol BB-HUB-SET-001 • v2.0.5</p>
+                </div>
+              </motion.div>
+            )}
             {activeTab === 'bookings' && (
               <motion.div 
                 key="bookings"
@@ -504,7 +710,7 @@ const PartnerDashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* SERVICE ADD MODAL */}
+      {/* SERVICE ADD/EDIT MODAL */}
       <AnimatePresence>
         {isAddingService && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -512,7 +718,7 @@ const PartnerDashboard: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsAddingService(false)}
+              onClick={() => { setIsAddingService(false); setEditingServiceId(null); }}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
             <motion.div 
@@ -524,7 +730,9 @@ const PartnerDashboard: React.FC = () => {
               <div className="absolute top-0 right-0 w-32 h-32 bg-bbBlue/5 rounded-full -translate-y-16 translate-x-16"></div>
               <div className="relative z-10 space-y-8">
                 <div className="border-l-4 border-bbBlue pl-6">
-                   <h3 className="text-[1.5rem] font-serif font-black uppercase tracking-tight">Service Asset Registry</h3>
+                   <h3 className="text-[1.5rem] font-serif font-black uppercase tracking-tight">
+                     {editingServiceId ? 'Edit Service Asset' : 'Service Asset Registry'}
+                   </h3>
                    <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Protocol 09: System inventory capture</p>
                 </div>
 
@@ -563,8 +771,10 @@ const PartnerDashboard: React.FC = () => {
                 </div>
 
                 <div className="flex gap-4 pt-4">
-                   <button onClick={() => setIsAddingService(false)} className="flex-1 py-5 border-2 border-gray-100 rounded-2xl text-[0.625rem] font-bold uppercase tracking-widest hover:bg-gray-50 transition-all">Cancel</button>
-                   <button onClick={handleAddService} className="flex-[2] py-5 bg-black text-white rounded-2xl text-[0.625rem] font-bold uppercase tracking-[0.4em] shadow-xl shadow-black/20 hover:bg-bbBlue transition-all">Sync Asset</button>
+                   <button onClick={() => { setIsAddingService(false); setEditingServiceId(null); }} className="flex-1 py-5 border-2 border-gray-100 rounded-2xl text-[0.625rem] font-bold uppercase tracking-widest hover:bg-gray-50 transition-all">Cancel</button>
+                   <button onClick={handleSaveService} className="flex-[2] py-5 bg-black text-white rounded-2xl text-[0.625rem] font-bold uppercase tracking-[0.4em] shadow-xl shadow-black/20 hover:bg-bbBlue transition-all">
+                      {editingServiceId ? 'Update Asset' : 'Sync Asset'}
+                   </button>
                 </div>
               </div>
             </motion.div>
