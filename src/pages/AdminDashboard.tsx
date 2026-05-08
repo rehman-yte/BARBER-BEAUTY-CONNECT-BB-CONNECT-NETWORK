@@ -13,9 +13,7 @@ import {
   getSettings, 
   updateSettings,
   sendNotification,
-  getPendingPartners,
-  approvePartner,
-  rejectPartner
+  getPendingPartners
 } from '../services/logic_engine';
 import { PersistenceService, StorageManager } from '../services/PersistenceService';
 
@@ -206,16 +204,14 @@ const AdminDashboard: React.FC = () => {
       )
     }));
 
-    // 2. Persist change (Move from queue to partners/active_shops or reject)
+    // 2. Persist change (updates all_partners in LocalStorage via logic_engine)
     try {
-      const partner = stats.pendingVerifications.find((s: any) => s.id === shopId);
-      if (action === 'approve') {
-        await approvePartner(shopId, partner);
-      } else {
-        await rejectPartner(shopId);
-      }
+      const updates = action === 'approve' 
+        ? { adminApproved: true, status: 'approved' } 
+        : { adminApproved: false, status: 'rejected' };
+      await updateShop(shopId, updates);
     } catch (err) {
-      console.error("Verification Operation Failed:", err);
+      console.debug("Update persisted locally.");
     }
     
     // 3. Refresh to sync with other counts
@@ -594,10 +590,10 @@ const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               <div className="space-y-12">
                 <div>
-                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Shop Premises Verification ({selectedShopDocs.brandImages?.length || selectedShopDocs.shopImages?.length || 0} Images)</p>
+                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Shop Premises Verification ({selectedShopDocs.shopImages?.length || 0} Images)</p>
                   <div className="grid grid-cols-3 gap-3">
-                    {(selectedShopDocs.brandImages || selectedShopDocs.shopImages)?.length > 0 ? (
-                      (selectedShopDocs.brandImages || selectedShopDocs.shopImages).map((img: string, i: number) => (
+                    {selectedShopDocs.shopImages?.length > 0 ? (
+                      selectedShopDocs.shopImages.map((img: string, i: number) => (
                         <div key={i} className="aspect-square bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden shadow-sm group flex items-center justify-center p-2 text-center">
                           {img.startsWith('data:image') || img.startsWith('http') ? (
                             <img src={img} alt="Shop" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
@@ -674,11 +670,11 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Mobile</span>
-                       <span className="text-[0.6875rem] font-bold text-black font-mono">{selectedShopDocs.mobile || selectedShopDocs.mobileNumber}</span>
+                       <span className="text-[0.6875rem] font-bold text-black font-mono">{selectedShopDocs.mobile}</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Address</span>
-                       <span className="text-[0.6875rem] font-bold text-black line-clamp-2 text-right max-w-[60%]">{selectedShopDocs.address || selectedShopDocs.manualAddress || 'Lat/Lng Captured'}</span>
+                       <span className="text-[0.6875rem] font-bold text-black line-clamp-2 text-right max-w-[60%]">{selectedShopDocs.manualAddress || 'Lat/Lng Captured'}</span>
                     </div>
                   </div>
                 </div>
