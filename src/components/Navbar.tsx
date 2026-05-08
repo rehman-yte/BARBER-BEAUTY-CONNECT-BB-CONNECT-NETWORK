@@ -500,7 +500,6 @@ const Navbar: React.FC = () => {
                           { id: 'shops', label: 'Master Shop Control', path: '/admin-dashboard?view=shops' },
                           { id: 'ledger', label: 'Accountant AI Ledger', path: '/admin-dashboard?view=ledger' },
                           { id: 'broadcast', label: 'Broadcast Center', path: '/admin-dashboard?view=broadcast' },
-                          { id: 'system', label: 'System Config', path: '/admin-dashboard?view=system' },
                         ].map((item) => (
                           <Link
                             key={item.id}

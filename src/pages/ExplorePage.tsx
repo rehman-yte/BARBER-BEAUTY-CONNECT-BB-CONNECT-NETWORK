@@ -2,15 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getApprovedPartners, getSettings } from '../services/logic_engine';
+import { getApprovedPartners } from '../services/logic_engine';
 import { useAuth } from '../context/AuthContext';
 import { PersistenceService, StorageManager } from '../services/PersistenceService';
 
 const ExplorePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [categories, setCategories] = useState<string[]>(['Barber', 'Beauty Parlour']);
-  const [filter, setFilter] = useState<string>('Barber');
+  const [filter, setFilter] = useState<'Barber' | 'Beauty Parlour'>('Barber');
   const [allApprovedShops, setAllApprovedShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,26 +20,19 @@ const ExplorePage: React.FC = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchShops = async () => {
       setLoading(true);
       try {
-        const [approvedShops, settings] = await Promise.all([
-          getApprovedPartners(),
-          getSettings()
-        ]);
+        const approvedShops = await getApprovedPartners();
         setAllApprovedShops(approvedShops);
-        if (settings?.system_config?.categories?.length > 0) {
-          setCategories(settings.system_config.categories);
-          setFilter(settings.system_config.categories[0]);
-        }
       } catch (error: any) {
-        console.error('Failed to fetch data:', error);
+        console.error('Failed to fetch shops:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchInitialData();
+    fetchShops();
   }, []);
 
   const filteredShops = allApprovedShops.filter(s => s.category === filter);
@@ -57,17 +49,22 @@ const ExplorePage: React.FC = () => {
 
         {/* Category Tabs */}
         <div className="flex gap-[1rem] mb-[3rem] border-b border-gray-100 pb-[1rem] overflow-x-auto scrollbar-hide">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              className={`px-[2rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
-                filter === cat ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue'
-              }`}
-            >
-              {cat} Near You
-            </button>
-          ))}
+          <button
+            onClick={() => setFilter('Barber')}
+            className={`px-[2rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
+              filter === 'Barber' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue'
+            }`}
+          >
+            Barber Shops Near You
+          </button>
+          <button
+            onClick={() => setFilter('Beauty Parlour')}
+            className={`px-[2rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
+              filter === 'Beauty Parlour' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue'
+            }`}
+          >
+            Beauty Parlours Near You
+          </button>
         </div>
 
         {/* Grid */}
