@@ -27,7 +27,7 @@ import {
   CreditCard
 } from 'lucide-react';
 
-/* PARTNER_PORTAL_V2 - LOCKED - SUCCESS */
+/* PARTNER_BOOKING_V3 - LOCKED - SUCCESS */
 
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -38,6 +38,7 @@ const PartnerDashboard: React.FC = () => {
   const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings'>('overview');
+  const [bookingView, setBookingView] = useState<'today' | 'upcoming'>('today');
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -51,6 +52,31 @@ const PartnerDashboard: React.FC = () => {
       setActiveTab('settings');
     }
   }, [window.location.search]);
+
+  useEffect(() => {
+    // Header Minimalism: Inject CSS to hide unwanted links in the global Navbar for a focused Partner experience
+    const styleId = 'partner-header-minimalism';
+    let styleTag = document.getElementById(styleId) as HTMLStyleElement;
+    
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      document.head.appendChild(styleTag);
+    }
+    
+    styleTag.innerHTML = `
+      nav a[href='/explore'], 
+      nav a[href='/partner-dashboard'],
+      nav a[href='/shop'] { 
+        display: none !important; 
+      }
+    `;
+
+    return () => {
+      const tag = document.getElementById(styleId);
+      if (tag) tag.remove();
+    };
+  }, []);
 
   // Sync Bridge: Fallback to localStorage for resilient state
   useEffect(() => {
@@ -125,6 +151,10 @@ const PartnerDashboard: React.FC = () => {
   // Stats Calculation
   const today = new Date().toISOString().split('T')[0];
   const todayBookings = bookings.filter(b => (b.date === today || b.appointmentDate?.split('T')[0] === today));
+  const futureBookingsList = bookings.filter(b => {
+    const bDate = b.date || b.appointmentDate?.split('T')[0];
+    return bDate > today;
+  });
   const todayEarnings = todayBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
   const totalSlots = bookings.length;
   
@@ -633,9 +663,26 @@ const PartnerDashboard: React.FC = () => {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-6"
               >
-                <div className="px-2">
-                  <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Master Booking Registry</h2>
-                  <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Live queue and scheduling archive</p>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-2">
+                  <div>
+                    <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Master Booking Registry</h2>
+                    <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Live queue and scheduling archive</p>
+                  </div>
+                  
+                  <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+                    <button 
+                      onClick={() => setBookingView('today')}
+                      className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'today' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
+                    >
+                      Today's Queue
+                    </button>
+                    <button 
+                      onClick={() => setBookingView('upcoming')}
+                      className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'upcoming' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
+                    >
+                      Upcoming Slots
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
@@ -651,7 +698,7 @@ const PartnerDashboard: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {bookings.map((b: any) => (
+                        {(bookingView === 'today' ? todayBookings : futureBookingsList).map((b: any) => (
                           <tr key={b.id} className="hover:bg-gray-50/50 transition-all group">
                             <td className="px-8 py-6">
                               <div className="flex items-center gap-3">
@@ -685,15 +732,18 @@ const PartnerDashboard: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
-                  {bookings.length === 0 && (
+                  {(bookingView === 'today' ? todayBookings : futureBookingsList).length === 0 && (
                     <div className="py-[10rem] flex flex-col items-center justify-center opacity-30 grayscale">
                        <Clock size={40} className="text-gray-200 mb-4" />
-                       <p className="text-[0.625rem] font-bold uppercase tracking-[0.5em]">No Requests Found</p>
+                       <p className="text-[0.625rem] font-bold uppercase tracking-[0.5em]">
+                         {bookingView === 'today' ? 'No Bookings for Today' : 'No Future Appointments'}
+                       </p>
                     </div>
                   )}
                 </div>
               </motion.div>
             )}
+
           </AnimatePresence>
         </div>
       </main>
