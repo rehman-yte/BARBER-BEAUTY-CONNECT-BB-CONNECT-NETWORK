@@ -106,13 +106,13 @@ const AppRoutes: React.FC = () => {
       
       {/* SHARED COMMERCE PORTAL */}
       <Route path="/shop" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopPage /></ProtectedRoute>} />
+      <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopDetail /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><MyShopping /></ProtectedRoute>} />
       
       {/* CUSTOMER PORTAL (Strictly locked) */}
       <Route path="/explore" element={<ProtectedRoute allowedRole="customer"><ExplorePage /></ProtectedRoute>} />
-      <Route path="/checkout" element={<ProtectedRoute allowedRole="customer"><CheckoutPage /></ProtectedRoute>} />
-      <Route path="/shop/:id" element={<ProtectedRoute allowedRole="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
-      <Route path="/my-shopping" element={<ProtectedRoute allowedRole="customer"><MyShopping /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL (Strictly locked) */}
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
