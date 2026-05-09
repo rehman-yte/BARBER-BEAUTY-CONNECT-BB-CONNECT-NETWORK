@@ -146,6 +146,7 @@ const PartnerDashboard: React.FC = () => {
   }
 
   const isPending = shopData?.status === 'pending';
+  const isRejected = shopData?.status === 'rejected';
   
   // Stats Calculation
   const today = new Date().toISOString().split('T')[0];
@@ -163,13 +164,13 @@ const PartnerDashboard: React.FC = () => {
     : (todayEarnings * 0.95);
 
   const handleToggleLive = async () => {
-    if (isPending) return;
+    if (isPending || isRejected) return;
     const nextState = !isLive;
     try {
-      await updateShop(user!.uid, { isLive: nextState });
+      await updateShop(user!.uid, { isLive: nextState, shopStatus: nextState ? 'open' : 'closed' });
       setIsLive(nextState);
       // Optimistic update for local cache
-      const updated = { ...shopData, isLive: nextState };
+      const updated = { ...shopData, isLive: nextState, shopStatus: nextState ? 'open' : 'closed' };
       setShopData(updated);
       localStorage.setItem(`partner_data_${user!.uid}`, JSON.stringify(updated));
     } catch (err) {
@@ -276,6 +277,21 @@ const PartnerDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* REJECTED / SUSPENDED BANNER */}
+      {isRejected && (
+        <div className="bg-red-500 px-6 py-3 flex items-center gap-3 relative overflow-hidden">
+          <motion.div 
+            animate={{ opacity: [0.1, 0.3, 0.1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="absolute inset-0 bg-white"
+          />
+          <AlertTriangle size={18} className="shrink-0 text-white" />
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-white relative z-10 leading-tight">
+             ACCOUNT SUSPENDED: Verification rejected by Admin. Please contact support or fix documents.
+          </p>
+        </div>
+      )}
+
       {/* DASHBOARD CONTENT */}
       <main className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6">
         
@@ -295,9 +311,9 @@ const PartnerDashboard: React.FC = () => {
             <div>
               <h2 className="text-[1rem] font-black uppercase tracking-tight">{shopData?.brandName || 'Partner Hub'}</h2>
               <div className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${isLive && !isRejected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
                 <span className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-[0.2em]">
-                  {isLive ? 'Network Active' : 'Station Offline'}
+                  {isRejected ? 'Account Revoked' : isLive ? 'Network Active' : 'Station Offline'}
                 </span>
               </div>
             </div>
@@ -306,21 +322,21 @@ const PartnerDashboard: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="hidden md:flex flex-col text-right mr-4">
               <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Protocol Status</span>
-              <span className={`text-[0.625rem] font-black uppercase tracking-widest ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
-                {isLive ? 'Ready for Bookings' : 'Suspended'}
+              <span className={`text-[0.625rem] font-black uppercase tracking-widest ${isRejected ? 'text-red-600' : isLive ? 'text-green-600' : 'text-gray-400'}`}>
+                {isRejected ? 'Permanent Suspension' : isLive ? 'Ready for Bookings' : 'Station Inactive'}
               </span>
             </div>
             <div className="flex items-center gap-3 bg-gray-50 px-6 py-3 rounded-full border border-gray-100">
-              <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
-                {isLive ? 'GO OFFLINE' : 'GO LIVE'}
+              <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] ${isLive && !isRejected ? 'text-green-600' : 'text-gray-400'}`}>
+                {isRejected ? 'LOCKED' : isLive ? 'GO OFFLINE' : 'GO LIVE'}
               </span>
               <button 
                 onClick={handleToggleLive}
-                disabled={isPending}
-                className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPending ? 'bg-gray-100 cursor-not-allowed' : isLive ? 'bg-green-500' : 'bg-gray-300'}`}
+                disabled={isPending || isRejected}
+                className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPending || isRejected ? 'bg-gray-100 cursor-not-allowed' : isLive ? 'bg-green-500' : 'bg-gray-300'}`}
               >
                 <motion.div 
-                  animate={{ x: isLive ? 24 : 0 }}
+                  animate={{ x: (isLive && !isRejected) ? 24 : 0 }}
                   className="w-4 h-4 bg-white rounded-full shadow-sm"
                 />
               </button>

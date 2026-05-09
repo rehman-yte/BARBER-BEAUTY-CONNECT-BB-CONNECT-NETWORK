@@ -37,6 +37,12 @@ const ExplorePage: React.FC = () => {
 
   const filteredShops = allApprovedShops.filter(s => s.category === filter);
 
+  const getShopStatus = (shop: any) => {
+    if (shop.shopStatus) return shop.shopStatus;
+    if (shop.isLive) return 'open';
+    return 'closed';
+  };
+
   return (
     <div className="pt-[8rem] pb-[5rem] bg-white min-h-screen">
       <div className="max-w-[1440px] mx-auto px-[5%]">
@@ -83,7 +89,7 @@ const ExplorePage: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className={`bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden group shadow-sm hover:shadow-2xl transition-all duration-700 flex flex-col ${shop.shopStatus === 'closed' ? 'opacity-60 grayscale-[0.5]' : ''}`}
+                  className={`bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden group shadow-sm hover:shadow-2xl transition-all duration-700 flex flex-col ${getShopStatus(shop) === 'closed' ? 'opacity-60 grayscale-[0.5]' : ''}`}
                 >
                   <div className="relative aspect-[16/9] overflow-hidden">
                     <img 
@@ -92,9 +98,9 @@ const ExplorePage: React.FC = () => {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" 
                     />
                     <div className="absolute top-[1rem] left-[1rem] px-[0.75rem] py-[0.375rem] bg-white/90 backdrop-blur-sm rounded-full flex items-center gap-[0.375rem] shadow-sm z-10">
-                      <div className={`w-[0.5rem] h-[0.5rem] rounded-full ${shop.shopStatus === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                      <span className={`text-[0.5625rem] font-bold uppercase tracking-widest ${shop.shopStatus === 'open' ? 'text-green-600' : 'text-red-600'}`}>
-                        {shop.shopStatus || 'closed'}
+                      <div className={`w-[0.5rem] h-[0.5rem] rounded-full ${getShopStatus(shop) === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                      <span className={`text-[0.5625rem] font-bold uppercase tracking-widest ${getShopStatus(shop) === 'open' ? 'text-green-600' : 'text-red-600'}`}>
+                        {getShopStatus(shop)}
                       </span>
                     </div>
                     <div className="absolute top-[1rem] right-[1rem] px-[0.75rem] py-[0.375rem] bg-white/90 backdrop-blur-sm rounded-full flex items-center gap-[0.375rem] shadow-sm">
@@ -131,13 +137,13 @@ const ExplorePage: React.FC = () => {
                         <Link 
                           to={`/shop/${shop.id}`}
                           className={`px-[1.25rem] py-[0.625rem] rounded-xl text-[0.625rem] font-bold uppercase tracking-widest transition-all active:scale-95 ${
-                            (shop.shopStatus === 'closed' || !(shop.adminApproved || shop.status === 'approved')) 
+                            (getShopStatus(shop) === 'closed' || !(shop.adminApproved || shop.status === 'approved')) 
                               ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                               : 'bg-charcoal text-white hover:bg-bbBlue'
                           }`}
-                          onClick={(e) => (shop.shopStatus === 'closed' || !(shop.adminApproved || shop.status === 'approved')) && e.preventDefault()}
+                          onClick={(e) => (getShopStatus(shop) === 'closed' || !(shop.adminApproved || shop.status === 'approved')) && e.preventDefault()}
                         >
-                          {shop.shopStatus === 'closed' ? 'Closed' : 'Book Slot'}
+                          {getShopStatus(shop) === 'closed' ? 'Closed' : 'Book Slot'}
                         </Link>
                       )}
                     </div>
