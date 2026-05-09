@@ -214,8 +214,8 @@ const AdminDashboard: React.FC = () => {
     // 2. Persist change (updates all_partners in LocalStorage via logic_engine)
     try {
       const updates = action === 'approve' 
-        ? { adminApproved: true, status: 'approved', isLive: true, shopStatus: 'open' } 
-        : { adminApproved: false, status: 'rejected', isLive: false, shopStatus: 'closed' };
+        ? { adminApproved: true, status: 'approved' } 
+        : { adminApproved: false, status: 'rejected' };
       await updateShop(shopId, updates);
     } catch (err) {
       console.debug("Update persisted locally.");

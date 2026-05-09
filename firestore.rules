@@ -187,17 +187,7 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    // 7. VERIFICATION QUEUE
-    // -------------------------------------------------------------------------
-
-    match /verification_queue/{id} {
-      allow read, write: if isAdmin();
-      // Allow partners to create their own queue entry
-      allow create: if isSignedIn() && isOwner(id);
-    }
-
-    // -------------------------------------------------------------------------
-    // 8. ADMINS COLLECTION
+    // 7. ADMINS COLLECTION
     // -------------------------------------------------------------------------
 
     match /admins/{adminId} {
