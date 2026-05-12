@@ -164,7 +164,6 @@ const PartnerDashboard: React.FC = () => {
     : (todayEarnings * 0.95);
 
   const handleToggleLive = async () => {
-    if (isPending) return;
     const nextState = !isLive;
     try {
       await updateShop(user!.uid, { isLive: nextState });
@@ -272,7 +271,7 @@ const PartnerDashboard: React.FC = () => {
           />
           <AlertTriangle size={18} className="shrink-0 text-black" />
           <p className="text-[0.625rem] font-black uppercase tracking-wider text-black relative z-10 leading-tight">
-            RESTRICTED ACCESS: ACCOUNT VERIFICATION PENDING BY ADMIN & ACCOUNTANT AI.
+            RESTRICTED ACCESS: ACCOUNT VERIFICATION PENDING BY BB NETWORK ADMIN.
           </p>
         </div>
       )}
@@ -317,8 +316,7 @@ const PartnerDashboard: React.FC = () => {
               </span>
               <button 
                 onClick={handleToggleLive}
-                disabled={isPending}
-                className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPending ? 'bg-gray-100 cursor-not-allowed' : isLive ? 'bg-green-500' : 'bg-gray-300'}`}
+                className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isLive ? 'bg-green-500' : 'bg-gray-300'}`}
               >
                 <motion.div 
                   animate={{ x: isLive ? 24 : 0 }}
