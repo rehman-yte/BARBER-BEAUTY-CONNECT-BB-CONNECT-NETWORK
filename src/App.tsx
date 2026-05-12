@@ -93,10 +93,10 @@ const AppRoutes: React.FC = () => {
       
       {/* CUSTOMER PORTAL */}
       <Route path="/customer/explore" element={<ProtectedRoute allowedRole="customer"><ExplorePage /></ProtectedRoute>} />
-      <Route path="/checkout" element={<ProtectedRoute allowedRole="customer"><CheckoutPage /></ProtectedRoute>} />
-      <Route path="/shop/:id" element={<ProtectedRoute allowedRole="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       <Route path="/my-shopping" element={<ProtectedRoute allowedRole="customer"><MyShopping /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute allowedRole="customer"><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/shop/:id" element={<ProtectedRoute allowedRole="customer"><ShopDetail /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL */}
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
