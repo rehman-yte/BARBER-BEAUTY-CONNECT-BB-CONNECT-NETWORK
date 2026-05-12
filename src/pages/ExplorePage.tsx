@@ -123,7 +123,11 @@ const ExplorePage: React.FC = () => {
                     <div className="mt-auto flex justify-between items-center">
                       <div className="flex items-center gap-[0.75rem]">
                         <div className="w-[2rem] h-[2rem] rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-[0.625rem] font-bold text-charcoal uppercase overflow-hidden">
-                          {shop.ownerName?.[0] || 'M'}
+                          {shop.ownerPicture || shop.photoURL ? (
+                            <img src={shop.ownerPicture || shop.photoURL} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                          ) : (
+                            shop.ownerName?.[0] || 'M'
+                          )}
                         </div>
                         <span className="text-[0.6875rem] font-bold text-gray-400 uppercase tracking-tighter">{shop.ownerName}</span>
                       </div>
@@ -131,11 +135,11 @@ const ExplorePage: React.FC = () => {
                         <Link 
                           to={`/shop/${shop.id}`}
                           className={`px-[1.25rem] py-[0.625rem] rounded-xl text-[0.625rem] font-bold uppercase tracking-widest transition-all active:scale-95 ${
-                            (shop.shopStatus === 'closed' || !(shop.adminApproved || shop.status === 'approved')) 
+                            (shop.shopStatus === 'closed' || !(shop.adminApproved || shop.status === 'approved' || shop.status === 'Active' || shop.status === 'active')) 
                               ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                               : 'bg-charcoal text-white hover:bg-bbBlue'
                           }`}
-                          onClick={(e) => (shop.shopStatus === 'closed' || !(shop.adminApproved || shop.status === 'approved')) && e.preventDefault()}
+                          onClick={(e) => (shop.shopStatus === 'closed' || !(shop.adminApproved || shop.status === 'approved' || shop.status === 'Active' || shop.status === 'active')) && e.preventDefault()}
                         >
                           {shop.shopStatus === 'closed' ? 'Closed' : 'Book Slot'}
                         </Link>

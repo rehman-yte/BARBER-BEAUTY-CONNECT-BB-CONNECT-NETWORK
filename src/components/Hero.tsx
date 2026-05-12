@@ -86,7 +86,7 @@ const Hero: React.FC = () => {
           
           <div className="flex flex-col sm:flex-row gap-[1rem] mt-[1rem] md:mt-[1.5rem] w-full sm:w-auto">
              <button 
-                onClick={() => handleAction('/explore')}
+                onClick={() => handleAction('/customer/explore')}
                 className="bg-bbBlue text-white px-[1.5rem] md:px-[2rem] py-[0.75rem] md:py-[1rem] rounded-full font-bold shadow-lg shadow-bbBlue/20 hover:bg-blue-600 transition-all uppercase text-[0.625rem] md:text-[0.75rem] tracking-widest text-center active:scale-95 w-full sm:w-auto"
               >
                 Find a Salon

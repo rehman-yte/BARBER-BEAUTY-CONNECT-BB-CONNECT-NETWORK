@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getShopById, addBooking } from '../services/logic_engine';
@@ -29,10 +29,12 @@ const ShopDetail: React.FC = () => {
       try {
         const data = await getShopById(id);
         if (data) {
-          // STRICT SECURITY: Only allow access if approved AND Active
-          if (data.isApproved !== true || data.status !== 'Active') {
+          // STRICT SECURITY: Only allow access if approved
+          const isActuallyApproved = data.adminApproved === true || data.status === 'approved' || data.status === 'Active' || data.status === 'active';
+          
+          if (!isActuallyApproved) {
              console.warn("UNAUTHORIZED ACCESS: Shop is not approved for public booking.");
-             navigate('/explore');
+             navigate('/customer/explore');
              return;
           }
           setShopData(data);
@@ -40,7 +42,7 @@ const ShopDetail: React.FC = () => {
             setSelectedService(data.services[0]);
           }
         } else {
-          navigate('/explore');
+          navigate('/customer/explore');
         }
       } catch (err) {
         console.error("Error fetching shop:", err);
@@ -291,7 +293,11 @@ const ShopDetail: React.FC = () => {
             <h1 className="text-[3rem] font-serif font-bold text-bbBlue-deep mb-[1rem] leading-tight">{shopData.brandName}</h1>
             <div className="flex items-center gap-[1rem]">
                <div className="w-[2.5rem] h-[2.5rem] rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-bold text-charcoal overflow-hidden uppercase">
-                 {shopData.ownerName?.[0] || 'M'}
+                 {shopData.ownerPicture || shopData.photoURL ? (
+                    <img src={shopData.ownerPicture || shopData.photoURL} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                 ) : (
+                    shopData.ownerName?.[0] || 'M'
+                 )}
                </div>
                <div>
                   <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest leading-tight">Master Professional</p>
