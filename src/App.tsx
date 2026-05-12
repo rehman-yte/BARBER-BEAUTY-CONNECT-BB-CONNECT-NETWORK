@@ -1,3 +1,4 @@
+
 /* LOCKED - POINT 1 COMPLETE: Auth & Routing Infrastructure */
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -34,10 +35,10 @@ const NotFound: React.FC = () => (
 );
 
 // --- Protected Route Helper ---
-const LoadingSpinner: React.FC = () => (
-  <div className="min-h-screen bg-white flex items-center justify-center">
+const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Verifying Gateway Access..." }) => (
+  <div className="min-h-screen bg-white flex flex-col items-center justify-center">
     <div className="w-8 h-8 border-2 border-[#0056b3] border-t-transparent rounded-full animate-spin"></div>
-    <span className="ml-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Verifying Gateway Access...</span>
+    <span className="mt-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{message}</span>
   </div>
 );
 
@@ -45,7 +46,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   const { user, loading } = useAuth();
   const location = useLocation();
   
+  // Point 3: DO NOT redirect if loading is true. Wait for state.
   if (loading) return <LoadingSpinner />; 
+  
   if (!user) {
     if (allowedRole === 'admin') return <Navigate to="/admin-login" replace />;
     return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
@@ -53,6 +56,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 
   const isAllowed = !allowedRole || 
     (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
+
+  // ROLE ENFORCEMENT: Block cross-access
+  if (allowedRole && !isAllowed) {
+    if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+    if (user.role === 'partner') {
+       const isComplete = !!user.brandName || !!user.onboardingComplete;
+       return <Navigate to={!isComplete ? "/onboarding" : "/partner-dashboard"} replace />;
+    }
+    if (user.role === 'customer') {
+       return <Navigate to="/customer-dashboard" replace />;
+    }
+  }
 
   // MANDATORY PARTNER GATE: status and brand check
   if (user.role === 'partner') {
@@ -66,25 +81,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     }
   }
 
-  // ROLE ENFORCEMENT: Block cross-access
-  if (allowedRole && !isAllowed) {
-    if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
-    if (user.role === 'partner') {
-       // Partner trying to access customer space
-       const isComplete = !!user.brandName || !!user.onboardingComplete;
-       return <Navigate to={!isComplete ? "/onboarding" : "/partner-dashboard"} replace />;
-    }
-    if (user.role === 'customer') {
-       // Customer trying to access partner space
-       return <Navigate to="/customer-dashboard" replace />;
-    }
-    // Logic for general "/dashboard" or other paths that might lead to customer dashboard
-    if (location.pathname === '/customer-dashboard') {
-       const isComplete = !!user.brandName || !!user.onboardingComplete;
-       return <Navigate to={!isComplete ? "/onboarding" : "/partner-dashboard"} replace />;
-    }
-  }
-
   return <>{children}</>;
 };
 
@@ -92,7 +88,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <LoadingSpinner message="Resolving Network Session..." />;
 
   return (
     <Routes>
