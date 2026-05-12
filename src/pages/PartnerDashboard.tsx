@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { doc, onSnapshot, query, collection, where, orderBy } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -100,43 +102,65 @@ const PartnerDashboard: React.FC = () => {
     audioRef.current.volume = 0.8;
   }, []);
 
+  // UI REAL-TIME ENGINE: Snapshot Listeners for zero-latency updates
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.uid) return;
-      try {
-        const [shop, registry, partnerRatings] = await Promise.all([
-          getShopById(user.uid),
-          getBookings(user.uid),
-          getRatings(user.uid)
-        ]);
-        
-        if (shop) {
-          setShopData(shop);
-          setIsLive(shop.isLive || false);
-          // Sync to localStorage as bridge
-          localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
-        }
-        
-        if (registry.length > bookings.length && bookings.length > 0) {
-          setHasNewBooking(true);
-          audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
-          setTimeout(() => setHasNewBooking(false), 5000);
-        }
-        setBookings(registry);
-        setRatings(partnerRatings || []);
-      } catch (err) {
-        console.error("Dashboard pull error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!user?.uid) return;
 
-    if (user?.uid) {
-      fetchData();
-      const interval = setInterval(fetchData, 8000); // Live Sync
-      return () => clearInterval(interval);
-    }
-  }, [user, bookings.length]);
+    // 1. Shop Data Listener
+    const shopRef = doc(db, 'partners', user.uid);
+    const unsubscribeShop = onSnapshot(shopRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const shop: any = {
+          id: docSnap.id,
+          ...data,
+          brandName: (data as any).brand_name || (data as any).brandName,
+          ownerName: (data as any).owner_name || (data as any).ownerName,
+          mobile: (data as any).mobile_number || (data as any).mobile,
+          upiId: (data as any).upi_id || (data as any).upiId,
+          status: (data as any).status || 'pending',
+          adminApproved: (data as any).adminApproved || (data as any).status === 'approved'
+        };
+        setShopData(shop);
+        setIsLive(shop.isLive || false);
+        localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
+      }
+      setLoading(false);
+    }, (err) => {
+      console.error("Shop snapshot error:", err);
+      setLoading(false);
+    });
+
+    // 2. Bookings Listener (Dual Path: Partner or Auditor)
+    const qPartner = query(collection(db, 'bookings'), where('partnerId', '==', user.uid));
+    const unsubscribeBookings = onSnapshot(qPartner, (snapshot) => {
+      const registry = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      if (registry.length > bookings.length && bookings.length > 0) {
+        setHasNewBooking(true);
+        audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
+        setTimeout(() => setHasNewBooking(false), 5000);
+      }
+      setBookings(registry);
+    }, (err) => {
+      console.error("Bookings snapshot error:", err);
+    });
+
+    // 3. Ratings Listener
+    const qRatings = query(collection(db, 'ratings'), where('partnerId', '==', user.uid), orderBy('createdAt', 'desc'));
+    const unsubscribeRatings = onSnapshot(qRatings, (snapshot) => {
+      const partnerRatings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRatings(partnerRatings);
+    }, (err) => {
+      console.error("Ratings snapshot error:", err);
+    });
+
+    return () => {
+      unsubscribeShop();
+      unsubscribeBookings();
+      unsubscribeRatings();
+    };
+  }, [user?.uid]);
 
   if (!authLoading && (!user || user.role !== 'partner')) {
     return <Navigate to="/customer-dashboard" replace />;
@@ -153,14 +177,22 @@ const PartnerDashboard: React.FC = () => {
   const isPending = shopData?.status === 'pending';
   
   // Stats Calculation
-  const today = new Date().toISOString().split('T')[0];
-  const todayBookings = bookings.filter(b => (b.date === today || b.appointmentDate?.split('T')[0] === today));
+  // We use current Date in both ISO and Locale formats to capture all potential booking styles
+  const todayISO = new Date().toISOString().split('T')[0];
+  const todayLocale = new Date().toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
+  
+  const todayBookings = bookings.filter(b => {
+    const bDate = b.date || b.appointmentDate?.split('T')[0];
+    return bDate === todayISO || bDate === todayLocale;
+  });
+
   const futureBookingsList = bookings.filter(b => {
     const bDate = b.date || b.appointmentDate?.split('T')[0];
-    return bDate > today;
+    return bDate > todayISO;
   });
+
   const todayEarnings = todayBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
-  const totalSlots = bookings.length;
+  const totalSlotsBooked = bookings.length;
   
   const avgRating = ratings.length > 0 
     ? (ratings.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / ratings.length).toFixed(1) 
@@ -358,7 +390,7 @@ const PartnerDashboard: React.FC = () => {
           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
             <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Total Bookings</span>
             <div className="flex items-end gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{totalSlots}</span>
+              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{totalSlotsBooked}</span>
               <span className="text-[0.5rem] text-gray-300 font-bold mb-1 uppercase tracking-widest">Total</span>
             </div>
           </div>
