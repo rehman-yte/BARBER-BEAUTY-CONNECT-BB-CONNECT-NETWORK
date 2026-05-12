@@ -144,8 +144,59 @@ const Navbar: React.FC = () => {
               <Link to="/checkout" className="relative p-2 text-gray-400 hover:text-bbBlue"><ShoppingBag size={20} />{totalItems > 0 && <span className="absolute top-1 right-1 min-w-[1rem] h-4 bg-bbBlue text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white px-1">{totalItems}</span>}</Link>
               
               <div className="relative" ref={notificationRef}>
-                <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 text-gray-400 hover:text-bbBlue"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>{hasUnread && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}</button>
-                <AnimatePresence>{showNotifications && <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 15 }} className="absolute right-0 mt-3 w-72 bg-white border border-gray-100 shadow-2xl rounded-2xl py-4 z-[1100] max-h-96 overflow-y-auto px-4 space-y-4">{notifications.length > 0 ? notifications.map(n => <div key={n.id} className="p-3 bg-gray-50 rounded-xl"><p className="text-[8px] font-bold uppercase text-bbBlue">{n.type}</p><p className="text-[10px] font-bold text-black">{n.title}</p><p className="text-[11px] text-gray-500">{n.message}</p></div>) : <p className="text-[10px] text-center text-gray-300 uppercase py-4">No Notifications</p>}</motion.div>}</AnimatePresence>
+                <button 
+                  onClick={() => {
+                    setShowNotifications(!showNotifications);
+                    setHasUnread(false);
+                    localStorage.setItem('bb_last_viewed_notifs', Date.now().toString());
+                    setLastViewed(Date.now());
+                  }} 
+                  className="relative p-2 text-gray-400 hover:text-bbBlue transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {hasUnread && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+                </button>
+                <AnimatePresence>
+                  {showNotifications && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }} 
+                      animate={{ opacity: 1, y: 0, scale: 1 }} 
+                      exit={{ opacity: 0, y: 15, scale: 0.95 }} 
+                      className="absolute right-0 mt-3 w-80 bg-white border border-gray-100 shadow-2xl rounded-3xl py-6 z-[1100] max-h-[28rem] overflow-hidden flex flex-col"
+                    >
+                      <div className="px-6 mb-4 flex justify-between items-center">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-black">Network Alerts</h3>
+                        {notifications.length > 0 && <button onClick={() => setClearedIds(notifications.map(n => n.id))} className="text-[8px] font-bold text-gray-300 hover:text-red-500 uppercase">Clear All</button>}
+                      </div>
+                      <div className="overflow-y-auto px-4 space-y-3 custom-scrollbar px-6">
+                        {notifications.length > 0 ? (
+                          notifications.map(n => (
+                            <div key={n.id} className="p-4 bg-gray-50 rounded-[1.5rem] border border-transparent hover:border-gray-100 transition-all group">
+                              <div className="flex justify-between items-start mb-1">
+                                <p className={`text-[7px] font-black uppercase tracking-widest ${n.type === 'GLOBAL BROADCAST' ? 'text-red-500' : 'text-bbBlue'}`}>
+                                  {n.type}
+                                </p>
+                                <span className="text-[7px] text-gray-300 font-bold uppercase">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <p className="text-[10px] font-bold text-black mb-0.5">{n.title || (n.type === 'GLOBAL BROADCAST' ? 'Admin Message' : 'Booking Alert')}</p>
+                              <p className="text-[10px] text-charcoal/70 leading-relaxed font-medium">{n.message}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-12 flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-200">
+                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                            </div>
+                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Inbox Zero</p>
+                            <p className="text-[8px] text-gray-200 uppercase mt-1">No pending network updates</p>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="relative" ref={dropdownRef}>
@@ -232,7 +283,6 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      <AnimatePresence>{activeToast && <motion.div initial={{ opacity: 0, y: 100, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: 100, x: '-50%' }} className="fixed bottom-8 left-1/2 z-[3000] w-full max-w-sm px-4"><div className="bg-black text-white p-6 rounded-3xl shadow-2xl flex items-center gap-4"><div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shrink-0">📢</div><div className="flex-1"><p className="text-[8px] font-bold text-red-500 uppercase mb-1">Broadcast</p><p className="text-[12px] font-bold">{activeToast.message}</p></div></div></motion.div>}</AnimatePresence>
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
     </nav>
   );
