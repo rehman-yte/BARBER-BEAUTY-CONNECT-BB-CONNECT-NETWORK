@@ -255,6 +255,27 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleToggleActive = async (shopId: string, currentStatus: boolean) => {
+    try {
+      await updateShop(shopId, { isActive: !currentStatus });
+      fetchStats();
+    } catch (err) {
+      console.error("Toggle active fail:", err);
+    }
+  };
+
+  const handleDeleteBroadcast = async (index: number) => {
+    try {
+      const config = await getSettings();
+      const broadcasts = config.broadcasts || [];
+      broadcasts.splice(index, 1);
+      await updateSettings({ broadcasts });
+      fetchStats();
+    } catch (err) {
+      console.error("Delete broadcast fail:", err);
+    }
+  };
+
   const handleToggleMaintenance = async () => {
     const next = !isMaintenanceMode;
     setIsMaintenanceMode(next);

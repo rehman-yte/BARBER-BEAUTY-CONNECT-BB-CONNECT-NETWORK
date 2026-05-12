@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: 'partner',
                 user_type: 'partner',
                 status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
-                photoURL: firebaseUser.photoURL || undefined,
+                photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
                 brandName: partnerData.brandName || undefined,
                 onboardingComplete: onboardingComplete
               });
@@ -131,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: 'customer',
                 user_type: 'customer',
                 status: 'active',
-                photoURL: firebaseUser.photoURL || undefined
+                photoURL: customerData.photoURL || firebaseUser.photoURL || undefined
               });
               setLoading(false);
               return;
@@ -152,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: role as any,
                 user_type: role as any,
                 status: role === 'partner' ? (data.onboardingComplete ? data.status : null) : 'active',
+                photoURL: data.photoURL || data.ownerPicture || firebaseUser.photoURL || undefined,
                 onboardingComplete: !!data.onboardingComplete,
                 token: role === 'admin' ? adminConfig.adminSecret : undefined
               });

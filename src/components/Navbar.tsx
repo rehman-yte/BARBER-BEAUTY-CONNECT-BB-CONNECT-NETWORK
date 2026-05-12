@@ -49,7 +49,7 @@ const Navbar: React.FC = () => {
         if (user.role === 'customer') {
           updateUser({ photoURL: base64String });
         } else if (user.role === 'partner') {
-          const success = await updateShop(user.uid, { image: base64String, isVerified: false });
+          const success = await updateShop(user.uid, { ownerPicture: base64String });
           if (success) updateUser({ photoURL: base64String });
         }
         setIsUploading(false);

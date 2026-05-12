@@ -166,10 +166,13 @@ const PartnerDashboard: React.FC = () => {
   const handleToggleLive = async () => {
     const nextState = !isLive;
     try {
-      await updateShop(user!.uid, { isLive: nextState });
+      await updateShop(user!.uid, { 
+        isLive: nextState, 
+        shopStatus: nextState ? 'open' : 'closed' 
+      });
       setIsLive(nextState);
       // Optimistic update for local cache
-      const updated = { ...shopData, isLive: nextState };
+      const updated = { ...shopData, isLive: nextState, shopStatus: nextState ? 'open' : 'closed' };
       setShopData(updated);
       localStorage.setItem(`partner_data_${user!.uid}`, JSON.stringify(updated));
     } catch (err) {
