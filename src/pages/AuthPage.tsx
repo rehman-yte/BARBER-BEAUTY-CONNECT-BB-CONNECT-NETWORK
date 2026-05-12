@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'motion/react';
 
 type Role = 'customer' | 'partner' | 'admin';
 
@@ -19,10 +19,10 @@ const AuthPage: React.FC = () => {
       if (user.role === 'customer') {
         navigate('/customer/explore', { replace: true });
       } else if (user.role === 'partner') {
-        const path = user.onboardingComplete ? '/partner-dashboard' : '/onboarding';
+        const path = user.onboardingComplete ? '/partner/dashboard' : '/onboarding';
         navigate(path, { replace: true });
       } else if (user.role === 'admin') {
-        navigate('/admin-dashboard', { replace: true });
+        navigate('/admin/dashboard', { replace: true });
       }
     }
   }, [user, loading, navigate]);
