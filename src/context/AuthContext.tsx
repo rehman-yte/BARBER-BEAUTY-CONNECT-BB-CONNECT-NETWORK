@@ -45,15 +45,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const SESSION_KEY = 'bb_network_session';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AppUser | null>(() => {
-    try {
-      const saved = localStorage.getItem(SESSION_KEY);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -64,23 +58,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   useEffect(() => {
-    // FIREBASE SESSION PERSISTENCE: Ensure admin session sticks across reloads
-    const initPersistence = async () => {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-      } catch (err) {
-        console.error("Persistence failed:", err);
-      }
-    };
-    initPersistence();
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
         try {
           console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid}`);
+          const isHardcodedAdmin = firebaseUser.email === 'haidartheworldking@gmail.com' || 
+                                   firebaseUser.email === 'rhfarooqui16@gmail.com';
           
-          // STEP A: MASTER CHECK - PARTNERS COLLECTION ONLY (STRONGEST SIGNAL)
+          // STEP A: ADMIN GATE - STRICT CHECK
+          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
+          
+          if (adminDoc.exists() || isHardcodedAdmin) {
+            const adminData = adminDoc.data() || {};
+            console.log("[AUTH ARCHITECT] Gate A: ADMIN ACCESS GRANTED");
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: adminData.name || 'System Admin',
+              role: 'admin',
+              user_type: 'admin',
+              status: 'active',
+              token: adminConfig.adminSecret
+            });
+            setLoading(false);
+            setAuthInitialized(true);
+            return;
+          }
+
+          const isAdmin = isHardcodedAdmin;
+
+          // STEP B: MASTER CHECK - PARTNERS COLLECTION ONLY
           const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
@@ -122,27 +130,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // STEP D: ADMIN DISCOVERY (Check dedicated admins collection + hardcoded list)
-          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
-          const isAdmin = adminDoc.exists() || 
-                         firebaseUser.email === 'haidartheworldking@gmail.com' || 
-                         firebaseUser.email === 'rhfarooqui16@gmail.com';
-          
+          // STEP D: LEGACY/USERS SYNC & FALLBACK
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          
-          if (userDoc.exists() || adminDoc.exists()) {
-            const userData = (userDoc.data() || adminDoc.data()) as any;
-            const role = isAdmin ? 'admin' : (userData.role || userData.user_type || 'customer');
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as any;
+            const role = userData.role || userData.user_type || 'customer';
             
-            console.log(`[AUTH ARCHITECT] Discovery Gate: DISCOVERED ROLE -> ${role}`);
+            console.log(`[AUTH ARCHITECT] Gate D: DISCOVERED ROLE -> ${role}`);
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: userData.name || (isAdmin ? 'System Admin' : 'Member'),
+              name: userData.name || 'Member',
               role: role as any,
               user_type: role as any,
               status: userData.status !== undefined ? userData.status : (role === 'partner' ? null : 'active'),
-              token: isAdmin ? adminConfig.adminSecret : undefined
             });
             setLoading(false);
             return;
@@ -195,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
       }
       setLoading(false);
+      setAuthInitialized(true);
     });
 
     return () => unsubscribe();
@@ -202,6 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, pass: string, additionalData: any) => {
     try {
+      await setPersistence(auth, browserLocalPersistence);
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
@@ -355,12 +358,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, bypassLogin, signInWithGoogle, resetPassword, logout, refreshAuth: () => {}, updateUser }}>
-      {!loading ? children : (
+    <AuthContext.Provider value={{ user, loading: loading || !authInitialized, signUp, signIn, bypassLogin, signInWithGoogle, resetPassword, logout, refreshAuth: () => {}, updateUser }}>
+      {(loading || !authInitialized) ? (
         <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-2 border-[#0056b3] border-t-transparent rounded-full animate-spin"></div>
+          <p className="ml-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">BB Network Authenticating...</p>
         </div>
-      )}
+      ) : children}
     </AuthContext.Provider>
   );
 };

@@ -34,11 +34,18 @@ const NotFound: React.FC = () => (
 );
 
 // --- Protected Route Helper ---
+const LoadingSpinner: React.FC = () => (
+  <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="w-8 h-8 border-2 border-[#0056b3] border-t-transparent rounded-full animate-spin"></div>
+    <span className="ml-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Verifying Gateway Access...</span>
+  </div>
+);
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'customer' | 'partner' | 'admin' | string[] }> = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
-  if (loading) return null; 
+  if (loading) return <LoadingSpinner />; 
   if (!user) {
     if (allowedRole === 'admin') return <Navigate to="/admin-login" replace />;
     return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
@@ -85,7 +92,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
 
-  if (loading) return null;
+  if (loading) return <LoadingSpinner />;
 
   return (
     <Routes>
