@@ -125,7 +125,7 @@ const CustomerDashboard: React.FC = () => {
               </div>
               <div className="flex flex-col sm:flex-row gap-[1rem] mt-[2rem] justify-center md:justify-start">
                  <Link 
-                    to="/explore"
+                    to="/customer/explore"
                     className="bg-bbBlue text-white px-[1.5rem] py-[0.75rem] rounded-full font-bold shadow-lg shadow-bbBlue/20 hover:bg-blue-600 transition-all uppercase text-[0.625rem] tracking-widest text-center active:scale-95"
                   >
                     Find a Salon
