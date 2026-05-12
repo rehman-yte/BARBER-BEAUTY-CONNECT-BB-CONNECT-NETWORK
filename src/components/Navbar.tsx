@@ -189,12 +189,35 @@ const Navbar: React.FC = () => {
                     )}
 
                     {user.role === 'admin' && (
-                      <Link to="/admin/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                        <span className="opacity-50">🔐</span> Admin Control
-                      </Link>
+                      <>
+                        <Link to="/admin/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">🔐</span> Admin Control
+                        </Link>
+                        <Link to="/admin/dashboard?view=verification" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">🛡️</span> Partner Vetting
+                        </Link>
+                        <Link to="/admin/dashboard?view=ledger" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">💸</span> Revenue Ledger
+                        </Link>
+                        <Link to="/admin/dashboard?view=broadcast" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">📢</span> Global Broadcast
+                        </Link>
+                        <Link to="/admin/dashboard?view=feedback" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">💬</span> Feedback Hub
+                        </Link>
+                      </>
                     )}
 
                     <div className="border-t border-gray-50 mt-1">
+                      <button 
+                        onClick={() => {
+                          setShowDropdown(false);
+                          fileInputRef.current?.click();
+                        }} 
+                        className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all"
+                      >
+                        <span className="opacity-50">📸</span> {isUploading ? 'Uploading...' : 'Update Profile Photo'}
+                      </button>
                       <button onClick={handleLogout} className="w-full text-left px-5 py-4 text-[10px] font-bold uppercase text-red-500 hover:bg-red-50 transition-colors">
                         Logout Session
                       </button>

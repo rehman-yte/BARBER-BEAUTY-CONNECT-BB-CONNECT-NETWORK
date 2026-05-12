@@ -31,8 +31,10 @@ const AdminDashboard: React.FC = () => {
   const [isUpdatingFee, setIsUpdatingFee] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [allRatings, setAllRatings] = useState<any[]>([]);
+  const [editingPartner, setEditingPartner] = useState<any>(null);
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(PersistenceService.load('system_maintenance') || false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback';
+  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings';
   const navigate = useNavigate();
 
   const setCurrentView = (view: string) => {
@@ -229,9 +231,36 @@ const AdminDashboard: React.FC = () => {
     setTimeout(fetchStats, 500);
   };
 
-  const handleToggleActive = async (shopId: string, currentStatus: boolean) => {
-    await updateShop(shopId, { isActive: !currentStatus });
-    fetchStats();
+  const handleDeleteRating = async (ratingId: string) => {
+    const confirm = window.confirm("Are you sure you want to delete this feedback? This action cannot be undone.");
+    if (!confirm) return;
+    try {
+      // In a real app, this would be a Firestore delete
+      // For now, we filter local state
+      setAllRatings(prev => prev.filter(r => r.id !== ratingId));
+      // Update persistence
+      const currentRatings = PersistenceService.load('ratings') || [];
+      PersistenceService.save('ratings', currentRatings.filter((r: any) => r.id !== ratingId));
+    } catch (error) {
+      console.error("Failed to delete rating:", error);
+    }
+  };
+
+  const handleUpdateShopDetails = async (shopId: string, updates: any) => {
+    try {
+      await updateShop(shopId, updates);
+      fetchStats();
+    } catch (error) {
+      console.error("Failed to update shop:", error);
+    }
+  };
+
+  const handleToggleMaintenance = async () => {
+    const next = !isMaintenanceMode;
+    setIsMaintenanceMode(next);
+    PersistenceService.save('system_maintenance', next);
+    await updateSettings({ maintenanceMode: next });
+    alert(`Maintenance Mode: ${next ? 'ENABLED' : 'DISABLED'}`);
   };
 
   const handleFreezePayout = async (shopId: string, bookingId: string, currentFrozen: boolean) => {
@@ -381,7 +410,13 @@ const AdminDashboard: React.FC = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-5 text-right">
+                        <td className="px-8 py-5 text-right space-x-2">
+                          <button 
+                            onClick={() => setEditingPartner(partner)}
+                            className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border border-blue-100 text-blue-500 hover:bg-blue-50 transition-all font-sans"
+                          >
+                            Edit Power
+                          </button>
                           <button 
                             onClick={() => handleToggleActive(partner.id, partner.isActive)}
                             className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${partner.isActive ? 'border-red-100 text-red-500 hover:bg-red-50' : 'border-emerald-100 text-emerald-500 hover:bg-emerald-50'}`}
@@ -530,7 +565,14 @@ const AdminDashboard: React.FC = () => {
                 allRatings.map((rating: any) => {
                   const partner = stats?.allPartners?.find((p: any) => p.id === rating.partnerId);
                   return (
-                    <div key={rating.id} className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm flex flex-col justify-between">
+                    <div key={rating.id} className="group bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm flex flex-col justify-between relative overflow-hidden">
+                      <button 
+                        onClick={() => handleDeleteRating(rating.id)}
+                        className="absolute -top-4 -right-4 w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                        title="Delete Feedback"
+                      >
+                         <svg className="w-4 h-4 translate-y-1 -translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                       <div>
                         <div className="flex justify-between items-start mb-6">
                           <div>
@@ -567,103 +609,189 @@ const AdminDashboard: React.FC = () => {
             <div className="mb-12 flex justify-between items-end">
               <div>
                 <h2 className="text-3xl font-serif font-bold text-black">BROADCAST CENTER</h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Global Communication & System Config</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Global Communication & Urgent Alerts</p>
               </div>
               <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back</button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-6">Global Message Hub</h3>
-                <textarea 
-                  placeholder="TYPE BROADCAST MESSAGE..."
-                  value={broadcastMsg}
-                  onChange={(e) => setBroadcastMsg(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-100 p-6 rounded-3xl text-sm font-medium outline-none focus:border-[#0056b3] min-h-[150px] resize-none mb-6"
-                />
-                <div className="flex flex-wrap gap-4 mb-8">
-                  {(['all', 'customers', 'partners'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setBroadcastTarget(t)}
-                      className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all border ${
-                        broadcastTarget === t 
-                          ? 'bg-black text-white border-black' 
-                          : 'bg-white text-gray-400 border-gray-100 hover:border-black hover:text-black'
-                      }`}
-                    >
-                      Target: {t}
-                    </button>
-                  ))}
+            <div className="bg-white border border-gray-100 p-12 rounded-[3.5rem] shadow-sm max-w-4xl mx-auto">
+              <h3 className="text-[12px] font-bold text-black uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+                 <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                 Dispatch New Broadcast
+              </h3>
+              
+              <div className="space-y-8">
+                <div>
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Target Audience</label>
+                   <div className="flex gap-4">
+                      {(['all', 'customers', 'partners'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setBroadcastTarget(t)}
+                          className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            broadcastTarget === t 
+                              ? 'bg-black text-white border-black shadow-lg shadow-black/20' 
+                              : 'bg-white text-gray-400 border-gray-100 hover:border-black hover:text-black'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Recipients: {broadcastTarget.toUpperCase()}</p>
+
+                <div>
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Broadcast Message</label>
+                   <textarea 
+                      placeholder="ENTER CRITICAL SYSTEM ALERT OR ANNOUNCEMENT..."
+                      value={broadcastMsg}
+                      onChange={(e) => setBroadcastMsg(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-100 p-8 rounded-[2rem] text-sm font-medium outline-none focus:border-bbBlue min-h-[200px] resize-none transition-all leading-relaxed shadow-inner"
+                   />
+                </div>
+
+                <div className="flex items-center justify-between pt-6">
+                   <div className="flex items-center gap-2 text-[9px] font-bold text-gray-300 uppercase tracking-widest">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Real-time push notifications will be sent
+                   </div>
+                   <button 
+                      onClick={handleBroadcast}
+                      disabled={isBroadcasting || !broadcastMsg.trim()}
+                      className="bg-[#2358E1] text-white px-12 py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-700 transition-all disabled:opacity-30 shadow-xl shadow-blue-500/20 active:scale-95"
+                   >
+                    {isBroadcasting ? 'Processing...' : 'Execute Dispatch'}
+                   </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {currentView === 'settings' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-12 flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-serif font-bold text-black">MARKETPLACE SETTINGS</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Core Platform Configuration & CMS</p>
+              </div>
+              <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-white border border-gray-100 p-10 rounded-[3rem] shadow-sm">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-8 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-bbBlue rounded-full"></span>
+                  Financial Configuration
+                </h3>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Platform Fee (Commission %)</label>
+                    <div className="flex gap-3">
+                      <div className="relative flex-1">
+                        <input 
+                          type="number" 
+                          value={platformFee}
+                          onChange={(e) => setPlatformFee(Number(e.target.value))}
+                          className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue transition-all"
+                        />
+                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
+                      </div>
+                      <button 
+                        onClick={handleUpdateFee} 
+                        disabled={isUpdatingFee} 
+                        className="bg-black text-white px-8 rounded-2xl text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-bbBlue transition-all shadow-lg active:scale-95"
+                      >
+                        {isUpdatingFee ? 'Updating...' : 'Save Fee'}
+                      </button>
+                    </div>
+                    <p className="text-[8px] text-gray-400 mt-2 font-medium uppercase tracking-widest">Applied to all future transactions across the network.</p>
+                  </div>
+
+                  <div className="pt-6 border-t border-gray-50">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">System Protocol Status</label>
+                    <div className="flex items-center justify-between p-6 bg-red-50 rounded-[2rem] border border-red-100">
+                      <div>
+                         <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Global Maintenance Mode</p>
+                         <p className="text-[8px] text-red-400 uppercase font-bold tracking-tighter">Redirects all traffic to protocol page</p>
+                      </div>
+                      <button 
+                        onClick={handleToggleMaintenance}
+                        className={`w-14 h-8 rounded-full p-1 transition-all duration-500 ${isMaintenanceMode ? 'bg-red-500' : 'bg-gray-300'}`}
+                      >
+                         <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-500 transform ${isMaintenanceMode ? 'translate-x-6' : 'translate-x-0'} shadow-sm flex items-center justify-center`}>
+                            {isMaintenanceMode ? <span className="text-[8px] font-black text-red-500">ON</span> : <span className="text-[8px] font-black text-gray-300">OFF</span>}
+                         </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 p-10 rounded-[3rem] shadow-sm">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-8 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                  Content Management (CMS)
+                </h3>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Global Marketplace Title</label>
+                    <input 
+                      type="text" 
+                      value={stats?.heroTitle || 'BB Grooming Excellence'}
+                      onChange={(e) => setStats({...stats, heroTitle: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl text-[12px] font-bold outline-none focus:border-bbBlue transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Global Marketplace Subtitle</label>
+                    <textarea 
+                      value={stats?.heroSubtitle || ''}
+                      onChange={(e) => setStats({...stats, heroSubtitle: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl text-[12px] font-medium outline-none focus:border-bbBlue h-32 resize-none transition-all leading-relaxed"
+                    />
+                  </div>
                   <button 
-                    onClick={handleBroadcast}
-                    disabled={isBroadcasting}
-                    className="bg-black text-white px-10 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-gray-900 transition-all disabled:opacity-50"
+                    onClick={async () => {
+                      setIsUpdatingFee(true);
+                      await updateSettings({ 
+                        heroTitle: stats.heroTitle, 
+                        heroSubtitle: stats.heroSubtitle 
+                      });
+                      setIsUpdatingFee(false);
+                      fetchStats();
+                    }} 
+                    className="w-full bg-black text-white py-5 rounded-2xl font-bold uppercase text-[10px] tracking-[0.3em] flex items-center justify-center gap-3 transition-all hover:bg-emerald-600 shadow-xl"
                   >
-                    {isBroadcasting ? 'Broadcasting...' : 'Send Global Broadcast'}
+                    Deploy Interface Update
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-6">System Configuration</h3>
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Platform Fee (%)</label>
-                    <div className="flex gap-2">
-                      <input 
-                        type="number" 
-                        value={platformFee}
-                        onChange={(e) => setPlatformFee(Number(e.target.value))}
-                        className="flex-1 bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-sm font-bold outline-none focus:border-[#0056b3]"
-                      />
-                      <button onClick={handleUpdateFee} disabled={isUpdatingFee} className="bg-[#0056b3] text-white px-6 py-3 rounded-2xl text-[8px] font-bold uppercase tracking-widest disabled:opacity-50">Apply</button>
-                    </div>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-2xl">
-                    <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mb-1">Last Broadcast</p>
-                    <p className="text-[10px] font-bold text-black">{stats?.broadcasts?.[0]?.timestamp ? new Date(stats.broadcasts[0].timestamp).toLocaleString() : 'None'}</p>
-                  </div>
-                  
-                  <div className="pt-6 border-t border-gray-100">
-                    <h4 className="text-[8px] font-bold text-black uppercase tracking-[0.2em] mb-4">Site Branding</h4>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Hero Title</label>
-                        <input 
-                          type="text" 
-                          value={stats?.heroTitle || 'BB Grooming Excellence'}
-                          onChange={(e) => setStats({...stats, heroTitle: e.target.value})}
-                          className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-[10px] font-bold outline-none focus:border-[#0056b3]"
-                        />
+              <div className="bg-white border border-gray-100 p-10 rounded-[3rem] shadow-sm md:col-span-2">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-8">Broadcast Repository (History)</h3>
+                <div className="space-y-4">
+                  {stats?.broadcasts?.length > 0 ? (
+                    stats.broadcasts.map((b: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-6 bg-gray-50 rounded-2xl group border border-transparent hover:border-gray-200 transition-all">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className="text-[8px] font-black uppercase text-bbBlue bg-bbBlue/10 px-2 py-0.5 rounded-full">{b.target}</span>
+                            <span className="text-[8px] font-bold text-gray-300 uppercase">{new Date(b.timestamp).toLocaleString()}</span>
+                          </div>
+                          <p className="text-[10px] font-bold text-charcoal">{b.message}</p>
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteBroadcast(i)}
+                          className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-300 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-red-100 hover:text-red-500"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
                       </div>
-                      <div>
-                        <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Hero Subtitle</label>
-                        <textarea 
-                          value={stats?.heroSubtitle || 'Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.'}
-                          onChange={(e) => setStats({...stats, heroSubtitle: e.target.value})}
-                          className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-2xl text-[10px] font-bold outline-none focus:border-[#0056b3] h-20 resize-none"
-                        />
-                      </div>
-                      <button 
-                        onClick={async () => {
-                          setIsUpdatingFee(true);
-                          await updateSettings({ 
-                            heroTitle: stats.heroTitle, 
-                            heroSubtitle: stats.heroSubtitle 
-                          });
-                          setIsUpdatingFee(false);
-                          fetchStats();
-                        }} 
-                        className="w-full bg-black text-white py-3 rounded-xl text-[8px] font-bold uppercase tracking-widest hover:bg-gray-900 transition-all"
-                      >
-                        Push Style Update
-                      </button>
-                    </div>
-                  </div>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center text-gray-300 text-[10px] font-bold uppercase tracking-widest border border-dashed border-gray-100 rounded-2xl">No broadcast history</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -681,7 +809,8 @@ const AdminDashboard: React.FC = () => {
           { id: 'shops', label: 'shops' },
           { id: 'ledger', label: 'ledger' },
           { id: 'feedback', label: 'Feedback' },
-          { id: 'broadcast', label: 'Global' }
+          { id: 'broadcast', label: 'Global' },
+          { id: 'settings', label: 'Systems' }
         ].map((v) => (
           <button
             key={v.id}
@@ -700,6 +829,67 @@ const AdminDashboard: React.FC = () => {
         ))}
         <button onClick={logout} className="px-6 py-2 rounded-full text-[8px] font-bold uppercase tracking-widest text-red-400 hover:bg-red-500/10">Exit</button>
       </motion.div>
+
+      {/* Partner Edit Modal */}
+      {editingPartner && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[3000] flex items-center justify-center p-6">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-xl p-12 rounded-[4rem] relative shadow-2xl">
+             <button onClick={() => setEditingPartner(null)} className="absolute top-10 right-10 text-gray-300 hover:text-black">
+               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+             </button>
+             <div className="mb-10">
+                <h3 className="text-2xl font-serif font-bold text-black uppercase">Partner Core Edit</h3>
+                <p className="text-[10px] text-bbBlue font-black uppercase tracking-[0.4em] mt-2 underline">Bypass Verification & Data Injection</p>
+             </div>
+             
+             <div className="space-y-6">
+                <div>
+                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-2">Display Name (Brand)</label>
+                   <input 
+                      type="text" 
+                      defaultValue={editingPartner.brandName || editingPartner.brand_name}
+                      onChange={(e) => setEditingPartner({...editingPartner, brandName: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl font-bold text-sm outline-none focus:border-bbBlue"
+                   />
+                </div>
+                <div>
+                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-2">Communication (Mobile)</label>
+                   <input 
+                      type="text" 
+                      defaultValue={editingPartner.mobile}
+                      onChange={(e) => setEditingPartner({...editingPartner, mobile: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl font-bold text-sm outline-none focus:border-bbBlue"
+                   />
+                </div>
+                <div>
+                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-2">Internal Status Protocol</label>
+                   <select 
+                      defaultValue={editingPartner.status}
+                      onChange={(e) => setEditingPartner({...editingPartner, status: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl font-bold text-[10px] uppercase outline-none focus:border-bbBlue"
+                   >
+                      <option value="pending">Pending Review</option>
+                      <option value="approved">White-listed (Approved)</option>
+                      <option value="rejected">Black-listed (Rejected)</option>
+                      <option value="suspended">Suspended</option>
+                   </select>
+                </div>
+
+                <div className="pt-8">
+                   <button 
+                     onClick={() => {
+                        handleUpdateShopDetails(editingPartner.id, editingPartner);
+                        setEditingPartner(null);
+                     }}
+                     className="w-full bg-black text-white py-5 rounded-3xl font-black uppercase text-[10px] tracking-[0.3em] hover:bg-bbBlue transition-all shadow-xl active:scale-95"
+                   >
+                      Commit Database Logic Update
+                   </button>
+                </div>
+             </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Document Modal (Verification) */}
       {selectedShopDocs && (
