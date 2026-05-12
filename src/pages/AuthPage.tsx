@@ -6,8 +6,10 @@ import { motion } from 'motion/react';
 type Role = 'customer' | 'partner' | 'admin';
 
 const AuthPage: React.FC = () => {
-  const { user, signIn, signInWithGoogle, loading } = useAuth();
+  const { user, signIn, signUp, signInWithGoogle, loading } = useAuth();
   const [role, setRole] = useState<Role>('customer');
+  const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -32,9 +34,13 @@ const AuthPage: React.FC = () => {
     setIsSubmitting(true);
     setError('');
     try {
-      await signIn(email, password, role);
+      if (isLogin) {
+        await signIn(email, password, role);
+      } else {
+        await signUp(email, password, { name, role });
+      }
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      setError(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -103,6 +109,24 @@ const AuthPage: React.FC = () => {
         )}
 
         <form onSubmit={handleEmailAuth} className="space-y-4">
+          {!isLogin && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-2 overflow-hidden"
+            >
+              <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
+              <input 
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required={!isLogin}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-3xl text-[0.875rem] font-medium outline-none focus:border-bbBlue/30 transition-all"
+                placeholder={role === 'partner' ? 'Studio Name / Owner' : 'Your name'}
+              />
+            </motion.div>
+          )}
+
           <div className="space-y-2">
             <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-4">Email Address</label>
             <input 
@@ -131,9 +155,22 @@ const AuthPage: React.FC = () => {
             disabled={isSubmitting}
             className="w-full py-4 bg-black text-white rounded-3xl font-bold uppercase tracking-widest text-[0.75rem] hover:bg-gray-900 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-black/10"
           >
-            {isSubmitting ? 'Verifying...' : `Login as ${role}`}
+            {isSubmitting ? 'Verifying...' : (isLogin ? `Login as ${role}` : `Register as ${role}`)}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-widest hover:underline"
+          >
+            {isLogin ? (
+              <>New {role}? <span className="text-black">Create Account</span></>
+            ) : (
+              <>Already have an account? <span className="text-black">Sign In</span></>
+            )}
+          </button>
+        </div>
 
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>

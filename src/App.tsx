@@ -92,11 +92,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/shop" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopPage /></ProtectedRoute>} />
       
       {/* CUSTOMER PORTAL */}
-      <Route path="/customer/explore" element={<ProtectedRoute allowedRole={['customer', 'partner']}><ExplorePage /></ProtectedRoute>} />
+      <Route path="/customer/explore" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ExplorePage /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
-      <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'partner']}><MyShopping /></ProtectedRoute>} />
-      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'partner']}><CheckoutPage /></ProtectedRoute>} />
-      <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'partner']}><ShopDetail /></ProtectedRoute>} />
+      <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><MyShopping /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopDetail /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL */}
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
