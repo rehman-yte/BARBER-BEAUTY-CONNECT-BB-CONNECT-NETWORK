@@ -8,7 +8,9 @@ import {
   signOut, 
   GoogleAuthProvider, 
   signInWithPopup,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
@@ -51,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -62,6 +64,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   useEffect(() => {
+    // FIREBASE SESSION PERSISTENCE: Ensure admin session sticks across reloads
+    const initPersistence = async () => {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (err) {
+        console.error("Persistence failed:", err);
+      }
+    };
+    initPersistence();
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
@@ -110,12 +122,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // STEP D: ADMIN / LEGACY DISCOVERY (Strict Isolation)
-          const isAdmin = firebaseUser.email === 'haidartheworldking@gmail.com' || firebaseUser.email === 'rhfarooqui16@gmail.com';
+          // STEP D: ADMIN DISCOVERY (Check dedicated admins collection + hardcoded list)
+          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
+          const isAdmin = adminDoc.exists() || 
+                         firebaseUser.email === 'haidartheworldking@gmail.com' || 
+                         firebaseUser.email === 'rhfarooqui16@gmail.com';
+          
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as any;
+          if (userDoc.exists() || adminDoc.exists()) {
+            const userData = (userDoc.data() || adminDoc.data()) as any;
             const role = isAdmin ? 'admin' : (userData.role || userData.user_type || 'customer');
             
             console.log(`[AUTH ARCHITECT] Discovery Gate: DISCOVERED ROLE -> ${role}`);
@@ -221,6 +237,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, pass: string) => {
     try {
+      // ENSURE PERSISTENCE BEFORE SIGN IN
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err: any) {
       console.error("Firebase signIn error:", err);
