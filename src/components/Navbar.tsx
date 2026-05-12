@@ -132,7 +132,9 @@ const Navbar: React.FC = () => {
         </Link>
 
         <div className="flex items-center gap-[1rem] sm:gap-[2rem]">
-          <Link to="/customer/explore" className={`text-[0.625rem] font-bold uppercase tracking-[0.2em] ${location.pathname === '/customer/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>Explore</Link>
+          {(!isLoggedIn || user.role === 'customer') && (
+            <Link to="/customer/explore" className={`text-[0.625rem] font-bold uppercase tracking-[0.2em] ${location.pathname === '/customer/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>Explore</Link>
+          )}
           {isLoggedIn && user.role === 'customer' && <Link to="/customer-dashboard" className={`text-[0.625rem] font-bold uppercase tracking-[0.2em] ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>Dashboard</Link>}
           {isLoggedIn && user.role === 'partner' && <Link to="/partner/dashboard" className={`text-[0.625rem] font-bold uppercase tracking-[0.2em] ${location.pathname === '/partner/dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>Terminal</Link>}
           {isLoggedIn && user.role === 'admin' && <Link to="/admin/dashboard" className={`text-[0.625rem] font-bold uppercase tracking-[0.2em] ${location.pathname === '/admin/dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>Admin</Link>}
@@ -173,9 +175,17 @@ const Navbar: React.FC = () => {
                     )}
 
                     {user.role === 'partner' && (
-                      <Link to="/partner/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                        <span className="opacity-50">💼</span> Partner Terminal
-                      </Link>
+                      <>
+                        <Link to="/partner/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">💼</span> Partner Terminal
+                        </Link>
+                        <Link to="/customer/explore" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">🛍️</span> Member Store
+                        </Link>
+                        <Link to="/my-shopping" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">📦</span> My Orders
+                        </Link>
+                      </>
                     )}
 
                     {user.role === 'admin' && (
