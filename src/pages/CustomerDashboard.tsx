@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { getBookings } from '../services/logic_engine';
+import { getBookings, submitRating } from '../services/logic_engine';
+import RatingModal from '../components/RatingModal';
 
 import { PersistenceService } from '../services/PersistenceService';
 
@@ -12,6 +13,7 @@ const CustomerDashboard: React.FC = () => {
   const [bookings, setBookings] = useState<any[]>(PersistenceService.load('customer_bookings') || []);
   const [loading, setLoading] = useState(!PersistenceService.load('customer_bookings'));
   const [activeTab, setActiveTab] = useState<'approved' | 'pending' | 'failed'>('approved');
+  const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
 
   // CRITICAL REDIRECT: Ensure partners never land on Customer Dashboard
   useEffect(() => {
@@ -41,6 +43,12 @@ const CustomerDashboard: React.FC = () => {
         setLoading(false);
         PersistenceService.save('customer_bookings', data);
         
+        // Priority: Check for completed bookings that need rating
+        const needsRating = data.find((b: any) => b.status === 'completed' && !b.rated);
+        if (needsRating) {
+          setPendingRatingBooking(needsRating);
+        }
+
         // AUTO-REFUND LOGIC: Check for expired held payments
         // This logic should ideally be on the server, but keeping it here for now as requested
         // However, we can't easily update localStorage anymore, so we'll just log it
@@ -66,6 +74,17 @@ const CustomerDashboard: React.FC = () => {
     if (activeTab === 'failed') return b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned';
     return b.status === 'approved' || b.status === 'confirmed';
   });
+
+  const handleRatingSubmit = async (rating: number, comment: string) => {
+    if (!pendingRatingBooking) return;
+    try {
+      await submitRating(pendingRatingBooking.id, pendingRatingBooking.partnerId || pendingRatingBooking.shopId, rating, comment);
+      setPendingRatingBooking(null);
+      // Data will refresh on next interval
+    } catch (error) {
+      console.error("Failed to submit rating:", error);
+    }
+  };
 
   const stats = {
     approved: bookings.filter(b => b.status === 'approved' || b.status === 'confirmed').length,
@@ -245,6 +264,16 @@ const CustomerDashboard: React.FC = () => {
            </AnimatePresence>
         </div>
       </div>
+
+      <AnimatePresence>
+        {pendingRatingBooking && (
+          <RatingModal 
+            booking={pendingRatingBooking}
+            onSubmit={handleRatingSubmit}
+            onClose={() => setPendingRatingBooking(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

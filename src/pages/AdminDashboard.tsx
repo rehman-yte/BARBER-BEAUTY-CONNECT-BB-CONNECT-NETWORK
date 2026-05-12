@@ -13,7 +13,8 @@ import {
   getSettings, 
   updateSettings,
   sendNotification,
-  getPendingPartners
+  getPendingPartners,
+  getRatings
 } from '../services/logic_engine';
 import { PersistenceService, StorageManager } from '../services/PersistenceService';
 
@@ -29,8 +30,9 @@ const AdminDashboard: React.FC = () => {
   const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'customers' | 'partners'>('all');
   const [isUpdatingFee, setIsUpdatingFee] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [allRatings, setAllRatings] = useState<any[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast';
+  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback';
   const navigate = useNavigate();
 
   const setCurrentView = (view: string) => {
@@ -65,6 +67,8 @@ const AdminDashboard: React.FC = () => {
         data = await getShops();
         allBookings = await getBookings();
         config = await getSettings();
+        const ratingsData = await getRatings();
+        setAllRatings(ratingsData);
       } catch (firestoreErr) {
         console.debug("Firestore access restricted, activating preview bypass mode...", firestoreErr);
       }
@@ -511,6 +515,53 @@ const AdminDashboard: React.FC = () => {
           </motion.div>
         )}
 
+        {currentView === 'feedback' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-12 flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-serif font-bold text-black">CUSTOMER FEEDBACK</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Quality Monitoring & Reviews</p>
+              </div>
+              <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {allRatings.length > 0 ? (
+                allRatings.map((rating: any) => {
+                  const partner = stats?.allPartners?.find((p: any) => p.id === rating.partnerId);
+                  return (
+                    <div key={rating.id} className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start mb-6">
+                          <div>
+                            <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.2em] mb-1">{partner?.brandName || 'Partner'}</p>
+                            <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Transaction: {rating.bookingId?.slice(-8)}</p>
+                          </div>
+                          <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-100">
+                            <span className="text-yellow-600 text-[0.625rem] font-black">★ {rating.rating}.0</span>
+                          </div>
+                        </div>
+                        <div className="p-6 bg-gray-50 rounded-2xl relative">
+                           <p className="text-[0.75rem] text-gray-600 italic leading-relaxed">"{rating.comment || 'No comment provided.'}"</p>
+                           <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-white rotate-45 border-r border-b border-gray-100"></div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-6 border-t border-gray-50 flex justify-between items-center">
+                        <p className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-widest">{new Date(rating.createdAt).toLocaleDateString()}</p>
+                        <p className="text-[0.5rem] font-bold text-charcoal uppercase tracking-widest">Customer: {rating.customerName}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-full py-20 text-center border border-dashed border-gray-100 rounded-[3rem]">
+                   <p className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-widest">No feedback received yet.</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {currentView === 'broadcast' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="mb-12 flex justify-between items-end">
@@ -619,6 +670,36 @@ const AdminDashboard: React.FC = () => {
           </motion.div>
         )}
       </main>
+
+      {/* Admin Bottom Navigation */}
+      <motion.div 
+        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black border border-white/10 p-2 rounded-full shadow-2xl z-[1000] flex items-center gap-2"
+      >
+        {[
+          { id: 'overview', label: 'Dashboard' },
+          { id: 'verification', label: 'Vetting', badge: stats?.pendingVerifications?.length },
+          { id: 'shops', label: 'shops' },
+          { id: 'ledger', label: 'ledger' },
+          { id: 'feedback', label: 'Feedback' },
+          { id: 'broadcast', label: 'Global' }
+        ].map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setCurrentView(v.id)}
+            className={`px-6 py-2 rounded-full text-[8px] font-bold uppercase tracking-widest transition-all relative ${
+              currentView === v.id ? 'bg-white text-black' : 'text-white/40 hover:text-white'
+            }`}
+          >
+            {v.label}
+            {(v.badge ?? 0) > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[6px]">
+                {v.badge}
+              </span>
+            )}
+          </button>
+        ))}
+        <button onClick={logout} className="px-6 py-2 rounded-full text-[8px] font-bold uppercase tracking-widest text-red-400 hover:bg-red-500/10">Exit</button>
+      </motion.div>
 
       {/* Document Modal (Verification) */}
       {selectedShopDocs && (

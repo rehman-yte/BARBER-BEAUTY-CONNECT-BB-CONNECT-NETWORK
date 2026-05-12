@@ -8,7 +8,8 @@ import {
   getBookings,
   addShopService,
   updateShopService,
-  deleteShopService
+  deleteShopService,
+  updateBooking
 } from '../services/logic_engine';
 import { 
   LayoutDashboard,
@@ -680,6 +681,7 @@ const PartnerDashboard: React.FC = () => {
                           <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Service Asset</th>
                           <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Schedule</th>
                           <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-center">Status</th>
+                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-center">Actions</th>
                           <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-right">Value</th>
                         </tr>
                       </thead>
@@ -705,10 +707,29 @@ const PartnerDashboard: React.FC = () => {
                             </td>
                             <td className="px-8 py-6 text-center">
                               <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                                b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 'bg-bbBlue/10 text-bbBlue'
+                                b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
+                                'bg-bbBlue/10 text-bbBlue'
                               }`}>
                                 {b.status}
                               </span>
+                            </td>
+                            <td className="px-8 py-6 text-center">
+                              {b.status !== 'completed' && (
+                                <button 
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const confirm = window.confirm("Clear this service? This will request feedback from customer.");
+                                    if(confirm) {
+                                      await updateBooking(b.id, { status: 'completed', completedAt: new Date().toISOString() });
+                                      // Force reload or state update logic is already in fetchData interval
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-black text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg active:scale-95"
+                                >
+                                  Clear Call
+                                </button>
+                              )}
                             </td>
                             <td className="px-8 py-6 text-right">
                               <span className="text-[0.75rem] font-serif font-black tracking-tight">₹{b.price}</span>

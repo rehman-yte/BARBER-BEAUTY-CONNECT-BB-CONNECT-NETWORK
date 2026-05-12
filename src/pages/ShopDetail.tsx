@@ -3,18 +3,19 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { getShopById, addBooking } from '../services/logic_engine';
 
 const ShopDetail: React.FC = () => {
   const { id } = useParams();
   const { user } = useAuth();
+  const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
   const [shopData, setShopData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [showPayment, setShowPayment] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -160,13 +161,29 @@ const ShopDetail: React.FC = () => {
   };
 
   const handleBooking = () => {
-    if (!selectedSlot) return;
-    setShowPayment(true);
+    if (!selectedSlot || !shopData || !selectedService) return;
+    
+    // Add booking details to cart and redirect to unified payment page
+    clearCart();
+    addToCart({
+      id: `booking-${id}-${selectedSlot}-${selectedDate.getTime()}`,
+      name: `${selectedService.name} (Booking)`,
+      price: selectedService.price,
+      image: shopData.shopImages?.[0] || shopData.brandImages?.[0] || '',
+      category: 'Booking',
+      shopId: id,
+      shopName: shopData.brandName,
+      date: selectedDate.toDateString(),
+      time: selectedSlot,
+      serviceName: selectedService.name,
+      type: 'booking'
+    });
+    
+    navigate('/checkout');
   };
 
   const handleAbandonment = async () => {
     if (!user || isProcessing || !shopData) {
-      setShowPayment(false);
       return;
     }
 
@@ -196,7 +213,6 @@ const ShopDetail: React.FC = () => {
       console.error("Abandonment log failed:", err);
     }
     
-    setShowPayment(false);
     navigate('/customer-dashboard');
   };
 
@@ -248,7 +264,6 @@ const ShopDetail: React.FC = () => {
       await addBooking(bookingPayload);
       setTimeout(() => {
         setIsProcessing(false);
-        setShowPayment(false);
         navigate('/customer-dashboard');
       }, 1500);
     } catch (err) {
@@ -410,58 +425,7 @@ const ShopDetail: React.FC = () => {
       </div>
 
       <AnimatePresence>
-         {showPayment && (
-            <motion.div 
-               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-               className="fixed inset-0 z-[2000] bg-charcoal/60 backdrop-blur-md flex items-center justify-center p-6"
-            >
-               <motion.div 
-                  initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }}
-                  className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl relative"
-               >
-                  <button onClick={handleAbandonment} className="absolute top-6 right-6 text-gray-400 hover:text-charcoal z-10">
-                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-
-                  <div className="bg-[#1D2B44] p-10 text-white">
-                     <div className="flex justify-between items-center mb-6">
-                        <span className="text-[9px] font-bold uppercase tracking-[0.3em] opacity-60">Escrow Secure</span>
-                     </div>
-                     <p className="text-xl font-serif font-bold mb-1">{shopData.brandName}</p>
-                     <p className="text-3xl font-serif font-bold">₹{selectedService?.price || 0}.00</p>
-                  </div>
-                  
-                  <div className="p-10 space-y-8">
-                     <div className="flex flex-col items-center gap-4">
-                        <div className="w-40 h-40 bg-gray-50 border border-gray-100 rounded-3xl flex items-center justify-center p-6 shadow-inner">
-                           <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_PAYMENT')] bg-center bg-no-repeat bg-contain opacity-70"></div>
-                        </div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Scan QR or select an app below</p>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-3">
-                        {['GPay', 'PhonePe', 'Paytm', 'Other UPI'].map(app => (
-                           <button 
-                             key={app} 
-                             onClick={() => handleUPILink(app)}
-                             className="py-4 border border-gray-100 rounded-2xl text-[10px] font-bold text-charcoal hover:border-bbBlue hover:bg-bbBlue/5 transition-all active:scale-[0.97]"
-                           >
-                             {app}
-                           </button>
-                        ))}
-                     </div>
-
-                     <button 
-                        onClick={() => handleConfirmPayment('UPI_DEEP_LINK')}
-                        disabled={isProcessing}
-                        className="w-full py-5 bg-[#2358E1] text-white rounded-2xl font-bold uppercase text-[10px] tracking-[0.25em] flex items-center justify-center gap-3 shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
-                     >
-                        {isProcessing ? 'Securing Funds...' : 'Confirm and Hold Payment'}
-                     </button>
-                  </div>
-               </motion.div>
-            </motion.div>
-         )}
+         {/* Payment modal removed - now uses unified CheckoutPage */}
       </AnimatePresence>
     </div>
   );
