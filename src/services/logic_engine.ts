@@ -57,12 +57,11 @@ export const getShops = async (): Promise<any[]> => {
         ...data,
         brandName: data.brand_name || data.brandName,
         ownerName: data.owner_name || data.ownerName,
-        ownerPicture: data.ownerPicture || data.photoURL,
         mobile: data.mobile_number || data.mobile,
-        lat: parseFloat(data.lat || data.coords?.lat || '0') || null,
-        lng: parseFloat(data.lng || data.coords?.lng || '0') || null,
-        shopImages: (data.shopImages || data.brandImages || []).filter((u: any) => u && typeof u === 'string' && u.startsWith('http')),
-        workerImages: (data.workerImages || []).filter((u: any) => u && typeof u === 'string' && u.startsWith('http')),
+        lat: data.lat || data.coords?.lat,
+        lng: data.lng || data.coords?.lng,
+        shopImages: data.shopImages || data.brandImages || [],
+        workerImages: data.workerImages || [],
         adminApproved: data.adminApproved || data.status === 'approved' || data.status === 'active'
       };
     });
@@ -132,12 +131,11 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
         ...data,
         brandName: data.brand_name || data.brandName,
         ownerName: data.owner_name || data.ownerName,
-        ownerPicture: data.ownerPicture || data.photoURL,
         mobile: data.mobile_number || data.mobile,
-        lat: parseFloat(data.lat || data.coords?.lat || '0') || null,
-        lng: parseFloat(data.lng || data.coords?.lng || '0') || null,
-        shopImages: (data.shopImages || data.brandImages || []).filter((u: any) => u && typeof u === 'string' && u.startsWith('http')),
-        workerImages: (data.workerImages || []).filter((u: any) => u && typeof u === 'string' && u.startsWith('http')),
+        lat: data.lat || data.coords?.lat,
+        lng: data.lng || data.coords?.lng,
+        shopImages: data.shopImages || data.brandImages || [],
+        workerImages: data.workerImages || [],
         adminApproved: data.adminApproved || data.status === 'approved' || data.status === 'active'
       };
     });
@@ -247,15 +245,14 @@ export const getShopById = async (id: string): Promise<any> => {
       services: services.length > 0 ? services : (data.services || []), // Fallback to array for migration
       brandName: data.brand_name || data.brandName,
       ownerName: data.owner_name || data.ownerName,
-      ownerPicture: data.ownerPicture || data.photoURL,
       mobile: data.mobile_number || data.mobile,
       upiId: data.upi_id || data.upiId,
       workerQuantity: data.worker_quantity || data.workerQuantity,
       status: data.status || 'pending',
-      lat: parseFloat(data.lat || data.coords?.lat || '0') || null,
-      lng: parseFloat(data.lng || data.coords?.lng || '0') || null,
-      shopImages: (data.shopImages || data.brandImages || []).filter((u: any) => u && typeof u === 'string' && u.startsWith('http')),
-      workerImages: (data.workerImages || []).filter((u: any) => u && typeof u === 'string' && u.startsWith('http')),
+      lat: data.lat || data.coords?.lat,
+      lng: data.lng || data.coords?.lng,
+      shopImages: data.shopImages || data.brandImages || [],
+      workerImages: data.workerImages || [],
       adminApproved: data.adminApproved || data.status === 'approved'
     };
   } catch (err) {
