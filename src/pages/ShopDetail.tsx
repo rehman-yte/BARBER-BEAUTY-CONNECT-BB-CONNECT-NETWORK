@@ -293,7 +293,7 @@ const ShopDetail: React.FC = () => {
             <h1 className="text-[3rem] font-serif font-bold text-bbBlue-deep mb-[1rem] leading-tight">{shopData.brandName}</h1>
             <div className="flex items-center gap-[1rem]">
                <div className="w-[2.5rem] h-[2.5rem] rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-bold text-charcoal overflow-hidden uppercase">
-                 {shopData.ownerPicture || shopData.photoURL ? (
+                 {((shopData.ownerPicture && shopData.ownerPicture !== 'pending_upload') || (shopData.photoURL && shopData.photoURL !== 'pending_upload')) ? (
                     <img src={shopData.ownerPicture || shopData.photoURL} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
                  ) : (
                     shopData.ownerName?.[0] || 'M'
@@ -307,11 +307,16 @@ const ShopDetail: React.FC = () => {
           </header>
 
           <div className="grid grid-cols-3 gap-[1rem]">
-             {(shopData.shopImages || []).map((url: string, i: number) => (
+             {(shopData.shopImages || []).filter((url: string) => url !== 'pending_upload').map((url: string, i: number) => (
                 <div key={i} className="aspect-square rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all">
                    <img src={url} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
                 </div>
              ))}
+             {(!shopData.shopImages || shopData.shopImages.filter((u:string)=>u!=='pending_upload').length === 0) && (
+               <div className="col-span-3 aspect-[21/9] bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-widest">No Gallery Images Available</p>
+               </div>
+             )}
           </div>
 
           {/* Navigation Map Section */}
@@ -335,6 +340,26 @@ const ShopDetail: React.FC = () => {
                      Open in Google Maps
                    </button>
                 </div>
+             </div>
+          </div>
+
+          {/* Specialists Section */}
+          <div className="space-y-[1.5rem]">
+             <h3 className="text-[0.75rem] font-bold uppercase tracking-widest text-charcoal">Meet our Specialists</h3>
+             <div className="grid grid-cols-3 sm:grid-cols-4 gap-[1rem]">
+                {(shopData.workerImages || []).filter((url: string) => url !== 'pending_upload').map((url: string, i: number) => (
+                   <div key={i} className="aspect-square rounded-2xl overflow-hidden border border-gray-100 shadow-sm group relative">
+                      <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                         <span className="text-[0.5rem] text-white font-bold uppercase tracking-widest">Specialist {i+1}</span>
+                      </div>
+                   </div>
+                ))}
+                {(!shopData.workerImages || shopData.workerImages.filter((u:string)=>u!=='pending_upload').length === 0) && (
+                  <div className="col-span-full py-6 bg-gray-50 rounded-2xl border border-dashed border-gray-100 flex items-center justify-center">
+                    <p className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-widest">Specialist Roster Private</p>
+                  </div>
+                )}
              </div>
           </div>
 

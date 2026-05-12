@@ -87,7 +87,7 @@ const ExplorePage: React.FC = () => {
                 >
                   <div className="relative aspect-[16/9] overflow-hidden">
                     <img 
-                      src={shop.shopImages?.[0] || shop.workerImages?.[0] || "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=600"} 
+                      src={(shop.shopImages?.filter((img: string) => img !== 'pending_upload')?.[0]) || (shop.workerImages?.filter((img: string) => img !== 'pending_upload')?.[0]) || "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=600"} 
                       alt={shop.brandName} 
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" 
                     />
@@ -123,7 +123,7 @@ const ExplorePage: React.FC = () => {
                     <div className="mt-auto flex justify-between items-center">
                       <div className="flex items-center gap-[0.75rem]">
                         <div className="w-[2rem] h-[2rem] rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-[0.625rem] font-bold text-charcoal uppercase overflow-hidden">
-                          {shop.ownerPicture || shop.photoURL ? (
+                          {((shop.ownerPicture && shop.ownerPicture !== 'pending_upload') || (shop.photoURL && shop.photoURL !== 'pending_upload')) ? (
                             <img src={shop.ownerPicture || shop.photoURL} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
                           ) : (
                             shop.ownerName?.[0] || 'M'
