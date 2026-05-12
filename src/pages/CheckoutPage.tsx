@@ -341,23 +341,39 @@ const CheckoutPage: React.FC = () => {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
-                          className="space-y-4"
+                          className="space-y-6"
                         >
-                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Enter UPI ID</label>
-                          <div className="relative">
+                          <div className="flex flex-col items-center gap-6 p-6 bg-white rounded-3xl border border-gray-100">
+                            <div className="w-40 h-40 bg-gray-50 border border-gray-100 rounded-3xl flex items-center justify-center p-6 shadow-inner">
+                              <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_CHECKOUT')] bg-center bg-no-repeat bg-contain opacity-70"></div>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-[10px] font-bold text-charcoal uppercase tracking-widest mb-1">Scan to Pay ₹{totalPrice}</p>
+                              <p className="text-[8px] text-gray-400 font-medium uppercase tracking-widest">Powered by BB Connect Secure Gateway</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {['Google Pay', 'PhonePe', 'Paytm', 'BHIM UPI'].map(app => (
+                              <button 
+                                key={app}
+                                onClick={() => alert(`Opening ${app}...`)}
+                                className="py-4 border border-gray-100 rounded-2xl text-[10px] font-bold text-charcoal hover:border-bbBlue hover:bg-bbBlue/5 transition-all text-center"
+                              >
+                                {app}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="pt-4 border-t border-gray-100 mt-4">
+                            <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Or enter UPI ID manually</label>
                             <input 
                               type="text" 
                               placeholder="username@bank"
                               value={paymentDetails.upiId}
                               onChange={(e) => setPaymentDetails({...paymentDetails, upiId: e.target.value})}
-                              className="w-full px-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono" 
+                              className="w-full px-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono mt-2" 
                             />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 grayscale brightness-125">
-                              {/* Mock UPI Icons */}
-                              <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-400">G</div>
-                              <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-400">P</div>
-                              <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-400">Pay</div>
-                            </div>
                           </div>
                         </motion.div>
                       )}
