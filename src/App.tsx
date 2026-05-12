@@ -1,5 +1,4 @@
-
-/* LOCKED - POINT 1 COMPLETE: Auth & Routing Infrastructure */
+/* UNIFIED AUTHENTICATION & ROUTING SYSTEM v4.0 */
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from "./components/Navbar";
@@ -11,14 +10,11 @@ import ShopDetail from "./pages/ShopDetail";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import PartnerDashboard from "./pages/PartnerDashboard";
 import PartnerOnboarding from "./pages/PartnerOnboarding";
-import PartnerAuth from "./pages/PartnerAuth";
-import PartnerSignIn from "./pages/PartnerSignIn";
 import ForgotPassword from "./pages/ForgotPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import CookiesPolicy from "./pages/CookiesPolicy";
 import AdminDashboard from "./pages/AdminDashboard";
-import AdminGateway from "./pages/AdminGateway";
 import ShopPage from "./pages/ShopPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import MyShopping from "./pages/MyShopping";
@@ -35,105 +31,81 @@ const NotFound: React.FC = () => (
 );
 
 // --- Protected Route Helper ---
-const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Verifying Gateway Access..." }) => (
-  <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-    <div className="w-8 h-8 border-2 border-[#0056b3] border-t-transparent rounded-full animate-spin"></div>
-    <span className="mt-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{message}</span>
-  </div>
-);
-
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'customer' | 'partner' | 'admin' | string[] }> = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
-  // Point 3: DO NOT redirect if loading is true. Wait for state.
-  if (loading) return <LoadingSpinner />; 
-  
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  ); 
+
   if (!user) {
-    if (allowedRole === 'admin') return <Navigate to="/admin-login" replace />;
-    return <Navigate to="/?auth=true" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
   const isAllowed = !allowedRole || 
     (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
 
-  // ROLE ENFORCEMENT: Block cross-access
-  if (allowedRole && !isAllowed) {
-    if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
-    if (user.role === 'partner') {
-       const isComplete = !!user.brandName || !!user.onboardingComplete;
-       return <Navigate to={!isComplete ? "/onboarding" : "/partner-dashboard"} replace />;
-    }
-    if (user.role === 'customer') {
-       return <Navigate to="/customer-dashboard" replace />;
-    }
+  if (user.role === 'partner' && !user.onboardingComplete && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
   }
 
-  // MANDATORY PARTNER GATE: status and brand check
-  if (user.role === 'partner') {
-    const isComplete = !!user.onboardingComplete;
-    if (!isComplete) {
-      if (location.pathname !== '/onboarding') {
-        return <Navigate to="/onboarding" replace />;
-      }
-    } else if (location.pathname === '/onboarding') {
-      return <Navigate to="/partner-dashboard" replace />;
-    }
+  if (allowedRole && !isAllowed) {
+    if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (user.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
+    if (user.role === 'customer') return <Navigate to="/customer/explore" replace />;
   }
 
   return <>{children}</>;
 };
 
-/* LOCKED - POINT 1 COMPLETE: Routing Protocol logic */
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
 
-  if (loading) return <LoadingSpinner message="Resolving Network Session..." />;
+  if (loading) return null;
 
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       
+      {/* UNIFIED AUTH PAGE */}
       <Route path="/auth" element={
         user ? <Navigate to={
-          user.role === 'admin' ? "/admin-dashboard" :
-          user.role === 'partner' ? (user.onboardingComplete ? "/partner-dashboard" : "/onboarding") : 
-          "/customer-dashboard"
+          user.role === 'admin' ? "/admin/dashboard" :
+          user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/onboarding") : 
+          "/customer/explore"
         } replace /> : <AuthPage />
       } />
+      
+      {/* REDIRECTS FOR LEGACY PATHS */}
+      <Route path="/admin-login" element={<Navigate to="/auth" replace />} />
+      <Route path="/partner-auth" element={<Navigate to="/auth" replace />} />
+      <Route path="/partner-signin" element={<Navigate to="/auth" replace />} />
       
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsAndConditions />} />
       <Route path="/cookies" element={<CookiesPolicy />} />
       
-      {/* SHARED COMMERCE PORTAL */}
       <Route path="/shop" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopPage /></ProtectedRoute>} />
       
-      {/* CUSTOMER PORTAL (Strictly locked) */}
-      <Route path="/explore" element={<ProtectedRoute allowedRole="customer"><ExplorePage /></ProtectedRoute>} />
+      {/* CUSTOMER PORTAL */}
+      <Route path="/customer/explore" element={<ProtectedRoute allowedRole="customer"><ExplorePage /></ProtectedRoute>} />
       <Route path="/checkout" element={<ProtectedRoute allowedRole="customer"><CheckoutPage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute allowedRole="customer"><ShopDetail /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       <Route path="/my-shopping" element={<ProtectedRoute allowedRole="customer"><MyShopping /></ProtectedRoute>} />
       
-      {/* PARTNER PORTAL (Strictly locked) */}
+      {/* PARTNER PORTAL */}
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
-      <Route path="/partner-auth" element={user ? <Navigate to={
-        user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : 
-        "/customer-dashboard"
-      } replace /> : <PartnerAuth />} />
-      <Route path="/partner-signin" element={user ? <Navigate to={
-        user.role === 'admin' ? "/admin-dashboard" :
-        user.role === 'partner' ? ((!user.brandName && !user.onboardingComplete) ? "/onboarding" : "/partner-dashboard") : 
-        "/customer-dashboard"
-      } replace /> : <PartnerSignIn />} />
-      <Route path="/partner-dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
+      <Route path="/partner/dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
+      <Route path="/partner-dashboard" element={<Navigate to="/partner/dashboard" replace />} />
       
       {/* ADMIN PORTAL */}
-      <Route path="/admin-login" element={user ? <Navigate to={user.role === 'admin' ? "/admin-dashboard" : "/customer-dashboard"} replace /> : <AdminGateway />} />
-      <Route path="/admin-dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
       
       {/* FALLBACKS */}
       <Route path="/404" element={<NotFound />} />
@@ -155,11 +127,6 @@ const LayoutWrapper: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  React.useEffect(() => {
-    // SILENCE CONSOLE: Clear all previous network/permission errors for a clean test UI
-    console.clear();
-  }, []);
-
   return (
     <AuthProvider>
       <CartProvider>
