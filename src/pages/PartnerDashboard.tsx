@@ -6,6 +6,7 @@ import {
   getShopById, 
   updateShop,
   getBookings,
+  getRatings,
   addShopService,
   updateShopService,
   deleteShopService,
@@ -35,6 +36,7 @@ const PartnerDashboard: React.FC = () => {
   const { user, loading: authLoading, logout, updateUser } = useAuth();
   const [shopData, setShopData] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [ratings, setRatings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
 
@@ -102,9 +104,10 @@ const PartnerDashboard: React.FC = () => {
     const fetchData = async () => {
       if (!user?.uid) return;
       try {
-        const [shop, registry] = await Promise.all([
+        const [shop, registry, partnerRatings] = await Promise.all([
           getShopById(user.uid),
-          getBookings(user.uid)
+          getBookings(user.uid),
+          getRatings(user.uid)
         ]);
         
         if (shop) {
@@ -120,6 +123,7 @@ const PartnerDashboard: React.FC = () => {
           setTimeout(() => setHasNewBooking(false), 5000);
         }
         setBookings(registry);
+        setRatings(partnerRatings || []);
       } catch (err) {
         console.error("Dashboard pull error:", err);
       } finally {
@@ -157,6 +161,11 @@ const PartnerDashboard: React.FC = () => {
   });
   const todayEarnings = todayBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
   const totalSlots = bookings.length;
+  
+  const avgRating = ratings.length > 0 
+    ? (ratings.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / ratings.length).toFixed(1) 
+    : "0.0";
+  const starCount = Math.round(Number(avgRating));
   
   // Accountant AI Engine Logic: Use field from Firestore or calculate if missing
   const walletBalance = shopData?.partner_wallet !== undefined 
@@ -356,9 +365,11 @@ const PartnerDashboard: React.FC = () => {
           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
             <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Customer Rating</span>
             <div className="flex items-center gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">4.9</span>
+              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{avgRating}</span>
               <div className="flex gap-0.5 ml-1">
-                {[1,2,3,4,5].map(i => <div key={i} className="w-1 h-1 bg-bbBlue rounded-full"></div>)}
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= starCount ? 'bg-bbBlue' : 'bg-gray-200'}`}></div>
+                ))}
               </div>
             </div>
           </div>
