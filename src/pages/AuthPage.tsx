@@ -16,9 +16,11 @@ const AuthPage: React.FC = () => {
 
   useEffect(() => {
     if (user && !loading) {
+      console.log(`[AUTH ROUTER] User Role: ${user.role}, Onboarding: ${user.onboardingComplete}`);
       if (user.role === 'customer') {
         navigate('/customer/explore', { replace: true });
       } else if (user.role === 'partner') {
+        // Explicitly check onboardingComplete to force /partner/signup for new partners
         const path = user.onboardingComplete ? '/partner/dashboard' : '/partner/signup';
         navigate(path, { replace: true });
       } else if (user.role === 'admin') {
@@ -32,9 +34,11 @@ const AuthPage: React.FC = () => {
     setError('');
     try {
       await signInWithGoogle(role);
-      // Logic for redirection will be handled by the useEffect or by checking manually here
-      // But the instructions specify checking collections after login.
-      // signInWithGoogle in AuthContext handles the popup.
+      
+      // The check for UID in collections and redirection of new partners is handled 
+      // by the robust resolution logic in AuthContext combined with the useEffect above.
+      // This ensures that even if onAuthStateChanged takes a moment, the UI 
+      // will eventually resolve to the correct portal or signup page.
     } catch (err: any) { 
       setError(err.message || 'Google login failed.');
       setIsSubmitting(false);

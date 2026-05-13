@@ -75,13 +75,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+      try {
+        if (!firebaseUser) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
+        console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
+        
+        // Timeout helper to prevent infinite spinning
+        const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number = 3000): Promise<T> => {
+          const timeout = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+          );
+          return Promise.race([promise, timeout]);
+        };
+
         try {
-          const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
-          console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
-          
           // 1. Check Admin
-          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
+          const adminDoc = await withTimeout(getDoc(doc(db, 'admins', firebaseUser.uid)));
           if (adminDoc.exists()) {
             const adminData = adminDoc.data();
             setUser({
@@ -98,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // 2. Check Partner
-          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
+          const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid)));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
             const onboardingComplete = !!partnerData.onboardingComplete;
@@ -118,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // 3. Check Customer
-          const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
+          const customerDoc = await withTimeout(getDoc(doc(db, 'customers', firebaseUser.uid)));
           if (customerDoc.exists()) {
             const customerData = customerDoc.data();
             setUser({
@@ -133,43 +147,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
             return;
           }
-
-          // 4. NEW USER LOGIC (Not found in any collection)
-          const finalRole = storedRole || 'customer';
-          
-          // If customer, we can auto-create basic record
-          if (finalRole === 'customer') {
-            const defaultData = {
-              name: firebaseUser.displayName || 'Customer',
-              email: firebaseUser.email,
-              role: 'customer',
-              user_type: 'customer',
-              status: 'active',
-              createdAt: new Date().toISOString()
-            };
-            await setDoc(doc(db, 'customers', firebaseUser.uid), defaultData);
-            setUser({ uid: firebaseUser.uid, ...defaultData } as AppUser);
-          } else {
-            // Admin or Partner - Don't auto-create, let component handle redirection
-            // Especially for Partner, they go to /partner/signup
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || 'New User',
-              role: finalRole as any,
-              user_type: finalRole as any,
-              status: null,
-              onboardingComplete: false
-            });
-          }
-        } catch (err) {
-          console.error("Auth status resolution error:", err);
-          setUser(null);
+        } catch (dbErr) {
+          console.warn("[AUTH ARCHITECT] Database check failed or timed out:", dbErr);
+          // If timeout occurs, we proceed to registration check based on stored role
         }
-      } else {
+
+        // 4. NEW USER LOGIC (Not found in any collection or timeout reached)
+        const finalRole = storedRole || 'customer';
+        
+        // Final fallback if no record found
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || 'New User',
+          role: finalRole as any,
+          user_type: finalRole as any,
+          status: null,
+          onboardingComplete: false
+        });
+
+      } catch (err) {
+        console.error("Auth status resolution error:", err);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

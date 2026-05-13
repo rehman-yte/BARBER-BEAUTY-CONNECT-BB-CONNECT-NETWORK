@@ -49,8 +49,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
 
   if (user.role === 'partner' && !user.onboardingComplete && location.pathname === '/partner/dashboard') {
-    // If they are on dashboard but not complete, we still allow it per user request
-    // However, if they are new (no onboarding at all), they use the join network button
+    return <Navigate to="/partner/signup" replace />;
   }
 
   if (allowedRole && !isAllowed) {
