@@ -75,7 +75,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin/dashboard" :
-          user.role === 'partner' ? "/partner/dashboard" : 
+          user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/partner/signup") : 
           "/customer/explore"
         } replace /> : <AuthPage />
       } />

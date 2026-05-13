@@ -80,98 +80,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
           console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
           
-          // Role-based retrieval logic
-          if (storedRole === 'admin') {
-            const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
-            if (adminDoc.exists()) {
-              const adminData = adminDoc.data();
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: adminData.name || 'System Admin',
-                role: 'admin',
-                user_type: 'admin',
-                status: 'active',
-                token: adminConfig.adminSecret
-              });
-              setLoading(false);
-              return;
-            }
+          // 1. Check Admin
+          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
+          if (adminDoc.exists()) {
+            const adminData = adminDoc.data();
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: adminData.name || 'System Admin',
+              role: 'admin',
+              user_type: 'admin',
+              status: 'active',
+              token: adminConfig.adminSecret
+            });
+            setLoading(false);
+            return;
           }
 
-          if (storedRole === 'partner' || !storedRole) {
-            const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
-            if (partnerDoc.exists()) {
-              const partnerData = partnerDoc.data();
-              const onboardingComplete = !!partnerData.onboardingComplete;
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: partnerData.brandName || partnerData.ownerName || 'Partner',
-                role: 'partner',
-                user_type: 'partner',
-                status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
-                photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
-                brandName: partnerData.brandName || undefined,
-                onboardingComplete: onboardingComplete
-              });
-              setLoading(false);
-              return;
-            }
+          // 2. Check Partner
+          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
+          if (partnerDoc.exists()) {
+            const partnerData = partnerDoc.data();
+            const onboardingComplete = !!partnerData.onboardingComplete;
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: partnerData.brandName || partnerData.ownerName || 'Partner',
+              role: 'partner',
+              user_type: 'partner',
+              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
+              photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
+              brandName: partnerData.brandName || undefined,
+              onboardingComplete: onboardingComplete
+            });
+            setLoading(false);
+            return;
           }
 
-          if (storedRole === 'customer' || !storedRole) {
-            const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
-            if (customerDoc.exists()) {
-              const customerData = customerDoc.data();
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: customerData.name || 'Customer',
-                role: 'customer',
-                user_type: 'customer',
-                status: 'active',
-                photoURL: customerData.photoURL || firebaseUser.photoURL || undefined
-              });
-              setLoading(false);
-              return;
-            }
+          // 3. Check Customer
+          const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
+          if (customerDoc.exists()) {
+            const customerData = customerDoc.data();
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: customerData.name || 'Customer',
+              role: 'customer',
+              user_type: 'customer',
+              status: 'active',
+              photoURL: customerData.photoURL || firebaseUser.photoURL || undefined
+            });
+            setLoading(false);
+            return;
           }
 
-          // Fallback to searching all (if storedRole was missing or wrong)
-          const searchCollections = ['admins', 'partners', 'customers'];
-          for (const coll of searchCollections) {
-            const snap = await getDoc(doc(db, coll, firebaseUser.uid));
-            if (snap.exists()) {
-              const data = snap.data();
-              const role = coll === 'admins' ? 'admin' : (coll === 'partners' ? 'partner' : 'customer');
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: data.name || data.brandName || (role === 'admin' ? 'Admin' : (role === 'partner' ? 'Partner' : 'Customer')),
-                role: role as any,
-                user_type: role as any,
-                status: role === 'partner' ? (data.onboardingComplete ? data.status : null) : 'active',
-                photoURL: data.photoURL || data.ownerPicture || firebaseUser.photoURL || undefined,
-                onboardingComplete: !!data.onboardingComplete,
-                token: role === 'admin' ? adminConfig.adminSecret : undefined
-              });
-              setLoading(false);
-              return;
-            }
-          }
-
-          // Last resort: If still not found but authenticated, create basic user record
+          // 4. NEW USER LOGIC (Not found in any collection)
           const finalRole = storedRole || 'customer';
-          const defaultData: any = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            name: firebaseUser.displayName || 'New User',
-            role: finalRole,
-            user_type: finalRole,
-            status: finalRole === 'partner' ? null : 'active'
-          };
-          setUser(defaultData);
+          
+          // If customer, we can auto-create basic record
+          if (finalRole === 'customer') {
+            const defaultData = {
+              name: firebaseUser.displayName || 'Customer',
+              email: firebaseUser.email,
+              role: 'customer',
+              user_type: 'customer',
+              status: 'active',
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(doc(db, 'customers', firebaseUser.uid), defaultData);
+            setUser({ uid: firebaseUser.uid, ...defaultData } as AppUser);
+          } else {
+            // Admin or Partner - Don't auto-create, let component handle redirection
+            // Especially for Partner, they go to /partner/signup
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'New User',
+              role: finalRole as any,
+              user_type: finalRole as any,
+              status: null,
+              onboardingComplete: false
+            });
+          }
         } catch (err) {
           console.error("Auth status resolution error:", err);
           setUser(null);
@@ -186,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, pass: string, additionalData: any) => {
+    // Still support manual signup for certain workflows if needed, but UI is removed
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
@@ -249,24 +240,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.setItem(ROLE_KEY, role);
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-      
-      const coll = role === 'admin' ? 'admins' : (role === 'partner' ? 'partners' : 'customers');
-      const docRef = doc(db, coll, firebaseUser.uid);
-      const snap = await getDoc(docRef);
-      
-      if (!snap.exists()) {
-        const userData = {
-          name: firebaseUser.displayName || 'Network User',
-          email: firebaseUser.email,
-          role: role,
-          user_type: role,
-          status: role === 'partner' ? null : 'active',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(docRef, userData);
-      }
+      await signInWithPopup(auth, provider);
+      // Logic for record creation is now moved to the onAuthStateChanged resolver 
+      // to ensure consistency between first-time login and subsequent refreshes.
     } catch (err: any) {
       localStorage.removeItem(ROLE_KEY);
       console.error("Firebase Google Auth error:", err);
