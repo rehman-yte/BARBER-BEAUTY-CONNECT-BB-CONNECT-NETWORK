@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db, adminConfig } from '../lib/firebase';
 import { 
@@ -23,32 +24,44 @@ interface AppUser {
   photoURL?: string;
   brandName?: string;
   onboardingComplete?: boolean;
-  token?: string;
+  token?: string; // For admin API calls
 }
 
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
   signUp: (email: string, pass: string, data: any) => Promise<void>;
-  signIn: (email: string, pass: string, role: 'customer' | 'partner' | 'admin') => Promise<void>;
+  signIn: (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => Promise<void>;
+  bypassLogin: (email: string, role: 'admin' | 'partner' | 'customer') => void;
   signInWithGoogle: (role: 'customer' | 'partner' | 'admin') => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (updates: Partial<AppUser>) => Promise<void>;
-  bypassLogin: (email: string, role: 'admin' | 'partner' | 'customer') => void;
+  refreshAuth: () => void;
+  updateUser: (updates: Partial<AppUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SESSION_KEY = 'bb_network_session_v5';
-const ROLE_KEY = 'bb_network_role_v5';
+const SESSION_KEY = 'bb_network_session';
+const ROLE_KEY = 'bb_network_role';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(() => {
-    const saved = localStorage.getItem(SESSION_KEY);
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem(SESSION_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
   const [loading, setLoading] = useState(true);
+
+  // Initialize persistence once
+  useEffect(() => {
+    setPersistence(auth, browserLocalPersistence).catch(err => {
+      console.warn("Persistence setup failed:", err);
+    });
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -56,111 +69,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(ROLE_KEY, user.role);
     } else {
       localStorage.removeItem(SESSION_KEY);
-      // We keep ROLE_KEY for a bit to help identity resolution if storedRole is needed
+      localStorage.removeItem(ROLE_KEY);
     }
   }, [user]);
 
   useEffect(() => {
-    // Initial persistence setup
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const uid = firebaseUser.uid;
-        const storedRole = localStorage.getItem(ROLE_KEY) as any;
-        
-        // Timer for loading fallback
-        const resolutionTimeout = setTimeout(() => {
-          setLoading(false);
-        }, 5000);
-
         try {
-          console.log(`[AUTH-ENGINE] Resolving identity for UID: ${uid}`);
-          // STEP B: Check Admin
-          const adminDoc = await getDoc(doc(db, 'admins', uid));
+          const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
+          console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
+          
+          // 1. Check Admin
+          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
           if (adminDoc.exists()) {
-            console.log("[AUTH-ENGINE] ID Resolved: ADMIN");
-            const data = adminDoc.data();
+            const adminData = adminDoc.data();
             setUser({
-              uid,
+              uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: data.name || 'Admin',
+              name: adminData.name || 'System Admin',
               role: 'admin',
               user_type: 'admin',
               status: 'active',
               token: adminConfig.adminSecret
             });
-            clearTimeout(resolutionTimeout);
             setLoading(false);
             return;
           }
 
-          // STEP C: Check Partner
-          const partnerDoc = await getDoc(doc(db, 'partners', uid));
+          // 2. Check Partner
+          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
           if (partnerDoc.exists()) {
-            console.log("[AUTH-ENGINE] ID Resolved: PARTNER");
-            const data = partnerDoc.data();
+            const partnerData = partnerDoc.data();
+            const onboardingComplete = !!partnerData.onboardingComplete;
             setUser({
-              uid,
+              uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: data.brandName || data.ownerName || 'Partner',
+              name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: data.status || 'pending',
-              onboardingComplete: !!data.onboardingComplete,
-              photoURL: data.photoURL || data.ownerPicture || undefined
+              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
+              photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
+              brandName: partnerData.brandName || undefined,
+              onboardingComplete: onboardingComplete
             });
-            clearTimeout(resolutionTimeout);
             setLoading(false);
             return;
           }
 
-          // STEP D: Check Customer
-          const customerDoc = await getDoc(doc(db, 'customers', uid));
+          // 3. Check Customer
+          const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
           if (customerDoc.exists()) {
-            console.log("[AUTH-ENGINE] ID Resolved: CUSTOMER");
-            const data = customerDoc.data();
+            const customerData = customerDoc.data();
             setUser({
-              uid,
+              uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: data.name || 'Customer',
+              name: customerData.name || 'Customer',
               role: 'customer',
               user_type: 'customer',
-              status: 'active'
+              status: 'active',
+              photoURL: customerData.photoURL || firebaseUser.photoURL || undefined
             });
-            clearTimeout(resolutionTimeout);
             setLoading(false);
             return;
           }
 
-          // STEP E: New User Logic
-          console.log(`[AUTH-ENGINE] NO DOC FOUND. Checking storedRole: ${storedRole}`);
-          if (storedRole === 'partner') {
-            console.log("[AUTH-ENGINE] New User -> Routing to PARTNER ONBOARDING");
-            setUser({
-              uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || 'New Partner',
-              role: 'partner',
-              user_type: 'partner',
-              status: null,
-              onboardingComplete: false
-            });
-          } else if (storedRole === 'admin') {
-            console.log("[AUTH-ENGINE] New User -> Routing to ADMIN (Pending)");
-            setUser({
-              uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || 'Admin Candidate',
-              role: 'admin',
-              user_type: 'admin',
-              status: null,
-              onboardingComplete: false
-            });
-          } else {
-            // Default to Customer auto-creation for safety
-            console.log("[AUTH-ENGINE] New User -> Auto-Creating CUSTOMER");
-            const newCustomer = {
+          // 4. NEW USER LOGIC (Not found in any collection)
+          const finalRole = storedRole || 'customer';
+          
+          // If customer, we can auto-create basic record
+          if (finalRole === 'customer') {
+            const defaultData = {
               name: firebaseUser.displayName || 'Customer',
               email: firebaseUser.email,
               role: 'customer',
@@ -168,113 +147,147 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               status: 'active',
               createdAt: new Date().toISOString()
             };
-            await setDoc(doc(db, 'customers', uid), newCustomer);
-            setUser({ uid, ...newCustomer } as AppUser);
+            await setDoc(doc(db, 'customers', firebaseUser.uid), defaultData);
+            setUser({ uid: firebaseUser.uid, ...defaultData } as AppUser);
+          } else {
+            // Admin or Partner - Don't auto-create, let component handle redirection
+            // Especially for Partner, they go to /partner/signup
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'New User',
+              role: finalRole as any,
+              user_type: finalRole as any,
+              status: null,
+              onboardingComplete: false
+            });
           }
         } catch (err) {
-          console.error("[AUTH-ENGINE] Identity resolution CRASH:", err);
+          console.error("Auth status resolution error:", err);
           setUser(null);
-        } finally {
-          clearTimeout(resolutionTimeout);
-          setLoading(false);
         }
       } else {
         setUser(null);
-        setLoading(false);
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const signInWithGoogle = async (role: 'customer' | 'partner' | 'admin') => {
-    setLoading(true);
+  const signUp = async (email: string, pass: string, additionalData: any) => {
+    // Still support manual signup for certain workflows if needed, but UI is removed
     try {
-      await setPersistence(auth, browserLocalPersistence);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      const firebaseUser = userCredential.user;
+      
+      const role = additionalData.role || 'customer';
+      const userData = {
+        email: firebaseUser.email,
+        name: additionalData.name || (role === 'partner' ? 'New Partner' : 'Customer'),
+        role: role,
+        user_type: role,
+        status: additionalData.status !== undefined ? additionalData.status : (role === 'partner' ? null : 'active'),
+        createdAt: new Date().toISOString()
+      };
+      
       localStorage.setItem(ROLE_KEY, role);
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      
+      if (role === 'partner') {
+        await setDoc(doc(db, 'partners', firebaseUser.uid), userData);
+      } else if (role === 'admin') {
+        await setDoc(doc(db, 'admins', firebaseUser.uid), userData);
+      } else {
+        await setDoc(doc(db, 'customers', firebaseUser.uid), userData);
+      }
+      
+      setUser({ uid: firebaseUser.uid, ...userData } as AppUser);
     } catch (err: any) {
-      localStorage.removeItem(ROLE_KEY);
-      setLoading(false);
+      console.error("Firebase signUp error:", err);
       throw err;
     }
   };
 
-  const logout = async () => {
-    await signOut(auth);
-    localStorage.clear();
-    sessionStorage.clear();
-    setUser(null);
-  };
-
-  const signUp = async (email: string, pass: string, data: any) => {
-    setLoading(true);
+  const signIn = async (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => {
     try {
-      const res = await createUserWithEmailAndPassword(auth, email, pass);
-      const uid = res.user.uid;
-      const role = data.role || 'customer';
-      const coll = role === 'admin' ? 'admins' : (role === 'partner' ? 'partners' : 'customers');
-      
-      const userData = {
-        uid,
-        email,
-        ...data,
-        createdAt: new Date().toISOString()
-      };
-      
-      await setDoc(doc(db, coll, uid), userData);
-      setUser(userData as any);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signIn = async (email: string, pass: string, role: 'customer' | 'partner' | 'admin') => {
-    setLoading(true);
-    try {
-      localStorage.setItem(ROLE_KEY, role);
+      localStorage.setItem(ROLE_KEY, intendedRole);
       await signInWithEmailAndPassword(auth, email, pass);
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      localStorage.removeItem(ROLE_KEY);
+      console.error("Firebase signIn error:", err);
+      throw err;
     }
-  };
-
-  const updateUser = async (updates: Partial<AppUser>) => {
-    if (!user) return;
-    const coll = user.role === 'admin' ? 'admins' : (user.role === 'partner' ? 'partners' : 'customers');
-    await updateDoc(doc(db, coll, user.uid), updates);
-    setUser(prev => prev ? { ...prev, ...updates } : null);
   };
 
   const bypassLogin = (email: string, role: 'admin' | 'partner' | 'customer') => {
+    console.log(`Executing Administrative Bypass for: ${email}`);
     localStorage.setItem(ROLE_KEY, role);
     const mockUser: AppUser = {
-      uid: 'bypass-' + role,
-      email,
-      name: 'Bypass ' + role,
-      role: role as any,
-      user_type: role as any,
+      uid: role === 'admin' ? 'admin-bypass-master' : 'mock-bypass-' + role,
+      email: email,
+      name: role === 'admin' ? 'Master Admin' : (role === 'partner' ? 'Partner Studio' : 'Active Customer'),
+      role: role,
+      user_type: role,
       status: 'active',
-      onboardingComplete: true,
-      token: role === 'admin' ? adminConfig.adminSecret : undefined
+      token: role === 'admin' ? adminConfig.adminSecret : undefined,
+      onboardingComplete: true
     };
     setUser(mockUser);
     setLoading(false);
   };
 
+  const signInWithGoogle = async (role: 'customer' | 'partner' | 'admin') => {
+    try {
+      localStorage.setItem(ROLE_KEY, role);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // Logic for record creation is now moved to the onAuthStateChanged resolver 
+      // to ensure consistency between first-time login and subsequent refreshes.
+    } catch (err: any) {
+      localStorage.removeItem(ROLE_KEY);
+      console.error("Firebase Google Auth error:", err);
+      throw err;
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err: any) {
+      console.error("Firebase password reset error:", err);
+      throw err;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(ROLE_KEY);
+      sessionStorage.clear();
+    } catch (err) {
+      console.error("Logout error:", err);
+      setUser(null);
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+  };
+
+  const updateUser = async (updates: Partial<AppUser>) => {
+    if (!auth.currentUser || !user) return;
+    try {
+      const coll = user.role === 'admin' ? 'admins' : (user.role === 'partner' ? 'partners' : 'customers');
+      const docRef = doc(db, coll, auth.currentUser.uid);
+      await updateDoc(docRef, updates);
+      setUser(prev => prev ? { ...prev, ...updates } : null);
+    } catch (err) {
+      console.error("Firestore update user error:", err);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      signUp, 
-      signIn, 
-      signInWithGoogle, 
-      resetPassword: async (e) => await sendPasswordResetEmail(auth, e), 
-      logout,
-      updateUser,
-      bypassLogin
-    }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, bypassLogin, signInWithGoogle, resetPassword, logout, refreshAuth: () => {}, updateUser }}>
       {!loading ? children : (
         <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
@@ -289,3 +302,4 @@ export const useAuth = () => {
   if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
+

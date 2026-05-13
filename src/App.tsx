@@ -75,16 +75,15 @@ const AppRoutes: React.FC = () => {
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin/dashboard" :
-          user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/onboarding") : 
+          user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/partner/signup") : 
           "/customer/explore"
         } replace /> : <AuthPage />
       } />
       
       {/* REDIRECTS FOR LEGACY PATHS */}
-      <Route path="/admin-login" element={<Navigate to="/auth?role=admin" replace />} />
-      <Route path="/partner-auth" element={<Navigate to="/auth?role=partner" replace />} />
-      <Route path="/partner-signup" element={<Navigate to="/onboarding" replace />} />
-      <Route path="/partner/signup" element={<Navigate to="/onboarding" replace />} />
+      <Route path="/admin-login" element={<Navigate to="/auth" replace />} />
+      <Route path="/partner-auth" element={<Navigate to="/auth" replace />} />
+      <Route path="/partner-signin" element={<Navigate to="/auth" replace />} />
       
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -101,7 +100,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ShopDetail /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL */}
-      <Route path="/onboarding" element={<PartnerOnboarding />} />
+      <Route path="/partner/signup" element={<PartnerOnboarding />} />
+      <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/partner/dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       <Route path="/partner-dashboard" element={<Navigate to="/partner/dashboard" replace />} />
       

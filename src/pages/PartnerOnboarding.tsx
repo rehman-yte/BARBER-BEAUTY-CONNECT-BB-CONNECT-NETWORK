@@ -39,7 +39,6 @@ const PartnerOnboarding: React.FC = () => {
     // If user is already logged in as partner and has completed onboarding,
     // we take them to dashboard as per instruction
     if (!loading && user && user.role === 'partner' && user.onboardingComplete) {
-      console.log("[ONBOARDING] Partner already complete, redirecting to dashboard");
       navigate('/partner/dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
