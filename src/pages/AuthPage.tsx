@@ -6,36 +6,40 @@ import { motion } from 'motion/react';
 type Role = 'customer' | 'partner' | 'admin';
 
 const AuthPage: React.FC = () => {
-  const { user, signIn, signInWithGoogle, loading } = useAuth();
+  const { user, signInWithGoogle, loading } = useAuth();
   const [role, setRole] = useState<Role>('customer');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
+  // GLOBAL REDIRECTION LOGIC
   useEffect(() => {
     if (user && !loading) {
-      console.log(`[AUTH PAGE] User resolved: ${user.uid} (${user.role})`);
-      if (user.role === 'customer') {
-        navigate('/customer/explore', { replace: true });
-      } else if (user.role === 'partner') {
-        const path = user.onboardingComplete ? '/partner/dashboard' : '/partner/signup';
-        navigate(path, { replace: true });
-      } else if (user.role === 'admin') {
+      console.log(`[AUTH ARCHITECT] Identifying Route for UID: ${user.uid} | Role: ${user.role}`);
+      
+      if (user.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
+      } else if (user.role === 'partner') {
+        // STEP C & STEP E Logic: Found vs New Partner
+        if (user.onboardingComplete) {
+          navigate('/partner/dashboard', { replace: true });
+        } else {
+          navigate('/partner/signup', { replace: true });
+        }
+      } else if (user.role === 'customer') {
+        navigate('/customer/explore', { replace: true });
       }
     }
   }, [user, loading, navigate]);
 
-  // Loading Timeout Fallback
+  // LOADING TIMEOUT: 7 seconds before showing fallback error
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isSubmitting) {
       timer = setTimeout(() => {
         setIsSubmitting(false);
-        setError("Network verification taking longer than expected. Please try again or check your connection.");
-      }, 7000); // Slightly longer than context timeout to allow context to finish if possible
+        setError("Identity verification is taking longer than expected. Please try again or check your Google Account permissions.");
+      }, 7000);
     }
     return () => clearTimeout(timer);
   }, [isSubmitting]);
@@ -44,12 +48,10 @@ const AuthPage: React.FC = () => {
     setIsSubmitting(true);
     setError('');
     try {
+      // Passes active role to context for new-user categorization
       await signInWithGoogle(role);
-      // Logic for redirection will be handled by the useEffect or by checking manually here
-      // But the instructions specify checking collections after login.
-      // signInWithGoogle in AuthContext handles the popup.
     } catch (err: any) { 
-      setError(err.message || 'Google login failed.');
+      setError(err.message || 'Google Authentication Failed.');
       setIsSubmitting(false);
     }
   };
@@ -68,11 +70,11 @@ const AuthPage: React.FC = () => {
         className="w-full max-w-[28rem] bg-white border border-gray-100 p-[2rem] md:p-[2.5rem] rounded-[2.5rem] shadow-2xl shadow-charcoal/5"
       >
         <div className="text-center mb-8">
-          <h1 className="text-[1.75rem] font-serif font-bold text-charcoal mb-2 uppercase tracking-tight">Unified Access</h1>
-          <p className="text-[0.625rem] text-bbBlue font-bold uppercase tracking-[0.3em]">Select your portal below</p>
+          <h1 className="text-[1.75rem] font-serif font-bold text-charcoal mb-2 uppercase tracking-tight">Access Gateway</h1>
+          <p className="text-[0.625rem] text-bbBlue font-bold uppercase tracking-[0.3em]">Proprietor & Member Network</p>
         </div>
 
-        {/* Role Toggles */}
+        {/* Roles Toggle */}
         <div className="flex bg-gray-50 p-1.5 rounded-2xl mb-8 border border-gray-100">
           {roles.map((r) => (
             <button
@@ -96,19 +98,18 @@ const AuthPage: React.FC = () => {
 
         {error && (
           <motion.div 
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
             className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-6 text-center"
           >
-            <p className="text-[0.625rem] text-red-600 font-bold">{error}</p>
+            <p className="text-[0.625rem] text-red-600 font-bold uppercase tracking-widest">{error}</p>
           </motion.div>
         )}
 
         <div className="space-y-6">
           <div className="p-6 bg-bbBlue/5 rounded-[2rem] border border-bbBlue/10 text-center">
-            <p className="text-[0.6875rem] font-medium text-bbBlue leading-relaxed">
-              Google Account required for secure biometric-level authentication. 
-              Manual login has been deactivated for security.
+            <p className="text-[0.625rem] font-bold text-bbBlue leading-relaxed uppercase tracking-widest">
+              Biometric & Google Auth Only.<br/>Manual credentials deactivated.
             </p>
           </div>
 
@@ -128,8 +129,8 @@ const AuthPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-8 text-center pt-4 opacity-30">
-          <p className="text-[0.5rem] font-bold text-gray-500 uppercase tracking-[0.5em]">BB Network Security Layer v5.1</p>
+        <div className="mt-12 text-center opacity-20">
+          <p className="text-[0.5rem] font-bold text-gray-500 uppercase tracking-[0.5em]">BB Security Engine v6.0</p>
         </div>
       </motion.div>
     </div>
