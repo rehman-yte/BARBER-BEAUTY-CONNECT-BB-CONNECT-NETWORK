@@ -75,9 +75,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }, 5000);
 
         try {
+          console.log(`[AUTH-ENGINE] Resolving identity for UID: ${uid}`);
           // STEP B: Check Admin
           const adminDoc = await getDoc(doc(db, 'admins', uid));
           if (adminDoc.exists()) {
+            console.log("[AUTH-ENGINE] ID Resolved: ADMIN");
             const data = adminDoc.data();
             setUser({
               uid,
@@ -96,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // STEP C: Check Partner
           const partnerDoc = await getDoc(doc(db, 'partners', uid));
           if (partnerDoc.exists()) {
+            console.log("[AUTH-ENGINE] ID Resolved: PARTNER");
             const data = partnerDoc.data();
             setUser({
               uid,
@@ -115,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // STEP D: Check Customer
           const customerDoc = await getDoc(doc(db, 'customers', uid));
           if (customerDoc.exists()) {
+            console.log("[AUTH-ENGINE] ID Resolved: CUSTOMER");
             const data = customerDoc.data();
             setUser({
               uid,
@@ -130,8 +134,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // STEP E: New User Logic
+          console.log(`[AUTH-ENGINE] NO DOC FOUND. Checking storedRole: ${storedRole}`);
           if (storedRole === 'partner') {
-            console.log("[AUTH] Resolving as NEW PARTNER (Onboarding Required)");
+            console.log("[AUTH-ENGINE] New User -> Routing to PARTNER ONBOARDING");
             setUser({
               uid,
               email: firebaseUser.email,
@@ -142,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               onboardingComplete: false
             });
           } else if (storedRole === 'admin') {
-            console.log("[AUTH] Resolving as NEW ADMIN (Restricted)");
+            console.log("[AUTH-ENGINE] New User -> Routing to ADMIN (Pending)");
             setUser({
               uid,
               email: firebaseUser.email,
@@ -154,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           } else {
             // Default to Customer auto-creation for safety
-            console.log("[AUTH] Resolving as NEW CUSTOMER (Auto-Creating)");
+            console.log("[AUTH-ENGINE] New User -> Auto-Creating CUSTOMER");
             const newCustomer = {
               name: firebaseUser.displayName || 'Customer',
               email: firebaseUser.email,
@@ -167,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser({ uid, ...newCustomer } as AppUser);
           }
         } catch (err) {
-          console.error("[AUTH] Identity resolution error:", err);
+          console.error("[AUTH-ENGINE] Identity resolution CRASH:", err);
           setUser(null);
         } finally {
           clearTimeout(resolutionTimeout);

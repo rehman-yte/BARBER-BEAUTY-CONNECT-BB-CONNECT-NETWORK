@@ -7,22 +7,31 @@ type Role = 'customer' | 'partner' | 'admin';
 
 const AuthPage: React.FC = () => {
   const { user, signInWithGoogle, loading } = useAuth();
-  const [role, setRole] = useState<Role>('customer');
+  const navigate = useNavigate();
+  const [role, setRole] = useState<Role>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get('role') as Role;
+    return (r === 'partner' || r === 'admin' || r === 'customer') ? r : 'customer';
+  });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
 
   // GLOBAL REDIRECTION LOGIC
   useEffect(() => {
     if (user && !loading) {
-      console.log(`[AUTH ARCHITECT] Identifying Route for User: ${user.email} | Role: ${user.role} | Onboarding: ${user.onboardingComplete}`);
+      console.log(`[AUTH ARCHITECT] Identifying Route | User: ${user.email} | Role: ${user.role} | Onboarding: ${user.onboardingComplete}`);
       
       if (user.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else if (user.role === 'partner') {
-        const target = user.onboardingComplete ? '/partner/dashboard' : '/partner/signup';
-        console.log(`[AUTH ARCHITECT] Routing Partner to: ${target}`);
-        navigate(target, { replace: true });
+        // STEP C & STEP E Logic: Found vs New Partner
+        if (user.onboardingComplete) {
+          console.log("[AUTH ARCHITECT] Existing Partner -> Terminal");
+          navigate('/partner/dashboard', { replace: true });
+        } else {
+          console.log("[AUTH ARCHITECT] New/Incomplete Partner -> Registration Workflow");
+          navigate('/onboarding', { replace: true });
+        }
       } else if (user.role === 'customer') {
         navigate('/customer/explore', { replace: true });
       }
