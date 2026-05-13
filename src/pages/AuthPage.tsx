@@ -16,6 +16,7 @@ const AuthPage: React.FC = () => {
 
   useEffect(() => {
     if (user && !loading) {
+      console.log(`[AUTH PAGE] User resolved: ${user.uid} (${user.role})`);
       if (user.role === 'customer') {
         navigate('/customer/explore', { replace: true });
       } else if (user.role === 'partner') {
@@ -26,6 +27,18 @@ const AuthPage: React.FC = () => {
       }
     }
   }, [user, loading, navigate]);
+
+  // Loading Timeout Fallback
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isSubmitting) {
+      timer = setTimeout(() => {
+        setIsSubmitting(false);
+        setError("Network verification taking longer than expected. Please try again or check your connection.");
+      }, 7000); // Slightly longer than context timeout to allow context to finish if possible
+    }
+    return () => clearTimeout(timer);
+  }, [isSubmitting]);
 
   const handleGoogleAuth = async () => {
     setIsSubmitting(true);

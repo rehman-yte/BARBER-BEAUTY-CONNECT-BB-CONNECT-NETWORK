@@ -77,93 +77,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
+          const uid = firebaseUser.uid;
           const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
-          console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
           
-          // 1. Check Admin
-          const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
-          if (adminDoc.exists()) {
-            const adminData = adminDoc.data();
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: adminData.name || 'System Admin',
-              role: 'admin',
-              user_type: 'admin',
-              status: 'active',
-              token: adminConfig.adminSecret
-            });
+          // Timeout protection for identity resolution
+          const timeout = setTimeout(() => {
+            console.warn("[AUTH] Identity resolution timed out, forcing fallback");
             setLoading(false);
-            return;
-          }
+          }, 5000);
 
-          // 2. Check Partner
-          const partnerDoc = await getDoc(doc(db, 'partners', firebaseUser.uid));
-          if (partnerDoc.exists()) {
-            const partnerData = partnerDoc.data();
-            const onboardingComplete = !!partnerData.onboardingComplete;
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: partnerData.brandName || partnerData.ownerName || 'Partner',
-              role: 'partner',
-              user_type: 'partner',
-              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
-              photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
-              brandName: partnerData.brandName || undefined,
-              onboardingComplete: onboardingComplete
-            });
-            setLoading(false);
-            return;
-          }
+          try {
+            // STEP B: Check Admin
+            const adminDoc = await getDoc(doc(db, 'admins', uid));
+            if (adminDoc.exists()) {
+              const data = adminDoc.data();
+              setUser({
+                uid,
+                email: firebaseUser.email,
+                name: data.name || 'Admin',
+                role: 'admin',
+                user_type: 'admin',
+                status: 'active',
+                token: adminConfig.adminSecret
+              });
+              clearTimeout(timeout);
+              setLoading(false);
+              return;
+            }
 
-          // 3. Check Customer
-          const customerDoc = await getDoc(doc(db, 'customers', firebaseUser.uid));
-          if (customerDoc.exists()) {
-            const customerData = customerDoc.data();
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: customerData.name || 'Customer',
-              role: 'customer',
-              user_type: 'customer',
-              status: 'active',
-              photoURL: customerData.photoURL || firebaseUser.photoURL || undefined
-            });
-            setLoading(false);
-            return;
-          }
+            // STEP C: Check Partner
+            const partnerDoc = await getDoc(doc(db, 'partners', uid));
+            if (partnerDoc.exists()) {
+              const data = partnerDoc.data();
+              setUser({
+                uid,
+                email: firebaseUser.email,
+                name: data.brandName || data.ownerName || 'Partner',
+                role: 'partner',
+                user_type: 'partner',
+                status: data.onboardingComplete ? data.status : null,
+                onboardingComplete: !!data.onboardingComplete,
+                photoURL: data.photoURL || data.ownerPicture || firebaseUser.photoURL || undefined
+              });
+              clearTimeout(timeout);
+              setLoading(false);
+              return;
+            }
 
-          // 4. NEW USER LOGIC (Not found in any collection)
-          const finalRole = storedRole || 'customer';
-          
-          // If customer, we can auto-create basic record
-          if (finalRole === 'customer') {
-            const defaultData = {
-              name: firebaseUser.displayName || 'Customer',
-              email: firebaseUser.email,
-              role: 'customer',
-              user_type: 'customer',
-              status: 'active',
-              createdAt: new Date().toISOString()
-            };
-            await setDoc(doc(db, 'customers', firebaseUser.uid), defaultData);
-            setUser({ uid: firebaseUser.uid, ...defaultData } as AppUser);
-          } else {
-            // Admin or Partner - Don't auto-create, let component handle redirection
-            // Especially for Partner, they go to /partner/signup
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || 'New User',
-              role: finalRole as any,
-              user_type: finalRole as any,
-              status: null,
-              onboardingComplete: false
-            });
+            // STEP D: Check Customer
+            const customerDoc = await getDoc(doc(db, 'customers', uid));
+            if (customerDoc.exists()) {
+              const data = customerDoc.data();
+              setUser({
+                uid,
+                email: firebaseUser.email,
+                name: data.name || 'Customer',
+                role: 'customer',
+                user_type: 'customer',
+                status: 'active'
+              });
+              clearTimeout(timeout);
+              setLoading(false);
+              return;
+            }
+
+            // STEP E: New User
+            const finalRole = storedRole || 'customer';
+            if (finalRole === 'customer') {
+              const defaultData = {
+                name: firebaseUser.displayName || 'Customer',
+                email: firebaseUser.email,
+                role: 'customer',
+                user_type: 'customer',
+                status: 'active',
+                createdAt: new Date().toISOString()
+              };
+              await setDoc(doc(db, 'customers', uid), defaultData);
+              setUser({ uid, ...defaultData } as AppUser);
+            } else {
+              setUser({
+                uid,
+                email: firebaseUser.email,
+                name: firebaseUser.displayName || 'New Partner',
+                role: 'partner',
+                user_type: 'partner',
+                status: null,
+                onboardingComplete: false
+              });
+            }
+          } finally {
+            clearTimeout(timeout);
           }
         } catch (err) {
-          console.error("Auth status resolution error:", err);
+          console.error("Auth identity resolution failed:", err);
           setUser(null);
         }
       } else {
@@ -176,11 +182,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, pass: string, additionalData: any) => {
-    // Still support manual signup for certain workflows if needed, but UI is removed
+    setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
-      
       const role = additionalData.role || 'customer';
       const userData = {
         email: firebaseUser.email,
@@ -192,29 +197,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       
       localStorage.setItem(ROLE_KEY, role);
-      
-      if (role === 'partner') {
-        await setDoc(doc(db, 'partners', firebaseUser.uid), userData);
-      } else if (role === 'admin') {
-        await setDoc(doc(db, 'admins', firebaseUser.uid), userData);
-      } else {
-        await setDoc(doc(db, 'customers', firebaseUser.uid), userData);
-      }
-      
+      const coll = role === 'admin' ? 'admins' : (role === 'partner' ? 'partners' : 'customers');
+      await setDoc(doc(db, coll, firebaseUser.uid), userData);
       setUser({ uid: firebaseUser.uid, ...userData } as AppUser);
     } catch (err: any) {
-      console.error("Firebase signUp error:", err);
+      console.error("Signup error:", err);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signIn = async (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => {
+  const signIn = async (email: string, pass: string, role: 'customer' | 'partner' | 'admin') => {
+    setLoading(true);
     try {
-      localStorage.setItem(ROLE_KEY, intendedRole);
+      localStorage.setItem(ROLE_KEY, role);
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err: any) {
       localStorage.removeItem(ROLE_KEY);
-      console.error("Firebase signIn error:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async (role: 'customer' | 'partner' | 'admin') => {
+    setLoading(true);
+    try {
+      // 3. Persistence
+      await setPersistence(auth, browserLocalPersistence);
+      localStorage.setItem(ROLE_KEY, role);
+      
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      
+      // The onAuthStateChanged listener will handle the collection checks and state updates
+      // This keeps the source of truth unified.
+    } catch (err: any) {
+      localStorage.removeItem(ROLE_KEY);
+      setLoading(false);
       throw err;
     }
   };
@@ -229,25 +250,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: role,
       user_type: role,
       status: 'active',
-      token: role === 'admin' ? adminConfig.adminSecret : undefined,
+      token: adminConfig.adminSecret,
       onboardingComplete: true
     };
     setUser(mockUser);
     setLoading(false);
-  };
-
-  const signInWithGoogle = async (role: 'customer' | 'partner' | 'admin') => {
-    try {
-      localStorage.setItem(ROLE_KEY, role);
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      // Logic for record creation is now moved to the onAuthStateChanged resolver 
-      // to ensure consistency between first-time login and subsequent refreshes.
-    } catch (err: any) {
-      localStorage.removeItem(ROLE_KEY);
-      console.error("Firebase Google Auth error:", err);
-      throw err;
-    }
   };
 
   const resetPassword = async (email: string) => {
