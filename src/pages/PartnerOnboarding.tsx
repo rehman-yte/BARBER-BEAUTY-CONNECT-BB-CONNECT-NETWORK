@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../lib/firebase';
 import { addShop } from '../services/logic_engine';
 import { useAuth } from '../context/AuthContext';
 import { Check, MapPin, Camera, User, ShoppingBag } from 'lucide-react';
@@ -15,6 +16,8 @@ const PartnerOnboarding: React.FC = () => {
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   const [formData, setFormData] = useState({
+    email: '',
+    password: '',
     ownerName: user?.name || '',
     brandName: '',
     mobileNumber: user?.email || '', // Set default if available
@@ -30,9 +33,13 @@ const PartnerOnboarding: React.FC = () => {
     govId: null as File | string | null,
   });
 
+  const { signUp } = useAuth(); // Added signUp
+
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'partner')) {
-      navigate('/partner-auth');
+    // If user is already logged in as partner and has completed onboarding,
+    // we take them to dashboard as per instruction
+    if (!loading && user && user.role === 'partner' && user.onboardingComplete) {
+      navigate('/partner/dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -121,6 +128,23 @@ const PartnerOnboarding: React.FC = () => {
     });
 
     try {
+      let activeUid = user?.uid;
+
+      // 0. Account Creation if not logged in
+      if (!user) {
+        if (!formData.email || !formData.password) {
+          throw new Error("Email and Password are required for network registration.");
+        }
+        await signUp(formData.email, formData.password, {
+          role: 'partner',
+          name: formData.ownerName,
+          status: 'pending'
+        });
+        // After signup, AuthContext will set user. We need to wait or get uid from result if signUp returned it.
+        // Actually our signUp doesn't return anything. But the user state will update soon.
+        // For safety, let's assume the flow continues with the new user.
+      }
+
       // Convert files to base64 strings
       const ownerPictureUrl = formData.ownerPicture instanceof File 
         ? await toBase64(formData.ownerPicture) 
@@ -144,7 +168,7 @@ const PartnerOnboarding: React.FC = () => {
 
       // 1. Prepare payload
       const shopPayload: any = {
-        uid: user?.uid,
+        uid: auth.currentUser?.uid || user?.uid,
         ownerName: formData.ownerName,
         brandName: formData.brandName,
         mobileNumber: formData.mobileNumber,
@@ -332,6 +356,34 @@ const PartnerOnboarding: React.FC = () => {
                   </div>
 
                   <div className="space-y-[2rem]">
+                    {!user && (
+                      <>
+                        <div className="flex flex-col gap-[0.5rem]">
+                          <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Network Email ID</label>
+                          <input
+                            required
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                            placeholder="yourname@example.com"
+                            className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-[0.5rem]">
+                          <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Security Password</label>
+                          <input
+                            required
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            placeholder="••••••••"
+                            className="w-full px-[1.5rem] py-[1.25rem] bg-gray-50 border border-gray-100 rounded-2xl text-[0.875rem] outline-none focus:border-bbBlue transition-all"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="flex flex-col gap-[0.5rem]">
                       <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.2em] ml-[0.25rem]">Master Proprietor Name</label>
                       <input

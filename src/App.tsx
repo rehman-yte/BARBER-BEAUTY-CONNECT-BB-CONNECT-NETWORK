@@ -48,8 +48,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   const isAllowed = !allowedRole || 
     (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
 
-  if (user.role === 'partner' && !user.onboardingComplete && location.pathname !== '/onboarding') {
-    return <Navigate to="/onboarding" replace />;
+  if (user.role === 'partner' && !user.onboardingComplete && location.pathname === '/partner/dashboard') {
+    // If they are on dashboard but not complete, we still allow it per user request
+    // However, if they are new (no onboarding at all), they use the join network button
   }
 
   if (allowedRole && !isAllowed) {
@@ -74,7 +75,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/auth" element={
         user ? <Navigate to={
           user.role === 'admin' ? "/admin/dashboard" :
-          user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/onboarding") : 
+          user.role === 'partner' ? "/partner/dashboard" : 
           "/customer/explore"
         } replace /> : <AuthPage />
       } />
@@ -89,16 +90,17 @@ const AppRoutes: React.FC = () => {
       <Route path="/terms" element={<TermsAndConditions />} />
       <Route path="/cookies" element={<CookiesPolicy />} />
       
-      <Route path="/shop" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><ShopPage /></ProtectedRoute>} />
+      <Route path="/shop" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ShopPage /></ProtectedRoute>} />
       
       {/* CUSTOMER PORTAL */}
-      <Route path="/customer/explore" element={<ProtectedRoute allowedRole={['customer', 'partner']}><ExplorePage /></ProtectedRoute>} />
+      <Route path="/customer/explore" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ExplorePage /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
-      <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'partner']}><MyShopping /></ProtectedRoute>} />
-      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'partner']}><CheckoutPage /></ProtectedRoute>} />
-      <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'partner']}><ShopDetail /></ProtectedRoute>} />
+      <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'admin']}><MyShopping /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'admin']}><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ShopDetail /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL */}
+      <Route path="/partner/signup" element={<PartnerOnboarding />} />
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/partner/dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       <Route path="/partner-dashboard" element={<Navigate to="/partner/dashboard" replace />} />

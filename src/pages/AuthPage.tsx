@@ -19,8 +19,7 @@ const AuthPage: React.FC = () => {
       if (user.role === 'customer') {
         navigate('/customer/explore', { replace: true });
       } else if (user.role === 'partner') {
-        const path = user.onboardingComplete ? '/partner/dashboard' : '/onboarding';
-        navigate(path, { replace: true });
+        navigate('/partner/dashboard', { replace: true });
       } else if (user.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       }
@@ -133,6 +132,18 @@ const AuthPage: React.FC = () => {
           >
             {isSubmitting ? 'Verifying...' : `Login as ${role}`}
           </button>
+
+          {role === 'partner' && (
+            <div className="mt-4 text-center">
+              <button 
+                type="button"
+                onClick={() => navigate('/partner/signup')}
+                className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.2em] hover:opacity-70 transition-opacity"
+              >
+                New Partner? Join Our Network
+              </button>
+            </div>
+          )}
         </form>
 
         <div className="relative my-8">
