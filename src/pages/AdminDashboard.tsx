@@ -926,17 +926,17 @@ const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               <div className="space-y-12">
                 <div>
-                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Shop Premises Verification ({selectedShopDocs.shopImages?.length || 0} Images)</p>
+                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Shop Premises Verification ({ (selectedShopDocs.shopImages || selectedShopDocs.brandImages || []).length } Images)</p>
                   <div className="grid grid-cols-3 gap-3">
-                    {selectedShopDocs.shopImages?.length > 0 ? (
-                      selectedShopDocs.shopImages.map((img: string, i: number) => (
+                    { (selectedShopDocs.shopImages || selectedShopDocs.brandImages || []).length > 0 ? (
+                      (selectedShopDocs.shopImages || selectedShopDocs.brandImages || []).map((img: string, i: number) => (
                         <div key={i} className="aspect-square bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden shadow-sm group flex items-center justify-center p-2 text-center">
-                          {img.startsWith('data:image') || img.startsWith('http') ? (
+                          { (typeof img === 'string' && (img.startsWith('data:image') || img.startsWith('http'))) ? (
                             <img src={img} alt="Shop" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                           ) : (
                             <div className="flex flex-col items-center">
                               <svg className="w-6 h-6 text-gray-200 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                              <span className="text-[8px] font-bold text-bbBlue uppercase truncate w-full px-1">{img.split(': ')[1] || img}</span>
+                              <span className="text-[8px] font-bold text-bbBlue uppercase truncate w-full px-1">{typeof img === 'string' ? (img.split(': ')[1] || img) : 'Invalid Image'}</span>
                             </div>
                           )}
                         </div>
@@ -948,17 +948,17 @@ const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div>
-                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Worker Verification ({selectedShopDocs.workerImages?.length || 0} Staff)</p>
+                  <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Worker Verification ({ (selectedShopDocs.workerImages || selectedShopDocs.staffImages || []).length } Staff)</p>
                   <div className="grid grid-cols-3 gap-3">
-                    {selectedShopDocs.workerImages?.length > 0 ? (
-                      selectedShopDocs.workerImages.map((img: string, i: number) => (
+                    { (selectedShopDocs.workerImages || selectedShopDocs.staffImages || []).length > 0 ? (
+                      (selectedShopDocs.workerImages || selectedShopDocs.staffImages || []).map((img: string, i: number) => (
                         <div key={i} className="aspect-square bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden shadow-sm group flex items-center justify-center p-2 text-center">
-                          {img.startsWith('data:image') || img.startsWith('http') ? (
+                          { (typeof img === 'string' && (img.startsWith('data:image') || img.startsWith('http'))) ? (
                             <img src={img} alt="Worker" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                           ) : (
                             <div className="flex flex-col items-center">
                               <svg className="w-6 h-6 text-gray-200 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                              <span className="text-[8px] font-bold text-bbBlue uppercase truncate w-full px-1">{img.split(': ')[1] || img}</span>
+                              <span className="text-[8px] font-bold text-bbBlue uppercase truncate w-full px-1">{typeof img === 'string' ? (img.split(': ')[1] || img) : 'Invalid Image'}</span>
                             </div>
                           )}
                         </div>
@@ -974,13 +974,17 @@ const AdminDashboard: React.FC = () => {
                 <div>
                   <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest mb-6">Government ID Verification</p>
                   <div className="aspect-[1.6/1] bg-gray-50 rounded-[2rem] border border-gray-100 overflow-hidden relative shadow-sm flex items-center justify-center p-4 text-center">
-                    {selectedShopDocs.govtIdUrl ? (
-                      (selectedShopDocs.govtIdUrl.startsWith('data:image') || selectedShopDocs.govtIdUrl.startsWith('http')) ? (
-                        <img src={selectedShopDocs.govtIdUrl} alt="Govt ID" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    { (selectedShopDocs.govtIdUrl || selectedShopDocs.govId) ? (
+                      (typeof (selectedShopDocs.govtIdUrl || selectedShopDocs.govId) === 'string' && ((selectedShopDocs.govtIdUrl || selectedShopDocs.govId).startsWith('data:image') || (selectedShopDocs.govtIdUrl || selectedShopDocs.govId).startsWith('http'))) ? (
+                        <img src={selectedShopDocs.govtIdUrl || selectedShopDocs.govId} alt="Govt ID" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
                         <div className="flex flex-col items-center">
                           <svg className="w-12 h-12 text-gray-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                          <span className="text-[10px] font-bold text-bbBlue uppercase">{selectedShopDocs.govtIdUrl.split(': ')[1] || selectedShopDocs.govtIdUrl}</span>
+                          <span className="text-[10px] font-bold text-bbBlue uppercase tracking-widest">
+                            { typeof (selectedShopDocs.govtIdUrl || selectedShopDocs.govId) === 'string' 
+                               ? ((selectedShopDocs.govtIdUrl || selectedShopDocs.govId).split(': ')[1] || 'DOC LOADED') 
+                               : 'NOT A VALID IMAGE STRING' }
+                          </span>
                         </div>
                       )
                     ) : (
@@ -1002,19 +1006,27 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Staff Count</span>
-                       <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerCount} Personnel</span>
+                       <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerCount || selectedShopDocs.workerQuantity || 0} Personnel</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">UPI ID (Finance)</span>
-                       <span className="text-[0.6875rem] font-bold text-bbBlue font-mono">{selectedShopDocs.upiId || 'N/A'}</span>
+                       <span className="text-[0.6875rem] font-bold text-bbBlue font-mono">{selectedShopDocs.upiId || selectedShopDocs.upi_id || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Mobile</span>
-                       <span className="text-[0.6875rem] font-bold text-black font-mono">{selectedShopDocs.mobile}</span>
+                       <span className="text-[0.6875rem] font-bold text-black font-mono">{selectedShopDocs.mobile || selectedShopDocs.mobile_number}</span>
                     </div>
-                    <div className="flex justify-between border-b border-gray-200/50 pb-2">
-                       <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Address</span>
-                       <span className="text-[0.6875rem] font-bold text-black line-clamp-2 text-right max-w-[60%]">{selectedShopDocs.manualAddress || 'Lat/Lng Captured'}</span>
+                    <div className="flex flex-col gap-1 pt-1">
+                       <div className="flex justify-between border-b border-gray-200/50 pb-2">
+                          <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Manual Address</span>
+                          <span className="text-[0.6875rem] font-bold text-black line-clamp-2 text-right max-w-[60%] lowercase first-letter:uppercase">{selectedShopDocs.manualAddress || selectedShopDocs.address || selectedShopDocs.manual_address || 'Not Provided'}</span>
+                       </div>
+                       <div className="flex justify-between border-b border-gray-200/50 pb-2 pt-1">
+                          <span className="text-[0.625rem] font-bold text-gray-400 uppercase">GPS Location</span>
+                          <span className="text-[0.6875rem] font-bold text-bbBlue font-mono">
+                            { (selectedShopDocs.coords?.lat || selectedShopDocs.lat) ? `${Number(selectedShopDocs.coords?.lat || selectedShopDocs.lat).toFixed(4)}, ${Number(selectedShopDocs.coords?.lng || selectedShopDocs.lng).toFixed(4)}` : 'No Coords' }
+                          </span>
+                       </div>
                     </div>
                   </div>
                 </div>
