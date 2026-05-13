@@ -205,11 +205,11 @@ const PartnerOnboarding: React.FC = () => {
             });
           }
 
-          navigate('/partner-dashboard', { replace: true });
+          navigate('/partner/dashboard', { replace: true });
         } catch (err) {
           console.error("Delayed sync failure:", err);
           // If it fails, we still try to move them as the local state is updated
-          navigate('/partner-dashboard', { replace: true });
+          navigate('/partner/dashboard', { replace: true });
         }
       }, 3000);
 

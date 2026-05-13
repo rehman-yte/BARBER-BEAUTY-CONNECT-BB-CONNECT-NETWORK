@@ -70,8 +70,9 @@ const PartnerDashboard: React.FC = () => {
     }
     
     styleTag.innerHTML = `
-      nav a[href='/explore'], 
-      nav a[href='/partner-dashboard'] { 
+      nav a[href$='/explore'], 
+      nav a[href$='/partner/dashboard'],
+      nav a[href$='/partner-dashboard'] { 
         display: none !important; 
       }
     `;
