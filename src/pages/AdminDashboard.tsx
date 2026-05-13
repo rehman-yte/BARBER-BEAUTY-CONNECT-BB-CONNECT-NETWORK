@@ -1005,6 +1005,10 @@ const AdminDashboard: React.FC = () => {
                        <span className="text-[0.6875rem] font-bold text-black">{selectedShopDocs.workerCount} Personnel</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2">
+                       <span className="text-[0.625rem] font-bold text-gray-400 uppercase">UPI ID (Finance)</span>
+                       <span className="text-[0.6875rem] font-bold text-bbBlue font-mono">{selectedShopDocs.upiId || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200/50 pb-2">
                        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Mobile</span>
                        <span className="text-[0.6875rem] font-bold text-black font-mono">{selectedShopDocs.mobile}</span>
                     </div>

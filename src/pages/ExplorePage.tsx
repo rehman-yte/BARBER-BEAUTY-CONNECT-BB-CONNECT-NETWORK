@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getApprovedPartners } from '../services/logic_engine';
+import { getApprovedPartners, getSettings, subscribeToNotifications } from '../services/logic_engine';
 import { useAuth } from '../context/AuthContext';
 import { PersistenceService, StorageManager } from '../services/PersistenceService';
 
@@ -12,6 +12,7 @@ const ExplorePage: React.FC = () => {
   const [filter, setFilter] = useState<'Barber' | 'Beauty Parlour'>('Barber');
   const [allApprovedShops, setAllApprovedShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [broadcast, setBroadcast] = useState<any>(null);
 
   useEffect(() => {
     if (user?.role === 'partner') {
@@ -25,6 +26,12 @@ const ExplorePage: React.FC = () => {
       try {
         const approvedShops = await getApprovedPartners();
         setAllApprovedShops(approvedShops);
+        
+        // Fetch global settings for broadcast fallback
+        const settings = await getSettings();
+        if (settings.broadcasts?.length > 0) {
+          setBroadcast(settings.broadcasts[0]);
+        }
       } catch (error: any) {
         console.error('Failed to fetch shops:', error);
       } finally {
@@ -33,13 +40,45 @@ const ExplorePage: React.FC = () => {
     };
 
     fetchShops();
-  }, []);
+
+    // Subscribe to live notifications
+    const unsubscribe = subscribeToNotifications('customers', user?.uid || 'guest', (notifs) => {
+      if (notifs.length > 0) {
+        setBroadcast(notifs[0]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   const filteredShops = allApprovedShops.filter(s => s.category === filter);
 
   return (
     <div className="pt-[8rem] pb-[5rem] bg-white min-h-screen">
       <div className="max-w-[1440px] mx-auto px-[5%]">
+        <AnimatePresence>
+          {broadcast && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mb-[2rem] bg-black text-white p-[1.5rem] rounded-[2rem] relative overflow-hidden group shadow-xl shadow-black/10"
+            >
+              <div className="flex items-center gap-[1rem] relative z-10">
+                <div className="w-[1.25rem] h-[1.25rem] bg-bbBlue rounded-full animate-pulse shadow-[0_0_15px_rgba(42,125,225,0.7)]"></div>
+                <div className="flex-1">
+                  <p className="text-[0.625rem] font-bold uppercase tracking-[0.3em] text-bbBlue mb-1">System Announcement</p>
+                  <p className="text-[0.875rem] font-medium leading-relaxed">{broadcast.message}</p>
+                </div>
+                <button onClick={() => setBroadcast(null)} className="text-white/40 hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="absolute top-0 right-0 w-32 h-full bg-white/5 skew-x-[-20deg] translate-x-16 group-hover:translate-x-12 transition-transform duration-1000"></div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <header className="mb-[3rem] flex flex-col md:flex-row justify-between items-start md:items-end gap-[1rem]">
           <div>
             <h1 className="text-[2.5rem] md:text-[3.125rem] font-serif font-bold text-bbBlue-deep mb-[1rem] uppercase tracking-tight">Discover Excellence</h1>

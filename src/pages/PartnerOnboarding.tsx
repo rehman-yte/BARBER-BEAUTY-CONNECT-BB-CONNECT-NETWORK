@@ -112,11 +112,36 @@ const PartnerOnboarding: React.FC = () => {
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     
-    // START PRE-EMPTIVE SUCCESS OVERLAY
-    // This ensures the "Initating Access" feedback is instant
-    setIsSuccess(true);
+    // Helper for base64 conversion
+    const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
 
     try {
+      // Convert files to base64 strings
+      const ownerPictureUrl = formData.ownerPicture instanceof File 
+        ? await toBase64(formData.ownerPicture) 
+        : (formData.ownerPicture || 'pending_upload');
+        
+      const govIdUrl = formData.govId instanceof File 
+        ? await toBase64(formData.govId) 
+        : (formData.govId || 'pending_upload');
+
+      const brandImagesUrls = await Promise.all(
+        formData.shopImages.map(async img => img instanceof File ? await toBase64(img) : img)
+      );
+
+      const workerImagesUrls = await Promise.all(
+        formData.workerImages.map(async img => img instanceof File ? await toBase64(img) : img)
+      );
+
+      // START PRE-EMPTIVE SUCCESS OVERLAY
+      // This ensures the "Initating Access" feedback is instant
+      setIsSuccess(true);
+
       // 1. Prepare payload
       const shopPayload: any = {
         uid: user?.uid,
@@ -130,10 +155,10 @@ const PartnerOnboarding: React.FC = () => {
         coords: { lat: formData.lat, lng: formData.lng },
         status: 'pending',
         onboardingComplete: true,
-        ownerPicture: typeof formData.ownerPicture === 'string' ? formData.ownerPicture : 'pending_upload',
-        govId: typeof formData.govId === 'string' ? formData.govId : 'pending_upload',
-        brandImages: formData.shopImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
-        workerImages: formData.workerImages.map(img => typeof img === 'string' ? img : 'pending_upload'),
+        ownerPicture: ownerPictureUrl,
+        govId: govIdUrl,
+        brandImages: brandImagesUrls.filter(Boolean),
+        workerImages: workerImagesUrls.filter(Boolean),
         updatedAt: new Date().toISOString()
       };
 
