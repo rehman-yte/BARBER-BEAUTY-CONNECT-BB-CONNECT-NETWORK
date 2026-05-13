@@ -15,17 +15,14 @@ const AuthPage: React.FC = () => {
   // GLOBAL REDIRECTION LOGIC
   useEffect(() => {
     if (user && !loading) {
-      console.log(`[AUTH ARCHITECT] Identifying Route for UID: ${user.uid} | Role: ${user.role}`);
+      console.log(`[AUTH ARCHITECT] Identifying Route for User: ${user.email} | Role: ${user.role} | Onboarding: ${user.onboardingComplete}`);
       
       if (user.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else if (user.role === 'partner') {
-        // STEP C & STEP E Logic: Found vs New Partner
-        if (user.onboardingComplete) {
-          navigate('/partner/dashboard', { replace: true });
-        } else {
-          navigate('/partner/signup', { replace: true });
-        }
+        const target = user.onboardingComplete ? '/partner/dashboard' : '/partner/signup';
+        console.log(`[AUTH ARCHITECT] Routing Partner to: ${target}`);
+        navigate(target, { replace: true });
       } else if (user.role === 'customer') {
         navigate('/customer/explore', { replace: true });
       }

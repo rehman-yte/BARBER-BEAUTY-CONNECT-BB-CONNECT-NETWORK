@@ -131,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // STEP E: New User Logic
           if (storedRole === 'partner') {
+            console.log("[AUTH] Resolving as NEW PARTNER (Onboarding Required)");
             setUser({
               uid,
               email: firebaseUser.email,
@@ -140,8 +141,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               status: null,
               onboardingComplete: false
             });
+          } else if (storedRole === 'admin') {
+            console.log("[AUTH] Resolving as NEW ADMIN (Restricted)");
+            setUser({
+              uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'Admin Candidate',
+              role: 'admin',
+              user_type: 'admin',
+              status: null,
+              onboardingComplete: false
+            });
           } else {
-            // Default to Customer auto-creation for safety (Even if Admin tab was somehow active for a new user)
+            // Default to Customer auto-creation for safety
+            console.log("[AUTH] Resolving as NEW CUSTOMER (Auto-Creating)");
             const newCustomer = {
               name: firebaseUser.displayName || 'Customer',
               email: firebaseUser.email,
