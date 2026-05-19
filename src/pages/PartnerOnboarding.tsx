@@ -128,10 +128,10 @@ const PartnerOnboarding: React.FC = () => {
     });
 
     try {
-      let activeUid = user?.uid;
+      let activeUid = auth.currentUser?.uid || user?.uid;
 
       // 0. Account Creation if not logged in
-      if (!user) {
+      if (!activeUid) {
         if (!formData.email || !formData.password) {
           throw new Error("Email and Password are required for network registration.");
         }
@@ -140,10 +140,10 @@ const PartnerOnboarding: React.FC = () => {
           name: formData.ownerName,
           status: 'pending'
         });
-        // After signup, AuthContext will set user. We need to wait or get uid from result if signUp returned it.
-        // Actually our signUp doesn't return anything. But the user state will update soon.
-        // For safety, let's assume the flow continues with the new user.
+        activeUid = auth.currentUser?.uid;
       }
+
+      if (!activeUid) throw new Error("Authentication failed. Please try again.");
 
       // Convert files to base64 strings
       const ownerPictureUrl = formData.ownerPicture instanceof File 
@@ -198,7 +198,7 @@ const PartnerOnboarding: React.FC = () => {
           await Promise.race([writePromise, writeTimeout]).catch(e => console.warn("Write sync non-blocking:", e));
           
           if (updateUser) {
-            await updateUser({ 
+            updateUser({ 
               role: 'partner',
               status: 'pending',
               brandName: formData.brandName,
@@ -210,7 +210,10 @@ const PartnerOnboarding: React.FC = () => {
           const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
           localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
 
-          navigate('/partner/dashboard', { replace: true });
+          // Force a small delay to ensure React state batching completes
+          setTimeout(() => {
+            navigate('/partner/dashboard', { replace: true });
+          }, 100);
         } catch (err) {
           console.error("Delayed sync failure:", err);
           navigate('/partner/dashboard', { replace: true });

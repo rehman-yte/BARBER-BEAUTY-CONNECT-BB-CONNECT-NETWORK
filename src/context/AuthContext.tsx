@@ -276,28 +276,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUser = async (updates: Partial<AppUser>) => {
+  const updateUser = (updates: Partial<AppUser>) => {
     const activeUid = auth.currentUser?.uid || user?.uid;
     if (!activeUid) return;
     
-    try {
-      // Determine collection based on current state or provided role
-      const role = updates.role || user?.role || 'customer';
-      const coll = role === 'admin' ? 'admins' : (role === 'partner' ? 'partners' : 'customers');
-      const docRef = doc(db, coll, activeUid);
-      
-      await updateDoc(docRef, updates);
-      
-      // Update local state functionally to ensure we don't use stale user object
-      setUser(prev => {
-        if (!prev) return null;
-        const newUser = { ...prev, ...updates };
-        localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
-        return newUser;
-      });
-    } catch (err) {
-      console.error("Firestore update user error:", err);
-    }
+    // 1. Optimistic Update (Immediate UI response)
+    setUser(prev => {
+      if (!prev) return null;
+      const newUser = { ...prev, ...updates };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
+      return newUser;
+    });
+
+    // 2. Background Persistence
+    const syncToDb = async () => {
+      try {
+        const role = updates.role || user?.role || 'customer';
+        const coll = role === 'admin' ? 'admins' : (role === 'partner' ? 'partners' : 'customers');
+        const docRef = doc(db, coll, activeUid);
+        await updateDoc(docRef, updates).catch(async (e) => {
+          // If update fails, document might not exist (e.g. race condition), try setDoc
+          if (e.code === 'not-found') {
+             const { role: _, ...rest } = updates; // Avoid overwriting role if possible
+             await setDoc(docRef, updates, { merge: true });
+          }
+        });
+      } catch (err) {
+        console.error("Firestore sync error:", err);
+      }
+    };
+    
+    syncToDb();
   };
 
   return (
