@@ -48,10 +48,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
   const isAllowed = !allowedRole || 
     (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
 
-  if (user.role === 'partner' && !user.onboardingComplete && location.pathname === '/partner/dashboard') {
-    return <Navigate to="/partner/signup" replace />;
-  }
-
   if (allowedRole && !isAllowed) {
     if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
     if (user.role === 'partner') return <Navigate to="/partner/dashboard" replace />;

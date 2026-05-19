@@ -277,12 +277,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateUser = async (updates: Partial<AppUser>) => {
-    if (!auth.currentUser || !user) return;
+    const activeUid = auth.currentUser?.uid || user?.uid;
+    if (!activeUid) return;
+    
     try {
-      const coll = user.role === 'admin' ? 'admins' : (user.role === 'partner' ? 'partners' : 'customers');
-      const docRef = doc(db, coll, auth.currentUser.uid);
+      // Determine collection based on current state or provided role
+      const role = updates.role || user?.role || 'customer';
+      const coll = role === 'admin' ? 'admins' : (role === 'partner' ? 'partners' : 'customers');
+      const docRef = doc(db, coll, activeUid);
+      
       await updateDoc(docRef, updates);
-      setUser(prev => prev ? { ...prev, ...updates } : null);
+      
+      // Update local state functionally to ensure we don't use stale user object
+      setUser(prev => {
+        if (!prev) return null;
+        const newUser = { ...prev, ...updates };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
+        return newUser;
+      });
     } catch (err) {
       console.error("Firestore update user error:", err);
     }

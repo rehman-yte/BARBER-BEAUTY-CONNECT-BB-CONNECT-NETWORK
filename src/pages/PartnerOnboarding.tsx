@@ -192,10 +192,11 @@ const PartnerOnboarding: React.FC = () => {
       // 2. Navigation Bridge (forced 3s delay for UX/Sync)
       setTimeout(async () => {
         try {
-          await writePromise; // Ensure write finishes before actually switching
+          // We attempt to wait for write, but we don't let it block indefinitely if it's slow
+          // since critical state is handled by updateUser and the dashboard snapshot
+          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 5000));
+          await Promise.race([writePromise, writeTimeout]).catch(e => console.warn("Write sync non-blocking:", e));
           
-          // CRITICAL: We update the local state ONLY after the timer
-          // This prevents the App.tsx redirect from cutting off our animation
           if (updateUser) {
             await updateUser({ 
               role: 'partner',
@@ -205,10 +206,13 @@ const PartnerOnboarding: React.FC = () => {
             });
           }
 
+          // Force local storage sync for immediate dashboard recognition
+          const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
+          localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
+
           navigate('/partner/dashboard', { replace: true });
         } catch (err) {
           console.error("Delayed sync failure:", err);
-          // If it fails, we still try to move them as the local state is updated
           navigate('/partner/dashboard', { replace: true });
         }
       }, 3000);
