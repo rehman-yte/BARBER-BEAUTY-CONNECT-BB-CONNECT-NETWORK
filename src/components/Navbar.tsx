@@ -114,7 +114,9 @@ const Navbar: React.FC = () => {
     .filter(n => !clearedIds.includes(n.id))
     .sort((a, b) => (typeof b.timestamp === 'string' ? new Date(b.timestamp).getTime() : b.timestamp) - (typeof a.timestamp === 'string' ? new Date(a.timestamp).getTime() : a.timestamp));
 
-  if (location.pathname === '/onboarding') {
+  const isOnboarding = location.pathname === '/onboarding' || location.pathname === '/partner/signup';
+
+  if (isOnboarding) {
     return (
       <nav className="fixed top-0 left-0 right-0 z-[1000] bg-charcoal border-b border-white/5 h-[5rem] flex items-center px-[5%] justify-between shadow-2xl">
         <div className="flex flex-col"><span className="text-[1rem] font-serif font-black text-white tracking-widest uppercase">Network <span className="text-bbBlue">Admission</span></span></div>

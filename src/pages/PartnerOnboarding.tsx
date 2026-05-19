@@ -217,6 +217,7 @@ const PartnerOnboarding: React.FC = () => {
           
           // CRITICAL: Set persistent flags BEFORE context update
           localStorage.setItem(`bb_registered_${activeUid}`, 'true');
+          localStorage.setItem("registration_complete", "true"); // GLOBAL FLAG REQUESTED
           const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
           localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
 
@@ -230,7 +231,10 @@ const PartnerOnboarding: React.FC = () => {
             });
           }
 
-          navigate('/partner/dashboard', { replace: true });
+          // Small recursive safety: Ensure state is flushed
+          setTimeout(() => {
+            navigate('/partner/dashboard', { replace: true });
+          }, 100);
         } catch (err) {
           console.error("Critical submission failure:", err);
           setError("Network Registration Failed or Timed Out. Your business profile might be too large or connection was lost. Please try again with fewer/smaller photos.");

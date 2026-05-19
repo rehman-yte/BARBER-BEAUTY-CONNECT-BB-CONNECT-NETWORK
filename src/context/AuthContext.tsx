@@ -49,7 +49,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(() => {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      
+      // Aggressive Flag Sync for Partners
+      const isRegistered = localStorage.getItem("registration_complete") === 'true' || 
+                          localStorage.getItem(`bb_registered_${parsed.uid}`) === 'true';
+                          
+      if (parsed && parsed.role === 'partner' && isRegistered) {
+        parsed.onboardingComplete = true;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -93,7 +103,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         const REGISTERED_KEY = `bb_registered_${firebaseUser.uid}`;
-        const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
+        const LEGACY_REG_KEY = "registration_complete";
+        const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true' || localStorage.getItem(LEGACY_REG_KEY) === 'true';
 
         // OPTIMIZATION: Immediate Recognition for Registered Partners
         if (isRegisteredCache && storedRole === 'partner') {
@@ -112,8 +123,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
           }
           
+          // Ensure flag is set on the object
+          baseData.onboardingComplete = true;
+          
           setUser(baseData);
           setLoading(false);
+          
+          // Keep cache in sync
+          localStorage.setItem(REGISTERED_KEY, 'true');
+          localStorage.setItem(LEGACY_REG_KEY, 'true');
           
           // Verify with DB in background to sync latest status
           getDoc(doc(db, 'partners', firebaseUser.uid)).then(docSnap => {
@@ -156,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
             localStorage.setItem(REGISTERED_KEY, 'true');
+            localStorage.setItem(LEGACY_REG_KEY, 'true');
             
             setUser({
               uid: firebaseUser.uid,
