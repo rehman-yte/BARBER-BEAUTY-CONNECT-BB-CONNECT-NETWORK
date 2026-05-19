@@ -54,12 +54,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     if (user.role === 'customer') return <Navigate to="/customer/explore" replace />;
   }
 
+  const isOnboardingPath = location.pathname === '/partner/signup' || location.pathname === '/onboarding';
+
   // FORCE PARTNER ONBOARDING REDIRECTION
-  if (user.role === 'partner' && !user.onboardingComplete && location.pathname !== '/partner/signup') {
+  if (user.role === 'partner' && !user.onboardingComplete && !isOnboardingPath) {
     return <Navigate to="/partner/signup" replace />;
   }
   
-  if (user.role === 'partner' && user.onboardingComplete && location.pathname === '/partner/signup') {
+  if (user.role === 'partner' && user.onboardingComplete && isOnboardingPath) {
     return <Navigate to="/partner/dashboard" replace />;
   }
 

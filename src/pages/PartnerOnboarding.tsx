@@ -119,12 +119,31 @@ const PartnerOnboarding: React.FC = () => {
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     
-    // Helper for base64 conversion
-    const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    // Image Resizing Helper (Maintains document size under 1MB limit)
+    const resizeImage = (file: File, maxWidth: number = 1000): Promise<string> => new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          // Using constant 0.6 quality for aggressive compression to ensure < 1MB for ~13 images
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.onerror = () => reject(new Error("Image Load Error"));
+      };
+      reader.onerror = () => reject(new Error("File Read Error"));
     });
 
     try {
@@ -145,25 +164,24 @@ const PartnerOnboarding: React.FC = () => {
 
       if (!activeUid) throw new Error("Authentication failed. Please try again.");
 
-      // Convert files to base64 strings
+      // Convert and resize all images in parallel
       const ownerPictureUrl = formData.ownerPicture instanceof File 
-        ? await toBase64(formData.ownerPicture) 
+        ? await resizeImage(formData.ownerPicture) 
         : (formData.ownerPicture || 'pending_upload');
         
       const govIdUrl = formData.govId instanceof File 
-        ? await toBase64(formData.govId) 
+        ? await resizeImage(formData.govId) 
         : (formData.govId || 'pending_upload');
 
       const brandImagesUrls = await Promise.all(
-        formData.shopImages.map(async img => img instanceof File ? await toBase64(img) : img)
+        formData.shopImages.map(async img => img instanceof File ? await resizeImage(img) : img)
       );
 
       const workerImagesUrls = await Promise.all(
-        formData.workerImages.map(async img => img instanceof File ? await toBase64(img) : img)
+        formData.workerImages.map(async img => img instanceof File ? await resizeImage(img) : img)
       );
 
       // START PRE-EMPTIVE SUCCESS OVERLAY
-      // This ensures the "Initating Access" feedback is instant
       setIsSuccess(true);
       
       // 1. Prepare payload
@@ -180,23 +198,29 @@ const PartnerOnboarding: React.FC = () => {
         status: 'pending',
         onboardingComplete: true,
         ownerPicture: ownerPictureUrl,
-        govId: govIdUrl,
+        govtIdUrl: govIdUrl, // Roadmap compliant name
+        govId: govIdUrl, // Legacy compat
         brandImages: brandImagesUrls.filter(Boolean),
         workerImages: workerImagesUrls.filter(Boolean),
         updatedAt: new Date().toISOString()
       };
 
-      // Execute Firestore write
+      // Execute Firestore write (Using elevated priority)
       const writePromise = addShop(shopPayload);
 
       // 2. Navigation Bridge
       setTimeout(async () => {
         try {
-          // Wait for write with a sensible timeout
-          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 10000));
+          // Robust write verification with 15s window
+          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 15000));
           await Promise.race([writePromise, writeTimeout]);
           
-          // CRITICAL: Synchronize Auth State ONLY AFTER SUCCESSFUL WRITE
+          // CRITICAL: Set persistent flags BEFORE context update
+          localStorage.setItem(`bb_registered_${activeUid}`, 'true');
+          const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
+          localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
+
+          // CRITICAL: Synchronize Auth State
           if (updateUser) {
             updateUser({ 
               role: 'partner',
@@ -206,18 +230,12 @@ const PartnerOnboarding: React.FC = () => {
             });
           }
 
-          // Force local storage sync for immediate dashboard recognition
-          const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
-          localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
-          localStorage.setItem(`bb_registered_${activeUid}`, 'true');
-
           navigate('/partner/dashboard', { replace: true });
         } catch (err) {
           console.error("Critical submission failure:", err);
-          setError("Network Registration Failed. Please verify your internet and try again. Your data was not saved.");
+          setError("Network Registration Failed or Timed Out. Your business profile might be too large or connection was lost. Please try again with fewer/smaller photos.");
           setIsProcessing(false);
           setIsSuccess(false);
-          // Do not navigate
         }
       }, 3000);
 
