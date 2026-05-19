@@ -85,8 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
         console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
         
-        // Timeout helper to prevent infinite spinning
-        const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number = 3000): Promise<T> => {
+        const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number = 8000): Promise<T> => {
           const timeout = new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
           );
@@ -94,6 +93,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         const REGISTERED_KEY = `bb_registered_${firebaseUser.uid}`;
+        const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
+
+        // OPTIMIZATION: Immediate Recognition for Registered Partners
+        if (isRegisteredCache && storedRole === 'partner') {
+          const cachedSession = localStorage.getItem(SESSION_KEY);
+          let baseData = cachedSession ? JSON.parse(cachedSession) : null;
+          
+          if (!baseData || baseData.uid !== firebaseUser.uid) {
+            baseData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'Partner',
+              role: 'partner',
+              user_type: 'partner',
+              status: 'pending',
+              onboardingComplete: true
+            };
+          }
+          
+          setUser(baseData);
+          setLoading(false);
+          
+          // Verify with DB in background to sync latest status
+          getDoc(doc(db, 'partners', firebaseUser.uid)).then(docSnap => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              updateUser({
+                name: data.brandName || data.ownerName || baseData.name,
+                status: data.status,
+                photoURL: data.ownerPicture,
+                onboardingComplete: true
+              });
+            }
+          }).catch(e => console.warn("Background partner sync failed:", e));
+          
+          return;
+        }
 
         try {
           // 1. Check Admin
@@ -114,12 +150,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 2. Check Partner (Priority for Partner Role or Cache)
-          const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
+          // 2. Check Partner
           const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid)));
           
-          if (partnerDoc.exists() || isRegisteredCache) {
-            const partnerData = partnerDoc.exists() ? partnerDoc.data() : {};
+          if (partnerDoc.exists()) {
+            const partnerData = partnerDoc.data();
             localStorage.setItem(REGISTERED_KEY, 'true');
             
             setUser({
@@ -131,7 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               status: partnerData.status || 'pending',
               photoURL: partnerData.ownerPicture || firebaseUser.photoURL || undefined,
               brandName: partnerData.brandName || undefined,
-              onboardingComplete: true // If they exist in DB or Cache, they are onboarded
+              onboardingComplete: true
             });
             setLoading(false);
             return;
@@ -172,16 +207,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // 4. NEW USER LOGIC (Not found in any collection or timeout reached)
         const finalRole = storedRole || 'customer';
+        const wasOnboarded = (isRegisteredCache && finalRole === 'partner');
         
         // Final fallback if no record found
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
-          name: firebaseUser.displayName || 'New User',
+          name: firebaseUser.displayName || (finalRole === 'partner' ? 'Partner Studio' : 'Network User'),
           role: finalRole as any,
           user_type: finalRole as any,
-          status: null,
-          onboardingComplete: false
+          status: wasOnboarded ? 'active' : null,
+          onboardingComplete: wasOnboarded
         });
 
       } catch (err) {
