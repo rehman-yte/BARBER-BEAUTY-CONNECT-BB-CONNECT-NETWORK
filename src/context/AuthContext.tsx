@@ -105,7 +105,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: 'admin',
               user_type: 'admin',
               status: 'active',
-              token: adminConfig.adminSecret
+              token: adminConfig.adminSecret,
+              onboardingComplete: true
             });
             setLoading(false);
             return;
@@ -115,14 +116,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid)));
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
-            const onboardingComplete = !!partnerData.onboardingComplete;
+            const onboardingComplete = partnerData.onboardingComplete !== undefined ? !!partnerData.onboardingComplete : true; // Default to true if doc exists but flag missing
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: partnerData.brandName || partnerData.ownerName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : null,
+              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : 'pending',
               photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
               brandName: partnerData.brandName || undefined,
               onboardingComplete: onboardingComplete
@@ -142,18 +143,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: 'customer',
               user_type: 'customer',
               status: 'active',
-              photoURL: customerData.photoURL || firebaseUser.photoURL || undefined
+              photoURL: customerData.photoURL || firebaseUser.photoURL || undefined,
+              onboardingComplete: true
             });
             setLoading(false);
             return;
           }
         } catch (dbErr) {
           console.warn("[AUTH ARCHITECT] Database check failed or timed out:", dbErr);
-          // If timeout occurs, we proceed to registration check based on stored role
+          // Fallback to session cache if DB is slow
+          const cached = localStorage.getItem(SESSION_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.uid === firebaseUser.uid) {
+              setUser(parsed);
+              setLoading(false);
+              return;
+            }
+          }
         }
 
         // 4. NEW USER LOGIC (Not found in any collection or timeout reached)
         const finalRole = storedRole || 'customer';
+        const cached = localStorage.getItem(SESSION_KEY);
+        const wasOnboarded = cached ? JSON.parse(cached).onboardingComplete : false;
         
         // Final fallback if no record found
         setUser({
@@ -163,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: finalRole as any,
           user_type: finalRole as any,
           status: null,
-          onboardingComplete: false
+          onboardingComplete: wasOnboarded || false
         });
 
       } catch (err) {

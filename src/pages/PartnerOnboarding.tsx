@@ -165,10 +165,20 @@ const PartnerOnboarding: React.FC = () => {
       // START PRE-EMPTIVE SUCCESS OVERLAY
       // This ensures the "Initating Access" feedback is instant
       setIsSuccess(true);
+      
+      // CRITICAL: Synchronize Auth State BEFORE navigation to prevent loop
+      if (updateUser) {
+        updateUser({ 
+          role: 'partner',
+          status: 'pending',
+          brandName: formData.brandName,
+          onboardingComplete: true
+        });
+      }
 
       // 1. Prepare payload
       const shopPayload: any = {
-        uid: auth.currentUser?.uid || user?.uid,
+        uid: activeUid,
         ownerName: formData.ownerName,
         brandName: formData.brandName,
         mobileNumber: formData.mobileNumber,
@@ -186,26 +196,16 @@ const PartnerOnboarding: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      // Execute Firestore write in parallel with the 3s timer
+      // Execute Firestore write in background
       const writePromise = addShop(shopPayload);
 
       // 2. Navigation Bridge (forced 3s delay for UX/Sync)
       setTimeout(async () => {
         try {
-          // We attempt to wait for write, but we don't let it block indefinitely if it's slow
-          // since critical state is handled by updateUser and the dashboard snapshot
-          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 5000));
+          // Wait for write with a sensible timeout
+          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 7000));
           await Promise.race([writePromise, writeTimeout]).catch(e => console.warn("Write sync non-blocking:", e));
           
-          if (updateUser) {
-            updateUser({ 
-              role: 'partner',
-              status: 'pending',
-              brandName: formData.brandName,
-              onboardingComplete: true
-            });
-          }
-
           // Force local storage sync for immediate dashboard recognition
           const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
           localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));

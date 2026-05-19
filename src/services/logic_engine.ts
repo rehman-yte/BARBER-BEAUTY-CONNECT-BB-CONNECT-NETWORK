@@ -176,10 +176,10 @@ export const addShop = async (shopData: any) => {
     };
 
     if (docId) {
-      // Save to main partners collection
-      await setDoc(doc(db, 'partners', docId), normalizedData);
-      // Save to verification_queue collection as requested for Admin Panel
-      await setDoc(doc(db, 'verification_queue', docId), normalizedData);
+      // Execute both writes in parallel for maximum speed and reliability
+      const p1 = setDoc(doc(db, 'partners', docId), normalizedData);
+      const p2 = setDoc(doc(db, 'verification_queue', docId), normalizedData);
+      await Promise.all([p1, p2]);
       return { id: docId, ...normalizedData };
     } else {
       const docRef = await addDoc(collection(db, 'partners'), normalizedData);
