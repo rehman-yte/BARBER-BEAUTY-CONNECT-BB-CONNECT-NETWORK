@@ -93,6 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return Promise.race([promise, timeout]);
         };
 
+        const REGISTERED_KEY = `bb_registered_${firebaseUser.uid}`;
+
         try {
           // 1. Check Admin
           const adminDoc = await withTimeout(getDoc(doc(db, 'admins', firebaseUser.uid)));
@@ -112,21 +114,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // 2. Check Partner
+          // 2. Check Partner (Priority for Partner Role or Cache)
+          const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
           const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid)));
-          if (partnerDoc.exists()) {
-            const partnerData = partnerDoc.data();
-            const onboardingComplete = partnerData.onboardingComplete !== undefined ? !!partnerData.onboardingComplete : true; // Default to true if doc exists but flag missing
+          
+          if (partnerDoc.exists() || isRegisteredCache) {
+            const partnerData = partnerDoc.exists() ? partnerDoc.data() : {};
+            localStorage.setItem(REGISTERED_KEY, 'true');
+            
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: partnerData.brandName || partnerData.ownerName || 'Partner',
+              name: partnerData.brandName || partnerData.ownerName || firebaseUser.displayName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: (onboardingComplete && partnerData.status) ? (partnerData.status as any) : 'pending',
-              photoURL: partnerData.photoURL || partnerData.ownerPicture || firebaseUser.photoURL || undefined,
+              status: partnerData.status || 'pending',
+              photoURL: partnerData.ownerPicture || firebaseUser.photoURL || undefined,
               brandName: partnerData.brandName || undefined,
-              onboardingComplete: onboardingComplete
+              onboardingComplete: true // If they exist in DB or Cache, they are onboarded
             });
             setLoading(false);
             return;
@@ -151,12 +156,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (dbErr) {
           console.warn("[AUTH ARCHITECT] Database check failed or timed out:", dbErr);
-          // Fallback to session cache if DB is slow
+          // Fallback to session cache or registered flag if DB is slow
+          const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
           const cached = localStorage.getItem(SESSION_KEY);
-          if (cached) {
-            const parsed = JSON.parse(cached);
+          
+          if (isRegisteredCache || cached) {
+            const parsed = cached ? JSON.parse(cached) : { uid: firebaseUser.uid, role: storedRole || 'partner', onboardingComplete: true };
             if (parsed.uid === firebaseUser.uid) {
-              setUser(parsed);
+              setUser({ ...parsed, onboardingComplete: isRegisteredCache ? true : parsed.onboardingComplete });
               setLoading(false);
               return;
             }
@@ -165,8 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // 4. NEW USER LOGIC (Not found in any collection or timeout reached)
         const finalRole = storedRole || 'customer';
-        const cached = localStorage.getItem(SESSION_KEY);
-        const wasOnboarded = cached ? JSON.parse(cached).onboardingComplete : false;
         
         // Final fallback if no record found
         setUser({
@@ -176,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: finalRole as any,
           user_type: finalRole as any,
           status: null,
-          onboardingComplete: wasOnboarded || false
+          onboardingComplete: false
         });
 
       } catch (err) {

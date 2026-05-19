@@ -54,6 +54,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     if (user.role === 'customer') return <Navigate to="/customer/explore" replace />;
   }
 
+  // FORCE PARTNER ONBOARDING REDIRECTION
+  if (user.role === 'partner' && !user.onboardingComplete && location.pathname !== '/partner/signup') {
+    return <Navigate to="/partner/signup" replace />;
+  }
+  
+  if (user.role === 'partner' && user.onboardingComplete && location.pathname === '/partner/signup') {
+    return <Navigate to="/partner/dashboard" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -95,7 +104,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ShopDetail /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL */}
-      <Route path="/partner/signup" element={<PartnerOnboarding />} />
+      <Route path="/partner/signup" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute allowedRole="partner"><PartnerOnboarding /></ProtectedRoute>} />
       <Route path="/partner/dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       <Route path="/partner-dashboard" element={<Navigate to="/partner/dashboard" replace />} />

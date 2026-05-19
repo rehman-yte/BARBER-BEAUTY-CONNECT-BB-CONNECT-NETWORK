@@ -166,16 +166,6 @@ const PartnerOnboarding: React.FC = () => {
       // This ensures the "Initating Access" feedback is instant
       setIsSuccess(true);
       
-      // CRITICAL: Synchronize Auth State BEFORE navigation to prevent loop
-      if (updateUser) {
-        updateUser({ 
-          role: 'partner',
-          status: 'pending',
-          brandName: formData.brandName,
-          onboardingComplete: true
-        });
-      }
-
       // 1. Prepare payload
       const shopPayload: any = {
         uid: activeUid,
@@ -196,27 +186,38 @@ const PartnerOnboarding: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      // Execute Firestore write in background
+      // Execute Firestore write
       const writePromise = addShop(shopPayload);
 
-      // 2. Navigation Bridge (forced 3s delay for UX/Sync)
+      // 2. Navigation Bridge
       setTimeout(async () => {
         try {
           // Wait for write with a sensible timeout
-          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 7000));
-          await Promise.race([writePromise, writeTimeout]).catch(e => console.warn("Write sync non-blocking:", e));
+          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 10000));
+          await Promise.race([writePromise, writeTimeout]);
           
+          // CRITICAL: Synchronize Auth State ONLY AFTER SUCCESSFUL WRITE
+          if (updateUser) {
+            updateUser({ 
+              role: 'partner',
+              status: 'pending',
+              brandName: formData.brandName,
+              onboardingComplete: true
+            });
+          }
+
           // Force local storage sync for immediate dashboard recognition
           const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
           localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
+          localStorage.setItem(`bb_registered_${activeUid}`, 'true');
 
-          // Force a small delay to ensure React state batching completes
-          setTimeout(() => {
-            navigate('/partner/dashboard', { replace: true });
-          }, 100);
-        } catch (err) {
-          console.error("Delayed sync failure:", err);
           navigate('/partner/dashboard', { replace: true });
+        } catch (err) {
+          console.error("Critical submission failure:", err);
+          setError("Network Registration Failed. Please verify your internet and try again. Your data was not saved.");
+          setIsProcessing(false);
+          setIsSuccess(false);
+          // Do not navigate
         }
       }, 3000);
 
