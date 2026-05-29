@@ -119,8 +119,8 @@ const PartnerOnboarding: React.FC = () => {
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     
-    // Image Resizing Helper (Maintains document size under 1MB limit)
-    const resizeImage = (file: File, maxWidth: number = 1000): Promise<string> => new Promise((resolve, reject) => {
+    // Image Resizing Helper (Maintains document size under 1MB limit by enforcing strict size and quality limits)
+    const resizeImage = (file: File, maxDimension: number = 400): Promise<string> => new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (e) => {
@@ -130,16 +130,23 @@ const PartnerOnboarding: React.FC = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
+          
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round(height * (maxDimension / width));
+              width = maxDimension;
+            } else {
+              width = Math.round(width * (maxDimension / height));
+              height = maxDimension;
+            }
           }
+          
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          // Using constant 0.6 quality for aggressive compression to ensure < 1MB for ~13 images
-          resolve(canvas.toDataURL('image/jpeg', 0.6));
+          // Using constant 0.5 quality for extra-aggressive compression to ensure total payload is < 200KB
+          resolve(canvas.toDataURL('image/jpeg', 0.5));
         };
         img.onerror = () => reject(new Error("Image Load Error"));
       };
