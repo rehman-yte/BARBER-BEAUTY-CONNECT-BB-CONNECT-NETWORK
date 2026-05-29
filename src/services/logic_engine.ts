@@ -192,19 +192,15 @@ export const addShop = async (shopData: any) => {
       coords: coordsVal,
       ownerPicture: ownerPictureStr,
       govId: govIdStr,
-      govtIdUrl: govIdStr,
-      govtId: govIdStr, // Ensure govtId is included explicitly or fallback
-      shopImages: shopImagesArr,
       brandImages: shopImagesArr, // Align for dashboard integration
       workerImages: workerImagesArr,
       onboardingComplete: true,
       adminApproved: false,
-      updatedAt: shopData.updatedAt || new Date().toISOString(),
-      createdAt: Timestamp.now()
+      updatedAt: shopData.updatedAt || new Date().toISOString()
     };
 
-    // Execute writes
-    const p1 = setDoc(doc(db, 'partners', docId), normalizedData);
+    // Execute writes with merge: true to avoid deleting unmodifiable keys like createdAt, avoiding affectedKeys rules failure
+    const p1 = setDoc(doc(db, 'partners', docId), normalizedData, { merge: true });
     
     // Safety Net: verification_queue might fail depending on project rules, swallow error to never block partner admission
     const p2 = setDoc(doc(db, 'verification_queue', docId), normalizedData).catch(err => {

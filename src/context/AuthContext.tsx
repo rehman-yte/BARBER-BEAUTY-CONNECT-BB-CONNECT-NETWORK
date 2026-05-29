@@ -269,7 +269,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(ROLE_KEY, role);
       
       if (role === 'partner') {
-        await setDoc(doc(db, 'partners', firebaseUser.uid), userData);
+        const skeletonPartner = {
+          ownerName: additionalData.name || 'New Partner',
+          brandName: 'New Partner Shop',
+          status: 'pending',
+          mobileNumber: additionalData.mobile || '',
+          adminApproved: false,
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(doc(db, 'partners', firebaseUser.uid), skeletonPartner);
+        // Also save to global user collections if allowed
+        await setDoc(doc(db, 'users', firebaseUser.uid), userData).catch(() => {});
       } else if (role === 'admin') {
         await setDoc(doc(db, 'admins', firebaseUser.uid), userData);
       } else {
