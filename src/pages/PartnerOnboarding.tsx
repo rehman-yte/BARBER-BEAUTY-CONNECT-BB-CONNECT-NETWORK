@@ -153,6 +153,63 @@ const PartnerOnboarding: React.FC = () => {
       reader.onerror = () => reject(new Error("File Read Error"));
     });
 
+    // Helper to compress/reduce Base64 string directly using Canvas
+    const compressBase64 = (base64Str: string, maxDim: number = 300, quality: number = 0.4): Promise<string> => {
+      return new Promise((resolve) => {
+        if (!base64Str || !base64Str.startsWith('data:image')) {
+          resolve(base64Str);
+          return;
+        }
+        const img = new Image();
+        img.src = base64Str;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round(height * (maxDim / width));
+              width = maxDim;
+            } else {
+              width = Math.round(width * (maxDim / height));
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } else {
+            resolve(base64Str);
+          }
+        };
+        img.onerror = () => resolve(base64Str);
+      });
+    };
+
+    const clearFormState = () => {
+      setFormData({
+        email: '',
+        password: '',
+        ownerName: '',
+        brandName: '',
+        mobileNumber: '',
+        manualAddress: '',
+        category: 'Barber' as 'Barber' | 'Beauty Parlour',
+        workerCount: 1,
+        upiId: '',
+        lat: null,
+        lng: null,
+        shopImages: Array(5).fill(null),
+        workerImages: Array(6).fill(null),
+        ownerPicture: null,
+        govId: null,
+      });
+      setError('');
+    };
+
     try {
       let activeUid = auth.currentUser?.uid || user?.uid;
 
@@ -172,24 +229,33 @@ const PartnerOnboarding: React.FC = () => {
       if (!activeUid) throw new Error("Authentication failed. Please try again.");
 
       // Convert and resize all images in parallel
-      const ownerPictureUrl = formData.ownerPicture instanceof File 
+      const rawOwnerPicture = formData.ownerPicture instanceof File 
         ? await resizeImage(formData.ownerPicture) 
         : (formData.ownerPicture || 'pending_upload');
         
-      const govIdUrl = formData.govId instanceof File 
+      const rawGovId = formData.govId instanceof File 
         ? await resizeImage(formData.govId) 
         : (formData.govId || 'pending_upload');
 
-      const brandImagesUrls = await Promise.all(
+      const rawBrandImages = await Promise.all(
         formData.shopImages.map(async img => img instanceof File ? await resizeImage(img) : img)
       );
 
-      const workerImagesUrls = await Promise.all(
+      const rawWorkerImages = await Promise.all(
         formData.workerImages.map(async img => img instanceof File ? await resizeImage(img) : img)
       );
 
-      // START PRE-EMPTIVE SUCCESS OVERLAY
-      setIsSuccess(true);
+      // Perform direct extra-compression on base64 strings
+      const ownerPictureUrl = typeof rawOwnerPicture === 'string' ? await compressBase64(rawOwnerPicture, 300, 0.4) : rawOwnerPicture;
+      const govIdUrl = typeof rawGovId === 'string' ? await compressBase64(rawGovId, 300, 0.4) : rawGovId;
+      
+      const compressedBrandImages = await Promise.all(
+        rawBrandImages.filter(Boolean).map(img => typeof img === 'string' ? compressBase64(img, 300, 0.4) : img)
+      );
+
+      const compressedWorkerImages = await Promise.all(
+        rawWorkerImages.filter(Boolean).map(img => typeof img === 'string' ? compressBase64(img, 300, 0.4) : img)
+      );
       
       // 1. Prepare payload
       const shopPayload: any = {
@@ -203,56 +269,87 @@ const PartnerOnboarding: React.FC = () => {
         upiId: formData.upiId,
         coords: { lat: formData.lat, lng: formData.lng },
         status: 'pending',
+        verification_status: 'pending', // Explicit status representation asked by senior dev
         onboardingComplete: true,
         ownerPicture: ownerPictureUrl,
         govtIdUrl: govIdUrl, // Roadmap compliant name
         govId: govIdUrl, // Legacy compat
-        brandImages: brandImagesUrls.filter(Boolean),
-        workerImages: workerImagesUrls.filter(Boolean),
+        brandImages: compressedBrandImages,
+        workerImages: compressedWorkerImages,
         updatedAt: new Date().toISOString()
       };
 
-      // Execute Firestore write (Using elevated priority)
-      const writePromise = addShop(shopPayload);
+      // 2. REDUCE PAYLOAD: If the total physical payload size exceeds 800KB, strip base64 schemas
+      const getPayloadSizeKB = (obj: any): number => {
+        return JSON.stringify(obj).length / 1024;
+      };
 
-      // 2. Navigation Bridge
-      setTimeout(async () => {
-        try {
-          // Robust write verification with 15s window
-          const writeTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('WRITE_TIMEOUT')), 15000));
-          await Promise.race([writePromise, writeTimeout]);
-          
-          // CRITICAL: Set persistent flags BEFORE context update
-          localStorage.setItem(`bb_registered_${activeUid}`, 'true');
-          localStorage.setItem("registration_complete", "true"); // GLOBAL FLAG REQUESTED
-          const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
-          localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
+      let currentSizeKB = getPayloadSizeKB(shopPayload);
+      console.log(`Computed Firestore Payload size: ${currentSizeKB.toFixed(2)} KB`);
 
-          // CRITICAL: Synchronize Auth State
-          if (updateUser) {
-            updateUser({ 
-              role: 'partner',
-              status: 'pending',
-              brandName: formData.brandName,
-              onboardingComplete: true
-            });
-          }
+      if (currentSizeKB > 800) {
+        console.warn("Payload size exceeds 800KB target limit. Initiating stripping of non-essential metadata...");
+        
+        const stripPrefix = (str: string): string => {
+          if (!str) return str;
+          return str.replace(/^data:image\/[a-z]+;base64,/, '');
+        };
 
-          // Small recursive safety: Ensure state is flushed
-          setTimeout(() => {
-            navigate('/partner/dashboard', { replace: true });
-          }, 100);
-        } catch (err) {
-          console.error("Critical submission failure:", err);
-          setError("Network Registration Failed or Timed Out. Your business profile might be too large or connection was lost. Please try again with fewer/smaller photos.");
-          setIsProcessing(false);
-          setIsSuccess(false);
+        if (shopPayload.ownerPicture) {
+          shopPayload.ownerPicture = stripPrefix(shopPayload.ownerPicture);
         }
+        if (shopPayload.govtIdUrl) {
+          shopPayload.govtIdUrl = stripPrefix(shopPayload.govtIdUrl);
+          shopPayload.govId = shopPayload.govtIdUrl;
+        }
+        if (Array.isArray(shopPayload.brandImages)) {
+          shopPayload.brandImages = shopPayload.brandImages.map(img => typeof img === 'string' ? stripPrefix(img) : img);
+        }
+        if (Array.isArray(shopPayload.workerImages)) {
+          shopPayload.workerImages = shopPayload.workerImages.map(img => typeof img === 'string' ? stripPrefix(img) : img);
+        }
+
+        console.log(`Highly optimized payload size after stripping: ${getPayloadSizeKB(shopPayload).toFixed(2)} KB`);
+      }
+
+      // Execute and await Firestore setDoc write fully
+      await addShop(shopPayload);
+
+      // CRITICAL success routing path begins here
+      // Set persistent onboarding flags BEFORE starting user state sync or navigation
+      localStorage.setItem(`bb_registered_${activeUid}`, 'true');
+      localStorage.setItem("registration_complete", "true");
+      
+      const localData = { ...shopPayload, status: 'pending', onboardingComplete: true };
+      localStorage.setItem(`partner_data_${activeUid}`, JSON.stringify(localData));
+
+      // Synchronize Auth State
+      if (updateUser) {
+        updateUser({ 
+          role: 'partner',
+          status: 'pending',
+          brandName: formData.brandName,
+          onboardingComplete: true
+        });
+      }
+
+      // Successfully saved! We now trigger/navigate to the 3-second timer success screen
+      setIsSuccess(true);
+
+      // Start the 3-second timer
+      setTimeout(() => {
+        // Clear local state of the form to prevent it from reloading on redirect
+        clearFormState();
+        setIsProcessing(false);
+        setIsSuccess(false);
+
+        // Final routing replacement to partner dashboard
+        navigate('/partner/dashboard', { replace: true });
       }, 3000);
 
     } catch (err: any) {
       console.error("Submission crash:", err);
-      setError(err.message || "Submission failed. Please check your network connection.");
+      setError(err.message || "Network Registration Failed or Timed Out. Please try again with fewer/smaller photos.");
       setIsProcessing(false);
       setIsSuccess(false);
     }
