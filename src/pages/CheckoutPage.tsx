@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
+import { getSettings } from '../services/logic_engine';
 
 const CheckoutPage: React.FC = () => {
   const { cart, totalPrice, totalItems, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -17,6 +18,29 @@ const CheckoutPage: React.FC = () => {
     (item.category && String(item.category).toLowerCase().includes('service')) || 
     (item.name && String(item.name).includes('(Booking)'))
   );
+
+  const [feePercent, setFeePercent] = useState<number>(10);
+  
+  useEffect(() => {
+    let active = true;
+    const fetchSettings = async () => {
+      try {
+        const settings = await getSettings();
+        if (settings && typeof settings.platformFee === 'number' && active) {
+          setFeePercent(settings.platformFee);
+        }
+      } catch (err) {
+        console.error("Failed to load settings in CheckoutPage:", err);
+      }
+    };
+    fetchSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const feeAmount = Math.round((totalPrice * feePercent) / 100);
+  const finalTotal = totalPrice + feeAmount;
   
   const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'processing' | 'success'>('cart');
   const [loading, setLoading] = useState(false);
@@ -85,7 +109,8 @@ const CheckoutPage: React.FC = () => {
           state: formData.state
         },
         items: cart,
-        totalAmount: totalPrice, // Strictly matches cart subtotal
+        totalAmount: finalTotal, // Includes platform / service fee
+        platformFee: feeAmount,
         status: 'confirmed',
         paymentStatus: 'paid', // Mark as paid ONLY after verification
         paymentMethod: paymentMethod,
@@ -134,7 +159,7 @@ const CheckoutPage: React.FC = () => {
         <div className="flex items-center justify-between mb-12 py-8 border-b border-gray-100">
           {(isSlotBooking 
             ? [
-                { id: 'cart', label: 'Cart', icon: ShieldCheck },
+                { id: 'cart', label: 'Slot', icon: ShieldCheck },
                 { id: 'payment', label: 'Payment', icon: CreditCard }
               ]
             : [
@@ -208,7 +233,7 @@ const CheckoutPage: React.FC = () => {
                   ))}
                   <div className="pt-8 flex justify-between">
                     <button onClick={() => navigate('/shop')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
-                      <ArrowLeft size={14} /> Continue Shopping
+                      <ArrowLeft size={14} /> {isSlotBooking ? 'Continue Slot Booking' : 'Continue Shopping'}
                     </button>
                     <button 
                       onClick={() => setStep(isSlotBooking ? 'payment' : 'shipping')}
@@ -368,7 +393,7 @@ const CheckoutPage: React.FC = () => {
                               <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_CHECKOUT')] bg-center bg-no-repeat bg-contain opacity-70"></div>
                             </div>
                             <div className="text-center">
-                              <p className="text-[10px] font-bold text-charcoal uppercase tracking-widest mb-1">Scan to Pay ₹{totalPrice}</p>
+                              <p className="text-[10px] font-bold text-charcoal uppercase tracking-widest mb-1">Scan to Pay ₹{finalTotal}</p>
                               <p className="text-[8px] text-gray-400 font-medium uppercase tracking-widest">Powered by BB Connect Secure Gateway</p>
                             </div>
                           </div>
@@ -516,7 +541,7 @@ const CheckoutPage: React.FC = () => {
                       ) : (
                         <>
                           <ShieldCheck size={20} />
-                          <span>Finalize & Pay ₹{totalPrice}</span>
+                          <span>Finalize & Pay ₹{finalTotal}</span>
                         </>
                       )}
                     </button>
@@ -549,7 +574,7 @@ const CheckoutPage: React.FC = () => {
                       <span className="text-[0.5rem] font-bold text-emerald-600 uppercase tracking-widest">Secure Connection Active</span>
                     </div>
                     <div className="w-[1px] h-4 bg-gray-200"></div>
-                    <span className="text-[0.75rem] font-mono font-bold text-charcoal">₹{totalPrice}</span>
+                    <span className="text-[0.75rem] font-mono font-bold text-charcoal">₹{finalTotal}</span>
                   </div>
                 </motion.div>
               )}
@@ -598,13 +623,13 @@ const CheckoutPage: React.FC = () => {
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 font-medium">Tax (GST)</span>
-                    <span className="font-mono font-bold">₹0</span>
+                    <span className="text-gray-500 font-medium">{isSlotBooking ? 'Service Fee' : 'Platform Fee'} ({feePercent}%)</span>
+                    <span className="font-mono font-bold">₹{feeAmount}</span>
                   </div>
                 </div>
                 <div className="pt-6 border-t border-gray-200 flex justify-between items-end mb-8">
                   <span className="text-[0.625rem] font-bold text-charcoal uppercase tracking-widest">Total Amount</span>
-                  <span className="text-3xl font-mono font-bold text-bbBlue">₹{totalPrice}</span>
+                  <span className="text-3xl font-mono font-bold text-bbBlue">₹{finalTotal}</span>
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">
