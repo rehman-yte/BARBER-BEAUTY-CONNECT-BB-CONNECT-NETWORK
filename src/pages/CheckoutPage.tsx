@@ -9,6 +9,20 @@ import { useNavigate } from 'react-router-dom';
 import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
 import { getSettings } from '../services/logic_engine';
 
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 const CheckoutPage: React.FC = () => {
   const { cart, totalPrice, totalItems, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
@@ -71,65 +85,178 @@ const CheckoutPage: React.FC = () => {
   const handlePayment = async () => {
     setLoading(true);
     setPaymentError(null);
-    setStep('processing');
-    
-    // Step 1: Simulated Secure Gateway Handshake
-    // We stay in the 'processing' state. No Firestore write happens yet.
-    await new Promise(resolve => setTimeout(resolve, 3500));
-    
-    // Step 2: Payment Verification Check
-    // Simulating a successful verification from the gateway provider
-    const isPaymentVerified = true; // In a real app, this is the API response code
-    
-    if (!isPaymentVerified) {
+
+    // Step 1: Load Razorpay SDK Script
+    const res = await loadRazorpayScript();
+    if (!res) {
       setLoading(false);
-      setStep('payment');
-      setPaymentError("Order Not Placed - Payment Failed. Please verify your details and try again.");
-      // Redirect logic if failure persists
-      setTimeout(() => {
-        navigate('/shop');
-      }, 3000);
+      setPaymentError("Razorpay SDK failed to load. Are you offline?");
       return;
     }
 
-    try {
-      // Step 3: Atomic Order Creation (Success Path Only)
-      const orderData = {
-        customerId: user?.uid,
-        customerName: formData.fullName || user?.name || 'Customer Booking',
-        shippingAddress: isSlotBooking ? {
-          address: 'N/A - Direct Service Slot Booking (Bypassed)',
-          city: 'N/A',
-          pincode: 'N/A',
-          state: 'N/A'
-        } : {
-          address: formData.address,
-          city: formData.city,
-          pincode: formData.pincode,
-          state: formData.state
-        },
-        items: cart,
-        totalAmount: finalTotal, // Includes platform / service fee
-        platformFee: feeAmount,
-        status: 'confirmed',
-        paymentStatus: 'paid', // Mark as paid ONLY after verification
-        paymentMethod: paymentMethod,
-        paymentMethodDetail: paymentMethod === 'upi' ? paymentDetails.upiId : 
-                             paymentMethod === 'wallet' ? paymentDetails.wallet : 
-                             paymentMethod === 'netbanking' ? paymentDetails.bank : 'card',
-        transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
-        createdAt: serverTimestamp()
-      };
+    // Step 2: Configure options
+    const options = {
+      key: "rzp_test_dummy_key", 
+      amount: finalTotal * 100, // INR in paise
+      currency: "INR",
+      name: "Barber & Beauty Connect",
+      description: isSlotBooking ? "Premium Slot Booking Payment" : "Premium Product Purchase Payment",
+      image: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT",
+      handler: async function (response: any) {
+        setStep('processing');
+        setLoading(true);
 
-      // ONLY write to orders collection AFTER verified success
-      await addDoc(collection(db, 'orders'), orderData);
-      
-      setStep('success');
-      clearCart();
-    } catch (error) {
-      console.error("Critical: Payment verified but order sync failed:", error);
-      setPaymentError("Payment Successful, but we encountered a sync error. Our team is resolving this.");
-    } finally {
+        try {
+          const transactionId = response.razorpay_payment_id || `RZP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+          // Write unified order details to Orders collection
+          const orderData = {
+            customerId: user?.uid,
+            customerName: formData.fullName || user?.name || 'Customer Booking',
+            shippingAddress: isSlotBooking ? {
+              address: 'N/A - Direct Service Slot Booking (Bypassed)',
+              city: 'N/A',
+              pincode: 'N/A',
+              state: 'N/A'
+            } : {
+              address: formData.address,
+              city: formData.city,
+              pincode: formData.pincode,
+              state: formData.state
+            },
+            items: cart,
+            totalAmount: finalTotal, // Includes the platform / service fee
+            platformFee: feeAmount,
+            status: 'confirmed',
+            paymentStatus: 'paid', // Mark as paid ONLY after verified success
+            paymentMethod: paymentMethod,
+            paymentMethodDetail: response.razorpay_payment_id || 'Razorpay Gateway',
+            transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
+            createdAt: serverTimestamp()
+          };
+
+          await addDoc(collection(db, 'orders'), orderData);
+
+          // Write bookings details directly to bookings collection for Customer Hub
+          if (isSlotBooking) {
+            for (const item of cart) {
+              if (
+                (item.category && String(item.category).toLowerCase().includes('service')) || 
+                (item.name && String(item.name).includes('(Booking)')) || 
+                item.type === 'booking'
+              ) {
+                const bookingDocData = {
+                  customerId: user?.uid,
+                  customerName: formData.fullName || user?.name || 'Customer Booking',
+                  partnerId: item.shopId || item.partnerId || '',
+                  shopId: item.shopId || item.partnerId || '',
+                  shopName: item.shopName || 'Partner Salon',
+                  service: item.serviceName || item.name || 'Grooming Service',
+                  serviceName: item.serviceName || item.name || 'Grooming Service',
+                  price: item.price,
+                  date: item.date || new Date().toDateString(),
+                  time: item.time || '10:00',
+                  status: 'confirmed',
+                  bookingStatus: 'confirmed',
+                  paymentStatus: 'paid',
+                  paymentMethod: paymentMethod,
+                  transactionId: transactionId,
+                  createdAt: new Date().toISOString()
+                };
+                await addDoc(collection(db, 'bookings'), bookingDocData);
+              }
+            }
+          }
+
+          setStep('success');
+          clearCart();
+          
+          // Successfully navigated
+          setTimeout(() => {
+            navigate('/customer/dashboard', { state: { successMessage: "Payment successful! Your order has been confirmed." } });
+          }, 2000);
+          
+        } catch (error) {
+          console.error("Critical: Payment verified but order sync failed:", error);
+          setPaymentError("Payment Successful, but we encountered a sync error. Our team is resolving this.");
+        } finally {
+          setLoading(false);
+        }
+      },
+      prefill: {
+        name: formData.fullName || user?.name || "Customer",
+        email: formData.email || user?.email || "customer@example.com",
+        contact: formData.phone || ""
+      },
+      notes: {
+        address: formData.address || 'N/A - Direct Booking'
+      },
+      theme: {
+        color: "#2358E1" // bbBlue
+      }
+    };
+
+    // Build configuration sequence according to user choice
+    if (paymentMethod === 'upi') {
+      (options as any).config = {
+        display: {
+          blocks: {
+            upi: {
+              name: 'Unified Payments Interface',
+              instruments: [
+                {
+                  method: 'upi',
+                  flows: ['intent', 'qr', 'collect']
+                }
+              ]
+            }
+          },
+          sequence: ['block.upi', 'card', 'netbanking'],
+          preferences: {
+            show_default_blocks: true
+          }
+        }
+      };
+    } else if (paymentMethod === 'card') {
+      (options as any).config = {
+        display: {
+          blocks: {
+            cards: {
+              name: 'Credit and Debit Cards',
+              instruments: [
+                {
+                  method: 'card'
+                }
+              ]
+            }
+          },
+          sequence: ['block.cards', 'upi', 'netbanking'],
+          preferences: {
+            show_default_blocks: true
+          }
+        }
+      };
+    } else {
+      (options as any).config = {
+        display: {
+          sequence: ['upi', 'card', 'netbanking'],
+          preferences: {
+            show_default_blocks: true
+          }
+        }
+      };
+    }
+
+    try {
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        setPaymentError(resp.error.description || "Transaction failed. Please try again.");
+        setLoading(false);
+      });
+      rzp.open();
+    } catch (err) {
+      console.error("Failed to initialize Razorpay:", err);
+      setPaymentError("Could not initialize payment gateway popup. Please try again.");
       setLoading(false);
     }
   };
@@ -376,142 +503,22 @@ const CheckoutPage: React.FC = () => {
                       {paymentMethod === 'wallet' && <Check size={16} className="text-bbBlue" />}
                     </button>
                   </div>
-
-                  {/* Method Details Input */}
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
-                    <AnimatePresence mode="wait">
-                      {paymentMethod === 'upi' && (
-                        <motion.div
-                          key="upi-input"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="space-y-6"
-                        >
-                          <div className="flex flex-col items-center gap-6 p-6 bg-white rounded-3xl border border-gray-100">
-                            <div className="w-40 h-40 bg-gray-50 border border-gray-100 rounded-3xl flex items-center justify-center p-6 shadow-inner">
-                              <div className="w-full h-full bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT_CHECKOUT')] bg-center bg-no-repeat bg-contain opacity-70"></div>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-[10px] font-bold text-charcoal uppercase tracking-widest mb-1">Scan to Pay ₹{finalTotal}</p>
-                              <p className="text-[8px] text-gray-400 font-medium uppercase tracking-widest">Powered by BB Connect Secure Gateway</p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            {['Google Pay', 'PhonePe', 'Paytm', 'BHIM UPI'].map(app => (
-                              <button 
-                                key={app}
-                                onClick={() => alert(`Opening ${app}...`)}
-                                className="py-4 border border-gray-100 rounded-2xl text-[10px] font-bold text-charcoal hover:border-bbBlue hover:bg-bbBlue/5 transition-all text-center"
-                              >
-                                {app}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="pt-4 border-t border-gray-100 mt-4">
-                            <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Or enter UPI ID manually</label>
-                            <input 
-                              type="text" 
-                              placeholder="username@bank"
-                              value={paymentDetails.upiId}
-                              onChange={(e) => setPaymentDetails({...paymentDetails, upiId: e.target.value})}
-                              className="w-full px-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono mt-2" 
-                            />
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {paymentMethod === 'card' && (
-                        <motion.div
-                          key="card-input"
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                        >
-                          <div className="p-8 bg-charcoal rounded-[2rem] text-white relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-bbBlue/20 blur-[60px] rounded-full"></div>
-                            <div className="relative z-10">
-                              <div className="flex justify-between items-start mb-12">
-                                <CreditCard size={32} className="text-bbBlue" />
-                                <span className="text-[0.5rem] font-bold uppercase tracking-[0.4em] opacity-50">Secure Gateway</span>
-                              </div>
-                              <div className="space-y-6">
-                                <div className="space-y-2">
-                                  <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">Card Number</p>
-                                  <input 
-                                    className="bg-transparent border-none outline-none text-xl font-mono tracking-[0.2em] w-full"
-                                    value={paymentDetails.cardNum}
-                                    onChange={(e) => setPaymentDetails({...paymentDetails, cardNum: e.target.value})}
-                                  />
-                                </div>
-                                <div className="flex gap-12">
-                                  <div className="space-y-2">
-                                    <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">Expiry</p>
-                                    <input 
-                                      className="bg-transparent border-none outline-none font-mono w-20"
-                                      value={paymentDetails.expiry}
-                                      onChange={(e) => setPaymentDetails({...paymentDetails, expiry: e.target.value})}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <p className="text-[0.5rem] font-bold uppercase tracking-widest opacity-50">CVV</p>
-                                    <input 
-                                      className="bg-transparent border-none outline-none font-mono w-12"
-                                      value={paymentDetails.cvv}
-                                      onChange={(e) => setPaymentDetails({...paymentDetails, cvv: e.target.value})}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {paymentMethod === 'netbanking' && (
-                        <motion.div
-                          key="bank-input"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="space-y-4"
-                        >
-                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Select Your Bank</label>
-                          <select 
-                            value={paymentDetails.bank}
-                            onChange={(e) => setPaymentDetails({...paymentDetails, bank: e.target.value})}
-                            className="w-full px-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all text-[0.875rem] font-bold text-charcoal appearance-none"
-                          >
-                            <option value="">Choose Bank</option>
-                            <option value="sbi">State Bank of India</option>
-                            <option value="hdfc">HDFC Bank</option>
-                            <option value="icici">ICICI Bank</option>
-                            <option value="axis">Axis Bank</option>
-                            <option value="pnb">Punjab National Bank</option>
-                          </select>
-                        </motion.div>
-                      )}
-
-                      {paymentMethod === 'wallet' && (
-                        <motion.div
-                          key="wallet-input"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="grid grid-cols-2 gap-4"
-                        >
-                          {['Paytm', 'Amazon Pay', 'PhonePe Wallet'].map(wallet => (
-                            <button
-                              key={wallet}
-                              onClick={() => setPaymentDetails({...paymentDetails, wallet})}
-                              className={`p-4 rounded-xl border transition-all text-center ${paymentDetails.wallet === wallet ? 'border-bbBlue bg-bbBlue/5 text-bbBlue' : 'border-gray-100 bg-white text-gray-400 hober:border-bbBlue'}`}
-                            >
-                              <span className="text-[0.625rem] font-bold uppercase tracking-widest">{wallet}</span>
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center justify-center text-center space-y-6">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+                      <ShieldCheck className="text-bbBlue" size={32} />
+                    </div>
+                    <div className="space-y-2 max-w-sm">
+                      <p className="text-[10px] font-bold text-charcoal uppercase tracking-widest">Razorpay Standard Handoff</p>
+                      <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest leading-relaxed">
+                        {paymentMethod === 'upi' && "UPI Intent is active. Pay directly via PhonePe, Google Pay, Paytm, or BHIM apps."}
+                        {paymentMethod === 'card' && "Cards module is active. Pay securely with major credit/debit cards."}
+                        {paymentMethod === 'netbanking' && "Net Banking is active. Pay directly from top Indian bank login gateways."}
+                        {paymentMethod === 'wallet' && "Digital Wallets active. Pay via Paytm, Amazon Pay, or PhonePe wallet."}
+                      </p>
+                    </div>
+                    <div className="text-[8px] text-gray-400 font-medium uppercase tracking-widest bg-white py-2 px-4 rounded-full border border-gray-100">
+                      Standard SDK Sandbox Gateway Mode Enabled
+                    </div>
                   </div>
 
                   {paymentError && (
@@ -533,7 +540,7 @@ const CheckoutPage: React.FC = () => {
                     </button>
                     <button 
                       onClick={handlePayment}
-                      disabled={loading || (paymentMethod === 'upi' && !paymentDetails.upiId) || (paymentMethod === 'netbanking' && !paymentDetails.bank) || (paymentMethod === 'wallet' && !paymentDetails.wallet)}
+                      disabled={loading}
                       className="bg-bbBlue text-white px-10 py-5 rounded-3xl font-bold uppercase text-[0.75rem] tracking-[0.2em] shadow-2xl shadow-bbBlue/30 hover:bg-blue-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50 order-1 md:order-2"
                     >
                       {loading ? (

@@ -101,6 +101,7 @@ const AppRoutes: React.FC = () => {
       {/* CUSTOMER PORTAL */}
       <Route path="/customer/explore" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ExplorePage /></ProtectedRoute>} />
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
+      <Route path="/customer/dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'admin']}><MyShopping /></ProtectedRoute>} />
       <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'admin']}><CheckoutPage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ShopDetail /></ProtectedRoute>} />
