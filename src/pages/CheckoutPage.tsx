@@ -13,6 +13,11 @@ const CheckoutPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  const isSlotBooking = cart.some(item => 
+    (item.category && String(item.category).toLowerCase().includes('service')) || 
+    (item.name && String(item.name).includes('(Booking)'))
+  );
+  
   const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'processing' | 'success'>('cart');
   const [loading, setLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -67,8 +72,13 @@ const CheckoutPage: React.FC = () => {
       // Step 3: Atomic Order Creation (Success Path Only)
       const orderData = {
         customerId: user?.uid,
-        customerName: formData.fullName,
-        shippingAddress: {
+        customerName: formData.fullName || user?.name || 'Customer Booking',
+        shippingAddress: isSlotBooking ? {
+          address: 'N/A - Direct Service Slot Booking (Bypassed)',
+          city: 'N/A',
+          pincode: 'N/A',
+          state: 'N/A'
+        } : {
           address: formData.address,
           city: formData.city,
           pincode: formData.pincode,
@@ -82,6 +92,7 @@ const CheckoutPage: React.FC = () => {
         paymentMethodDetail: paymentMethod === 'upi' ? paymentDetails.upiId : 
                              paymentMethod === 'wallet' ? paymentDetails.wallet : 
                              paymentMethod === 'netbanking' ? paymentDetails.bank : 'card',
+        transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
         createdAt: serverTimestamp()
       };
 
@@ -121,15 +132,24 @@ const CheckoutPage: React.FC = () => {
       <div className="max-w-6xl mx-auto px-[5%]">
         {/* Progress Bar */}
         <div className="flex items-center justify-between mb-12 py-8 border-b border-gray-100">
-          {[
-            { id: 'cart', label: 'Cart', icon: ShieldCheck },
-            { id: 'shipping', label: 'Shipping', icon: Truck },
-            { id: 'payment', label: 'Payment', icon: CreditCard }
-          ].map((s, idx) => {
+          {(isSlotBooking 
+            ? [
+                { id: 'cart', label: 'Cart', icon: ShieldCheck },
+                { id: 'payment', label: 'Payment', icon: CreditCard }
+              ]
+            : [
+                { id: 'cart', label: 'Cart', icon: ShieldCheck },
+                { id: 'shipping', label: 'Shipping', icon: Truck },
+                { id: 'payment', label: 'Payment', icon: CreditCard }
+              ]
+          ).map((s, idx, stepsArr) => {
             const Icon = s.icon;
             const isActive = step === s.id;
-            const isDone = ['shipping', 'payment', 'success'].includes(step) && s.id === 'cart' || 
-                           (['payment', 'success'].includes(step) && s.id === 'shipping');
+            const isDone = isActive ? false : (
+              (step === 'shipping' && s.id === 'cart') ||
+              (step === 'payment' && (s.id === 'cart' || s.id === 'shipping')) ||
+              (step === 'success' && (s.id === 'cart' || s.id === 'shipping' || s.id === 'payment'))
+            );
             
             return (
               <React.Fragment key={s.id}>
@@ -144,7 +164,7 @@ const CheckoutPage: React.FC = () => {
                     {s.label}
                   </span>
                 </div>
-                {idx < 2 && <div className="flex-grow h-[1px] bg-gray-100 mx-4 mb-6" />}
+                {idx < stepsArr.length - 1 && <div className="flex-grow h-[1px] bg-gray-100 mx-4 mb-6" />}
               </React.Fragment>
             );
           })}
@@ -191,10 +211,10 @@ const CheckoutPage: React.FC = () => {
                       <ArrowLeft size={14} /> Continue Shopping
                     </button>
                     <button 
-                      onClick={() => setStep('shipping')}
+                      onClick={() => setStep(isSlotBooking ? 'payment' : 'shipping')}
                       className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl"
                     >
-                      Proceed to Shipping
+                      {isSlotBooking ? "Confirm Booking & Pay" : "Proceed to Shipping"}
                     </button>
                   </div>
                 </motion.div>
@@ -480,8 +500,11 @@ const CheckoutPage: React.FC = () => {
                   )}
 
                   <div className="pt-8 flex flex-col md:flex-row justify-between gap-4">
-                    <button onClick={() => setStep('shipping')} className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors order-2 md:order-1">
-                      <ArrowLeft size={14} /> Back to Shipping
+                    <button 
+                      onClick={() => setStep(isSlotBooking ? 'cart' : 'shipping')} 
+                      className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors order-2 md:order-1"
+                    >
+                      <ArrowLeft size={14} /> {isSlotBooking ? "Back to Cart" : "Back to Shipping"}
                     </button>
                     <button 
                       onClick={handlePayment}
@@ -543,7 +566,9 @@ const CheckoutPage: React.FC = () => {
                   </div>
                   <h2 className="text-4xl font-serif font-bold text-charcoal mb-4">Order Confirmed!</h2>
                   <p className="text-gray-400 uppercase tracking-widest text-[0.625rem] mb-12 max-w-md mx-auto leading-relaxed">
-                    Your premium essentials are being prepared for dispatch. You will receive a tracking link via SMS shortly.
+                    {isSlotBooking 
+                      ? "Your slot booking has been successfully confirmed. Please check your dashboard for details." 
+                      : "Your premium essentials are being prepared for dispatch. You will receive a tracking link via SMS shortly."}
                   </p>
                   <button 
                     onClick={() => navigate('/customer-dashboard')}
@@ -566,12 +591,14 @@ const CheckoutPage: React.FC = () => {
                     <span className="text-gray-500">Subtotal ({totalItems} items)</span>
                     <span className="font-mono font-bold">₹{totalPrice}</span>
                   </div>
+                  {!isSlotBooking && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Shipping</span>
+                      <span className="text-green-500 font-bold uppercase text-[10px]">Free</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Shipping</span>
-                    <span className="text-green-500 font-bold uppercase text-[10px]">Free</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Tax (GST)</span>
+                    <span className="text-gray-500 font-medium">Tax (GST)</span>
                     <span className="font-mono font-bold">₹0</span>
                   </div>
                 </div>
