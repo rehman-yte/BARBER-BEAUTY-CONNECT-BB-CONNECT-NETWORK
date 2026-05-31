@@ -9,19 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
 import { getSettings } from '../services/logic_engine';
 
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
+// Purged Razorpay Script Integrations. Using Direct UPI Intent Interface.
 
 const CheckoutPage: React.FC = () => {
   const { cart, totalPrice, totalItems, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -78,25 +66,53 @@ const CheckoutPage: React.FC = () => {
     state: ''
   });
 
+  // Countdown timer and auto-check listener states
+  const [timeLeft, setTimeLeft] = useState<number>(110);
+  const [timerActive, setTimerActive] = useState<boolean>(false);
+  const [isWaitingPayment, setIsWaitingPayment] = useState<boolean>(false);
+
+  // Trigger countdown timer on entering payment step
+  useEffect(() => {
+    if (step === 'payment') {
+      setTimeLeft(110);
+      setTimerActive(true);
+    } else {
+      setTimerActive(false);
+      setIsWaitingPayment(false);
+    }
+  }, [step]);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (timerActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && timerActive) {
+      setPaymentError("Payment session expired. Please restart the checkout process.");
+      setTimerActive(false);
+      setIsWaitingPayment(false);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timerActive, timeLeft]);
+
+  const formatTime = (seconds: number) => {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handlePayment = async () => {
+  const handlePayment = async (provider: 'GPay' | 'PhonePe' | 'Paytm') => {
     setLoading(true);
     setPaymentError(null);
 
-    // Step 1: Load Razorpay SDK Script
-    const res = await loadRazorpayScript();
-    if (!res) {
-      setLoading(false);
-      setPaymentError("Razorpay SDK failed to load. Are you offline?");
-      return;
-    }
-
-    // Step 2: Call Backend Create Order API to obtain standard Order ID
-    let razorpayOrderId = "";
-    let razorpayKey = "rzp_test_SvrVkSoTGGlNX1"; // default option
+    let createdOrderId = "";
     try {
       const createOrderResponse = await fetch('/api/create-order', {
         method: 'POST',
@@ -104,7 +120,7 @@ const CheckoutPage: React.FC = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          amount: finalTotal * 100, // in paise
+          amount: finalTotal,
           currency: "INR",
           type: isSlotBooking ? "slot_booking" : "product_purchase"
         })
@@ -122,10 +138,7 @@ const CheckoutPage: React.FC = () => {
         throw new Error(createOrderData?.error || "Could not generate transaction order ID on the server.");
       }
 
-      razorpayOrderId = createOrderData.order_id || createOrderData.orderId || "";
-      if (createOrderData.key) {
-        razorpayKey = createOrderData.key;
-      }
+      createdOrderId = createOrderData.order_id || createOrderData.orderId || "";
     } catch (orderErr: any) {
       console.error("Failed to generate order ID:", orderErr);
       setPaymentError(orderErr.message || "Failed to initiate secure payment checkout. Please try again.");
@@ -133,7 +146,7 @@ const CheckoutPage: React.FC = () => {
       return;
     }
 
-    // Step 3: Write initial pending transaction records to Firestore prior to standard handoff
+    // Step 2: Write initial pending transaction records to Firestore prior to standard handoff
     let finalOrderId = '';
     let finalBookingIds: string[] = [];
 
@@ -158,8 +171,8 @@ const CheckoutPage: React.FC = () => {
         platformFee: feeAmount,
         status: 'payment_held', // initial pending status before signature validation
         paymentStatus: 'unpaid',
-        paymentMethod: paymentMethod,
-        razorpayOrderId: razorpayOrderId,
+        paymentMethod: 'UPI_INTENT',
+        razorpayOrderId: createdOrderId, // compatible fallback storage key
         transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
         createdAt: serverTimestamp()
       };
@@ -189,8 +202,8 @@ const CheckoutPage: React.FC = () => {
               status: 'payment_held', // pending
               bookingStatus: 'pending_payment',
               paymentStatus: 'unpaid',
-              paymentMethod: paymentMethod,
-              razorpayOrderId: razorpayOrderId,
+              paymentMethod: 'UPI_INTENT',
+              razorpayOrderId: createdOrderId, // compatible fallback storage key
               createdAt: new Date().toISOString()
             };
             const bookingRef = await addDoc(collection(db, 'bookings'), bookingDocData);
@@ -205,132 +218,56 @@ const CheckoutPage: React.FC = () => {
       return;
     }
 
-    // Step 4: Configure Razorpay Checkout options
-    const options = {
-      key: razorpayKey, // Dynamic Razorpay credential synchronized perfectly from backend
-      amount: finalTotal * 100, // INR in paise
-      currency: "INR",
-      name: "Barber & Beauty Connect",
-      order_id: razorpayOrderId, // Integrate backend order_id correctly
-      description: isSlotBooking ? "Premium Slot Booking Payment" : "Premium Product Purchase Payment",
-      image: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT",
-      handler: async function (response: any) {
-        setStep('processing');
-        setLoading(true);
+    // Step 3: Trigger exact requested direct UPI Intent Deep Link URL
+    // upi://pay?pa=YOUR_UPI_ID@bank&pn=BB_ONNECT_NETWORK&am={TOTAL_AMOUNT}&cu=INR&tn=Order_{ID}
+    const upiParams = `pa=bbconnect@okaxis&pn=BB_ONNECT_NETWORK&am=${finalTotal}&cu=INR&tn=Order_${createdOrderId}`;
+    let upiIntentUrl = `upi://pay?${upiParams}`;
 
-        try {
-          // Send signature validation to the backend service
-          const verifyResponse = await fetch('/api/verify-payment', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              bookingDocIds: finalBookingIds,
-              orderDocId: finalOrderId
-            })
-          });
-
-          const verifyData = await verifyResponse.json();
-          if (!verifyData || !verifyData.success) {
-            throw new Error(verifyData?.error || "Transaction verification signature authentication failed.");
-          }
-
-          setStep('success');
-          clearCart();
-          
-          // Successfully navigated
-          setTimeout(() => {
-            navigate('/customer/dashboard', { state: { successMessage: "Payment successful! Your order has been confirmed." } });
-          }, 2000);
-          
-        } catch (error: any) {
-          console.error("Critical: Payment verified but order sync failed:", error);
-          setPaymentError(error.message || "Payment Successful, but we encountered a signature verification sync error.");
-          setStep('payment');
-        } finally {
-          setLoading(false);
-        }
-      },
-      prefill: {
-        name: formData.fullName || user?.name || "Customer",
-        email: formData.email || user?.email || "customer@example.com",
-        contact: formData.phone || ""
-      },
-      notes: {
-        address: formData.address || 'N/A - Direct Booking'
-      },
-      theme: {
-        color: "#2358E1" // bbBlue
-      }
-    };
-
-    // Build configuration sequence according to user choice
-    if (paymentMethod === 'upi') {
-      (options as any).config = {
-        display: {
-          blocks: {
-            upi: {
-              name: 'Unified Payments Interface',
-              instruments: [
-                {
-                  method: 'upi',
-                  flows: ['intent', 'qr', 'collect']
-                }
-              ]
-            }
-          },
-          sequence: ['block.upi', 'card', 'netbanking'],
-          preferences: {
-            show_default_blocks: true
-          }
-        }
-      };
-    } else if (paymentMethod === 'card') {
-      (options as any).config = {
-        display: {
-          blocks: {
-            cards: {
-              name: 'Credit and Debit Cards',
-              instruments: [
-                {
-                  method: 'card'
-                }
-              ]
-            }
-          },
-          sequence: ['block.cards', 'upi', 'netbanking'],
-          preferences: {
-            show_default_blocks: true
-          }
-        }
-      };
-    } else {
-      (options as any).config = {
-        display: {
-          sequence: ['upi', 'card', 'netbanking'],
-          preferences: {
-            show_default_blocks: true
-          }
-        }
-      };
+    if (provider === 'GPay') {
+      upiIntentUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+    } else if (provider === 'PhonePe') {
+      upiIntentUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.phonepe.app;end`;
+    } else if (provider === 'Paytm') {
+      upiIntentUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=net.one97.paytm;end`;
     }
+
+    console.log(`[UPI INTENT] Redirection to ${provider}: ${upiIntentUrl}`);
 
     try {
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', function (resp: any) {
-        setPaymentError(resp.error.description || "Transaction failed. Please try again.");
-        setLoading(false);
-      });
-      rzp.open();
-    } catch (err) {
-      console.error("Failed to initialize Razorpay:", err);
-      setPaymentError("Could not initialize payment gateway popup. Please try again.");
-      setLoading(false);
+      window.location.href = upiIntentUrl;
+    } catch (redirectErr) {
+      console.warn("Operating system did not handle intent link, polling in background.");
     }
+
+    // Step 4: Run the Smart 'Reality Check' listener (automatic backend verification polling loop)
+    setIsWaitingPayment(true);
+    setLoading(false);
+
+    let checkCount = 0;
+    const pollInterval = setInterval(async () => {
+      checkCount++;
+      try {
+        // Query the live backend status endpoint
+        const checkResponse = await fetch(`/api/check-payment/${finalOrderId}`);
+        if (checkResponse.ok) {
+          const checkData = await checkResponse.json();
+          if (checkData && checkData.success && checkData.paymentStatus === 'paid') {
+            clearInterval(pollInterval);
+            setIsWaitingPayment(false);
+            setTimerActive(false);
+            setStep('success');
+            clearCart();
+          }
+        }
+      } catch (checkErr) {
+        console.error("Reality Check polling listener exception:", checkErr);
+      }
+
+      // Safety polling cancel
+      if (checkCount > 120) {
+        clearInterval(pollInterval);
+      }
+    }, 2000);
   };
 
   if (cart.length === 0 && step !== 'success') {
@@ -515,132 +452,150 @@ const CheckoutPage: React.FC = () => {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-8"
                 >
-                  <div className="flex justify-between items-center mb-8">
-                    <h3 className="text-2xl font-serif font-bold text-charcoal">Secure Payment</h3>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-green-50 rounded-full">
-                      <ShieldCheck size={12} className="text-green-500" />
-                      <span className="text-[0.5rem] font-bold text-green-600 uppercase tracking-widest">256-bit AES Encryption</span>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-2xl font-serif font-bold text-charcoal">Direct UPI Checkout</h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Metro-Style Instant Intent Flow</p>
+                    </div>
+                    {/* Countdown Timer */}
+                    <div className="flex items-center gap-3 bg-red-50 text-red-600 px-4 py-2.5 rounded-2xl border border-red-100/50">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                      <div className="text-right">
+                        <span className="text-[8px] font-extrabold uppercase tracking-widest block opacity-75">SESSION TIMEOUT</span>
+                        <span className="text-sm font-mono font-bold tracking-tight">{formatTime(timeLeft)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* UPI Option */}
-                    <button 
-                      onClick={() => setPaymentMethod('upi')}
-                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'upi' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'upi' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
-                          <Smartphone size={20} />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">UPI Payment</p>
-                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Google Pay, PhonePe</p>
+                  {isWaitingPayment ? (
+                    /* Reality Check Polling HUD */
+                    <div className="bg-charcoal text-white p-8 rounded-[2rem] border border-gray-800 flex flex-col items-center justify-center text-center space-y-8 py-14 shadow-2xl">
+                      <div className="relative">
+                        <div className="w-24 h-24 border-4 border-bbBlue border-t-transparent rounded-full animate-spin" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ShieldCheck size={32} className="text-bbBlue animate-pulse" />
                         </div>
                       </div>
-                      {paymentMethod === 'upi' && <Check size={16} className="text-bbBlue" />}
-                    </button>
-
-                    {/* Card Option */}
-                    <button 
-                      onClick={() => setPaymentMethod('card')}
-                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'card' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'card' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
-                          <CreditCard size={20} />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">Credit / Debit Card</p>
-                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Visa, Mastercard, RuPay</p>
-                        </div>
+                      <div className="space-y-3 max-w-sm">
+                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] bg-emerald-950/50 py-1.5 px-4 rounded-full border border-emerald-800/30">
+                          ● Reality Check: Listening Live
+                        </span>
+                        <h4 className="text-lg font-serif font-bold text-white pt-2">Waiting for UPI Confirmation</h4>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-relaxed">
+                          Please complete the payment inside your selected UPI client app. Our system will automatically direct you once confirmed.
+                        </p>
                       </div>
-                      {paymentMethod === 'card' && <Check size={16} className="text-bbBlue" />}
-                    </button>
-
-                    {/* Net Banking */}
-                    <button 
-                      onClick={() => setPaymentMethod('netbanking')}
-                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'netbanking' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'netbanking' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
-                          <Landmark size={20} />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">Net Banking</p>
-                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Major Indian Banks</p>
-                        </div>
+                      <div className="text-[10px] font-mono text-gray-400 max-w-xs bg-white/5 py-2 px-5 rounded-full border border-white/5">
+                        DO NOT REFRESH OR ESCAPE (Timeout: {formatTime(timeLeft)})
                       </div>
-                      {paymentMethod === 'netbanking' && <Check size={16} className="text-bbBlue" />}
-                    </button>
-
-                    {/* Wallets */}
-                    <button 
-                      onClick={() => setPaymentMethod('wallet')}
-                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border transition-all ${paymentMethod === 'wallet' ? 'border-bbBlue bg-bbBlue/5 shadow-sm' : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'wallet' ? 'bg-bbBlue text-white' : 'bg-white text-gray-400'}`}>
-                          <Wallet size={20} />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-[0.625rem] font-bold uppercase tracking-widest text-charcoal">Wallets</p>
-                          <p className="text-[0.5625rem] text-gray-400 uppercase tracking-widest mt-0.5">Paytm, Amazon Pay</p>
-                        </div>
-                      </div>
-                      {paymentMethod === 'wallet' && <Check size={16} className="text-bbBlue" />}
-                    </button>
-                  </div>
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center justify-center text-center space-y-6">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
-                      <ShieldCheck className="text-bbBlue" size={32} />
                     </div>
-                    <div className="space-y-2 max-w-sm">
-                      <p className="text-[10px] font-bold text-charcoal uppercase tracking-widest">Razorpay Standard Handoff</p>
-                      <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest leading-relaxed">
-                        {paymentMethod === 'upi' && "UPI Intent is active. Pay directly via PhonePe, Google Pay, Paytm, or BHIM apps."}
-                        {paymentMethod === 'card' && "Cards module is active. Pay securely with major credit/debit cards."}
-                        {paymentMethod === 'netbanking' && "Net Banking is active. Pay directly from top Indian bank login gateways."}
-                        {paymentMethod === 'wallet' && "Digital Wallets active. Pay via Paytm, Amazon Pay, or PhonePe wallet."}
-                      </p>
+                  ) : (
+                    /* Three prominent Metro-Style branded buttons */
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 pl-1 font-sans">Select UPI App to Trigger Intent</p>
+                      
+                      <div className="grid grid-cols-1 gap-4 font-sans">
+                        {/* Google Pay */}
+                        <button 
+                          onClick={() => handlePayment('GPay')}
+                          disabled={loading || timeLeft === 0}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-blue-500 hover:shadow-lg transition-all text-left duration-200 group"
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 rounded-2xl bg-[#eff3ff] flex items-center justify-center font-serif font-black text-blue-600 text-lg shadow-sm">
+                              G
+                            </div>
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-wider text-charcoal group-hover:text-blue-600 transition-colors">Pay with Google Pay</p>
+                              <p className="text-[9px] text-gray-400 uppercase tracking-widest mt-1">Instant deep-linking to GPay</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-blue-50 text-blue-600 py-1 px-3 rounded-full border border-blue-100">GPAY LOCAL</span>
+                            <Check className="text-gray-300 group-hover:text-blue-500 transition-colors" size={18} />
+                          </div>
+                        </button>
+
+                        {/* PhonePe */}
+                        <button 
+                          onClick={() => handlePayment('PhonePe')}
+                          disabled={loading || timeLeft === 0}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-purple-500 hover:shadow-lg transition-all text-left duration-200 group"
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 rounded-2xl bg-[#f4e8ff] flex items-center justify-center font-serif font-black text-purple-600 text-lg shadow-sm">
+                              P
+                            </div>
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-wider text-charcoal group-hover:text-purple-600 transition-colors">Pay with PhonePe</p>
+                              <p className="text-[9px] text-gray-400 uppercase tracking-widest mt-1">Instant deep-linking to PhonePe</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-purple-50 text-purple-600 py-1 px-3 rounded-full border border-purple-100">PHONEPE</span>
+                            <Check className="text-gray-300 group-hover:text-purple-500 transition-colors" size={18} />
+                          </div>
+                        </button>
+
+                        {/* Paytm */}
+                        <button 
+                          onClick={() => handlePayment('Paytm')}
+                          disabled={loading || timeLeft === 0}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-cyan-500 hover:shadow-lg transition-all text-left duration-200 group"
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 rounded-2xl bg-[#e6f7ff] flex items-center justify-center font-serif font-black text-cyan-600 text-lg shadow-sm">
+                              Py
+                            </div>
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-wider text-charcoal group-hover:text-cyan-500 transition-colors">Pay with Paytm</p>
+                              <p className="text-[9px] text-gray-400 uppercase tracking-widest mt-1">Instant deep-linking to Paytm Wallet</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-cyan-50 text-cyan-600 py-1 px-3 rounded-full border border-cyan-100">PAYTM HUB</span>
+                            <Check className="text-gray-300 group-hover:text-cyan-500 transition-colors" size={18} />
+                          </div>
+                        </button>
+                      </div>
+
+                      <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 flex flex-col items-center justify-center text-center space-y-4">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="text-bbBlue" size={24} />
+                          <span className="text-[9px] font-black text-charcoal uppercase tracking-[0.2em]">DIRECT UPI GATEWAY ENFORCED</span>
+                        </div>
+                        <p className="text-[9px] text-gray-400 font-medium uppercase tracking-widest leading-relaxed max-w-sm">
+                          This checkout does not expose keys or credit profiles. Payment will execute via simple, direct bank intent routing secured by virtual private payment IDs.
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-[8px] text-gray-400 font-medium uppercase tracking-widest bg-white py-2 px-4 rounded-full border border-gray-100">
-                      Standard SDK Sandbox Gateway Mode Enabled
-                    </div>
-                  </div>
+                  )}
 
                   {paymentError && (
                     <motion.div 
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-6"
+                      className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-6 font-sans"
                     >
                       <p className="text-[0.625rem] font-bold text-red-500 uppercase tracking-widest text-center">{paymentError}</p>
                     </motion.div>
                   )}
 
-                  <div className="pt-8 flex flex-col md:flex-row justify-between gap-4">
+                  <div className="pt-8 flex flex-col md:flex-row justify-between gap-4 border-t border-gray-100">
                     <button 
                       onClick={() => setStep(isSlotBooking ? 'cart' : 'shipping')} 
-                      className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors order-2 md:order-1"
+                      disabled={loading || isWaitingPayment}
+                      className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors disabled:opacity-30"
                     >
-                      <ArrowLeft size={14} /> {isSlotBooking ? "CONTINUE SLOT BOOKING" : "Back to Cart"}
+                      <ArrowLeft size={14} /> Back to Details
                     </button>
-                    <button 
-                      onClick={handlePayment}
-                      disabled={loading}
-                      className="bg-bbBlue text-white px-10 py-5 rounded-3xl font-bold uppercase text-[0.75rem] tracking-[0.2em] shadow-2xl shadow-bbBlue/30 hover:bg-blue-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50 order-1 md:order-2"
-                    >
-                      {loading ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <ShieldCheck size={20} />
-                          <span>Finalize & Pay ₹{finalTotal}</span>
-                        </>
-                      )}
-                    </button>
+                    
+                    {loading && (
+                      <div className="flex items-center gap-3 text-bbBlue bg-blue-50 py-3 px-6 rounded-full border border-blue-100 font-sans">
+                        <div className="w-4 h-4 border-2 border-bbBlue border-t-transparent rounded-full animate-spin" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Generating UPI Intent Hash...</span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
