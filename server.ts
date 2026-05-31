@@ -412,8 +412,12 @@ async function startServer() {
   });
 
   // Razorpay Order Creation and Verification API
-  const razorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_SvrVkSoTGGlNX1';
-  const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || 'xdOTXQYun04VJSN92LkU9BDk';
+  const razorpayKeyId = (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_ID !== 'null') 
+    ? process.env.RAZORPAY_KEY_ID 
+    : 'rzp_test_SvrVkSoTGGlNX1';
+  const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== 'null') 
+    ? process.env.RAZORPAY_KEY_SECRET 
+    : 'xdOTXQYun04VJSN92LkU9BDk';
 
   let razorpayInstance: any = null;
   const getRazorpayInstance = () => {
@@ -428,10 +432,12 @@ async function startServer() {
   };
 
   app.post('/api/create-order', async (req, res) => {
+    console.log(`[API CREATE-ORDER] Incoming request body:`, req.body);
     try {
       const { amount, currency = 'INR', type } = req.body;
       
       if (!amount || amount < 100) {
+        console.warn(`[API CREATE-ORDER] Rejected order for insufficient amount: ${amount}`);
         return res.status(400).json({ success: false, error: 'Amount must be valid and >= 100 paise (1 INR)' });
       }
 
@@ -445,7 +451,10 @@ async function startServer() {
         }
       };
 
+      console.log(`[API CREATE-ORDER] Creating Razorpay order with options:`, options);
       const order = await razorpay.orders.create(options);
+      console.log(`[API CREATE-ORDER] Successfully created Razorpay order:`, order.id);
+
       res.json({
         success: true,
         order_id: order.id,
@@ -539,6 +548,12 @@ async function startServer() {
       console.error('Error in /api/verify-payment:', err);
       res.status(500).json({ success: false, error: err.message || 'Signature verification failure' });
     }
+  });
+
+  // PREVENT HTML FALLBACK FOR API: Any unmatched API route must return a 404 JSON response
+  app.all('/api/*all', (req, res) => {
+    console.warn(`[API 404 RESCUE] Unmatched API route requested: ${req.method} ${req.url}`);
+    res.status(404).json({ error: 'API route not found' });
   });
 
   // Vite middleware for development
