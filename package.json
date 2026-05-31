@@ -19,6 +19,7 @@
     "framer-motion": "^12.29.2",
     "lucide-react": "^0.475.0",
     "motion": "^12.4.3",
+    "razorpay": "^2.9.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0",

@@ -94,12 +94,113 @@ const CheckoutPage: React.FC = () => {
       return;
     }
 
-    // Step 2: Configure options
+    // Step 2: Call Backend Create Order API to obtain standard Order ID
+    let razorpayOrderId = "";
+    try {
+      const createOrderResponse = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: finalTotal * 100, // in paise
+          currency: "INR",
+          type: isSlotBooking ? "slot_booking" : "product_purchase"
+        })
+      });
+
+      const createOrderData = await createOrderResponse.json();
+      if (!createOrderData || !createOrderData.success) {
+        throw new Error(createOrderData?.error || "Could not generate transaction order ID on the server.");
+      }
+
+      razorpayOrderId = createOrderData.orderId;
+    } catch (orderErr: any) {
+      console.error("Failed to generate order ID:", orderErr);
+      setPaymentError(orderErr.message || "Failed to initiate secure payment checkout. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Step 3: Write initial pending transaction records to Firestore prior to standard handoff
+    let finalOrderId = '';
+    let finalBookingIds: string[] = [];
+
+    try {
+      // Write initial Order document
+      const orderData = {
+        customerId: user?.uid,
+        customerName: formData.fullName || user?.name || 'Customer Booking',
+        shippingAddress: isSlotBooking ? {
+          address: 'N/A - Direct Service Slot Booking (Bypassed)',
+          city: 'N/A',
+          pincode: 'N/A',
+          state: 'N/A'
+        } : {
+          address: formData.address,
+          city: formData.city,
+          pincode: formData.pincode,
+          state: formData.state
+        },
+        items: cart,
+        totalAmount: finalTotal, // Includes platform / service fee
+        platformFee: feeAmount,
+        status: 'payment_held', // initial pending status before signature validation
+        paymentStatus: 'unpaid',
+        paymentMethod: paymentMethod,
+        razorpayOrderId: razorpayOrderId,
+        transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
+        createdAt: serverTimestamp()
+      };
+
+      const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      finalOrderId = orderRef.id;
+
+      // Write initial Booking documents if slot booking
+      if (isSlotBooking) {
+        for (const item of cart) {
+          if (
+            (item.category && String(item.category).toLowerCase().includes('service')) || 
+            (item.name && String(item.name).includes('(Booking)')) || 
+            item.type === 'booking'
+          ) {
+            const bookingDocData = {
+              customerId: user?.uid,
+              customerName: formData.fullName || user?.name || 'Customer Booking',
+              partnerId: item.shopId || item.partnerId || '',
+              shopId: item.shopId || item.partnerId || '',
+              shopName: item.shopName || 'Partner Salon',
+              service: item.serviceName || item.name || 'Grooming Service',
+              serviceName: item.serviceName || item.name || 'Grooming Service',
+              price: item.price,
+              date: item.date || new Date().toDateString(),
+              time: item.time || '10:00',
+              status: 'payment_held', // pending
+              bookingStatus: 'pending_payment',
+              paymentStatus: 'unpaid',
+              paymentMethod: paymentMethod,
+              razorpayOrderId: razorpayOrderId,
+              createdAt: new Date().toISOString()
+            };
+            const bookingRef = await addDoc(collection(db, 'bookings'), bookingDocData);
+            finalBookingIds.push(bookingRef.id);
+          }
+        }
+      }
+    } catch (saveError: any) {
+      console.error("Database sync failed prior to checkout modal:", saveError);
+      setPaymentError("Could not initialize order state database entry. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Step 4: Configure Razorpay Checkout options
     const options = {
-      key: "rzp_test_dummy_key", 
+      key: "rzp_test_SvrVkSoTGGlNX1", // Standard Razorpay credentials as requested
       amount: finalTotal * 100, // INR in paise
       currency: "INR",
       name: "Barber & Beauty Connect",
+      order_id: razorpayOrderId, // Integrate backend order_id correctly
       description: isSlotBooking ? "Premium Slot Booking Payment" : "Premium Product Purchase Payment",
       image: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BB_CONNECT",
       handler: async function (response: any) {
@@ -107,65 +208,24 @@ const CheckoutPage: React.FC = () => {
         setLoading(true);
 
         try {
-          const transactionId = response.razorpay_payment_id || `RZP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-          // Write unified order details to Orders collection
-          const orderData = {
-            customerId: user?.uid,
-            customerName: formData.fullName || user?.name || 'Customer Booking',
-            shippingAddress: isSlotBooking ? {
-              address: 'N/A - Direct Service Slot Booking (Bypassed)',
-              city: 'N/A',
-              pincode: 'N/A',
-              state: 'N/A'
-            } : {
-              address: formData.address,
-              city: formData.city,
-              pincode: formData.pincode,
-              state: formData.state
+          // Send signature validation to the backend service
+          const verifyResponse = await fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
             },
-            items: cart,
-            totalAmount: finalTotal, // Includes the platform / service fee
-            platformFee: feeAmount,
-            status: 'confirmed',
-            paymentStatus: 'paid', // Mark as paid ONLY after verified success
-            paymentMethod: paymentMethod,
-            paymentMethodDetail: response.razorpay_payment_id || 'Razorpay Gateway',
-            transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
-            createdAt: serverTimestamp()
-          };
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              bookingDocIds: finalBookingIds,
+              orderDocId: finalOrderId
+            })
+          });
 
-          await addDoc(collection(db, 'orders'), orderData);
-
-          // Write bookings details directly to bookings collection for Customer Hub
-          if (isSlotBooking) {
-            for (const item of cart) {
-              if (
-                (item.category && String(item.category).toLowerCase().includes('service')) || 
-                (item.name && String(item.name).includes('(Booking)')) || 
-                item.type === 'booking'
-              ) {
-                const bookingDocData = {
-                  customerId: user?.uid,
-                  customerName: formData.fullName || user?.name || 'Customer Booking',
-                  partnerId: item.shopId || item.partnerId || '',
-                  shopId: item.shopId || item.partnerId || '',
-                  shopName: item.shopName || 'Partner Salon',
-                  service: item.serviceName || item.name || 'Grooming Service',
-                  serviceName: item.serviceName || item.name || 'Grooming Service',
-                  price: item.price,
-                  date: item.date || new Date().toDateString(),
-                  time: item.time || '10:00',
-                  status: 'confirmed',
-                  bookingStatus: 'confirmed',
-                  paymentStatus: 'paid',
-                  paymentMethod: paymentMethod,
-                  transactionId: transactionId,
-                  createdAt: new Date().toISOString()
-                };
-                await addDoc(collection(db, 'bookings'), bookingDocData);
-              }
-            }
+          const verifyData = await verifyResponse.json();
+          if (!verifyData || !verifyData.success) {
+            throw new Error(verifyData?.error || "Transaction verification signature authentication failed.");
           }
 
           setStep('success');
@@ -176,9 +236,10 @@ const CheckoutPage: React.FC = () => {
             navigate('/customer/dashboard', { state: { successMessage: "Payment successful! Your order has been confirmed." } });
           }, 2000);
           
-        } catch (error) {
+        } catch (error: any) {
           console.error("Critical: Payment verified but order sync failed:", error);
-          setPaymentError("Payment Successful, but we encountered a sync error. Our team is resolving this.");
+          setPaymentError(error.message || "Payment Successful, but we encountered a signature verification sync error.");
+          setStep('payment');
         } finally {
           setLoading(false);
         }
@@ -282,6 +343,23 @@ const CheckoutPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white pb-20">
       <div className="max-w-6xl mx-auto px-[5%]">
+        {/* UNDER WEBSITE NAME DYNAMIC FLOW LABEL */}
+        <div className="pt-8 pb-4 border-b border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="space-y-1">
+            <span className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.4em] block">
+              BARBER & BEAUTY CONNECT
+            </span>
+            <h1 className="text-2xl font-serif font-black text-charcoal tracking-wide uppercase">
+              {isSlotBooking ? "SLOT" : "CART"}
+            </h1>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] bg-gray-50 py-1.5 px-3.5 rounded-full border border-gray-100">
+              {isSlotBooking ? "Context: Service Slot Reservation" : "Context: Product Logistics Checkout"}
+            </span>
+          </div>
+        </div>
+
         {/* Progress Bar */}
         <div className="flex items-center justify-between mb-12 py-8 border-b border-gray-100">
           {(isSlotBooking 
@@ -360,7 +438,7 @@ const CheckoutPage: React.FC = () => {
                   ))}
                   <div className="pt-8 flex justify-between">
                     <button onClick={() => navigate('/shop')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
-                      <ArrowLeft size={14} /> {isSlotBooking ? 'Continue Slot Booking' : 'Continue Shopping'}
+                      <ArrowLeft size={14} /> {isSlotBooking ? 'CONTINUE SLOT BOOKING' : 'Continue Shopping'}
                     </button>
                     <button 
                       onClick={() => setStep(isSlotBooking ? 'payment' : 'shipping')}

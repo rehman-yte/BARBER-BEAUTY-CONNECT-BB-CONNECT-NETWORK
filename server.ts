@@ -5,9 +5,26 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
+import crypto from 'crypto';
+import Razorpay from 'razorpay';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Firebase for Backend Database Sync
+const firebaseConfig = {
+  apiKey: "AIzaSyDkyxmVMMS9ABmh_VWM7VkCFTgZl6Zq1Zs",
+  authDomain: "bb-connect-network-34617.firebaseapp.com",
+  projectId: "bb-connect-network-34617",
+  storageBucket: "bb-connect-network-34617.firebasestorage.app",
+  messagingSenderId: "48595477782",
+  appId: "1:48595477782:web:8b62b58aa07beb962c9c37"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 const MASTER_DATA_PATH = path.join(__dirname, 'master_data.csv');
 const CONFIG_PATH = path.join(__dirname, 'admin_config.json');
@@ -392,6 +409,134 @@ async function startServer() {
       return s;
     });
     res.json(safeShops);
+  });
+
+  // Razorpay Order Creation and Verification API
+  const razorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_SvrVkSoTGGlNX1';
+  const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || 'xdOTXQYun04VJSN92LkU9BDk';
+
+  let razorpayInstance: any = null;
+  const getRazorpayInstance = () => {
+    if (!razorpayInstance) {
+      razorpayInstance = new Razorpay({
+        key_id: razorpayKeyId,
+        key_secret: razorpayKeySecret,
+      });
+    }
+    return razorpayInstance;
+  };
+
+  app.post('/api/create-order', async (req, res) => {
+    try {
+      const { amount, currency = 'INR', type } = req.body;
+      
+      if (!amount || amount < 100) {
+        return res.status(400).json({ success: false, error: 'Amount must be valid and >= 100 paise (1 INR)' });
+      }
+
+      const razorpay = getRazorpayInstance();
+      const options = {
+        amount: Math.round(amount), // must be in paise
+        currency,
+        receipt: `receipt_order_${Date.now()}`,
+        notes: {
+          checkout_type: type || 'shopping_checkout'
+        }
+      };
+
+      const order = await razorpay.orders.create(options);
+      res.json({
+        success: true,
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency
+      });
+    } catch (err: any) {
+      console.error('Error in /api/create-order:', err);
+      res.status(500).json({ success: false, error: err.message || 'Failed to create Razorpay order' });
+    }
+  });
+
+  app.post('/api/verify-payment', async (req: any, res: any) => {
+    try {
+      const { 
+        razorpay_payment_id, 
+        razorpay_order_id, 
+        razorpay_signature,
+        bookingDocIds,
+        orderDocId
+      } = req.body;
+
+      if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Missing standard verification parameters' });
+      }
+
+      // Re-create the HMAC-SHA256 signature to verify authenticity
+      const text = razorpay_order_id + "|" + razorpay_payment_id;
+      const expectedSignature = crypto
+        .createHmac('sha256', razorpayKeySecret)
+        .update(text)
+        .digest('hex');
+
+      const isVerified = (expectedSignature === razorpay_signature);
+
+      if (!isVerified) {
+        return res.status(400).json({ success: false, error: 'Signature verification failure: authentication mismatch.' });
+      }
+
+      // Update Firestore documents in background since verified successfully
+      try {
+        if (orderDocId) {
+          const oRef = doc(db, 'orders', orderDocId);
+          await updateDoc(oRef, {
+            paymentStatus: 'paid',
+            status: 'confirmed',
+            paymentMethodDetail: razorpay_payment_id
+          });
+        }
+
+        if (bookingDocIds && Array.isArray(bookingDocIds)) {
+          for (const bid of bookingDocIds) {
+            const bRef = doc(db, 'bookings', bid);
+            await updateDoc(bRef, {
+              paymentStatus: 'paid',
+              bookingStatus: 'confirmed',
+              status: 'confirmed',
+              transactionId: razorpay_payment_id
+            });
+          }
+        }
+
+        // Backwards compatible fallback query using Razorpay order ID
+        const qOrders = query(collection(db, 'orders'), where('razorpayOrderId', '==', razorpay_order_id));
+        const ordersSnap = await getDocs(qOrders);
+        for (const docSnap of ordersSnap.docs) {
+          await updateDoc(doc(db, 'orders', docSnap.id), {
+            paymentStatus: 'paid',
+            status: 'confirmed',
+            paymentMethodDetail: razorpay_payment_id
+          });
+        }
+        
+        const qBookings = query(collection(db, 'bookings'), where('razorpayOrderId', '==', razorpay_order_id));
+        const bookingsSnap = await getDocs(qBookings);
+        for (const docSnap of bookingsSnap.docs) {
+          await updateDoc(doc(db, 'bookings', docSnap.id), {
+            paymentStatus: 'paid',
+            bookingStatus: 'confirmed',
+            status: 'confirmed',
+            transactionId: razorpay_payment_id
+          });
+        }
+      } catch (dbErr: any) {
+        console.error('Verified payment but failed to sync to Firestore:', dbErr);
+      }
+
+      res.json({ success: true, paymentId: razorpay_payment_id });
+    } catch (err: any) {
+      console.error('Error in /api/verify-payment:', err);
+      res.status(500).json({ success: false, error: err.message || 'Signature verification failure' });
+    }
   });
 
   // Vite middleware for development
