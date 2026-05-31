@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
 import { getSettings } from '../services/logic_engine';
@@ -65,6 +65,13 @@ const CheckoutPage: React.FC = () => {
     pincode: '',
     state: ''
   });
+
+  // Active document and manual verification states
+  const [createdOrderDocId, setCreatedOrderDocId] = useState<string>('');
+  const [createdBookingDocIds, setCreatedBookingDocIds] = useState<string[]>([]);
+  const [utrNumber, setUtrNumber] = useState<string>('');
+  const [bankDetailsInput, setBankDetailsInput] = useState<string>('');
+  const [submittingVerification, setSubmittingVerification] = useState<boolean>(false);
 
   // Countdown timer and auto-check listener states
   const [timeLeft, setTimeLeft] = useState<number>(110);
@@ -146,7 +153,7 @@ const CheckoutPage: React.FC = () => {
       return;
     }
 
-    // Step 2: Write initial pending transaction records to Firestore prior to standard handoff
+    // Write initial pending transaction records to Firestore prior to handoff
     let finalOrderId = '';
     let finalBookingIds: string[] = [];
 
@@ -212,15 +219,15 @@ const CheckoutPage: React.FC = () => {
         }
       }
     } catch (saveError: any) {
-      console.error("Database sync failed prior to checkout modal:", saveError);
+      console.error("Database sync failed prior to checkout:", saveError);
       setPaymentError("Could not initialize order state database entry. Please try again.");
       setLoading(false);
       return;
     }
 
     // Step 3: Trigger exact requested direct UPI Intent Deep Link URL
-    // upi://pay?pa=YOUR_UPI_ID@bank&pn=BB_ONNECT_NETWORK&am={TOTAL_AMOUNT}&cu=INR&tn=Order_{ID}
-    const upiParams = `pa=bbconnect@okaxis&pn=BB_ONNECT_NETWORK&am=${finalTotal}&cu=INR&tn=Order_${createdOrderId}`;
+    // upi://pay?pa=8273865308@idfcfirst&pn=Mohd_Shoeb&am=275&cu=INR&tn=BB_Connect_Booking
+    const upiParams = `pa=8273865308@idfcfirst&pn=Mohd_Shoeb&am=${finalTotal}&cu=INR&tn=BB_Connect_Booking`;
     let upiIntentUrl = `upi://pay?${upiParams}`;
 
     if (provider === 'GPay') {
@@ -235,39 +242,75 @@ const CheckoutPage: React.FC = () => {
 
     try {
       window.location.href = upiIntentUrl;
+      // Fallback redirect for desktop browsers/iOS
+      setTimeout(() => {
+        window.location.href = `upi://pay?${upiParams}`;
+      }, 500);
     } catch (redirectErr) {
-      console.warn("Operating system did not handle intent link, polling in background.");
+      window.location.href = `upi://pay?${upiParams}`;
     }
 
-    // Step 4: Run the Smart 'Reality Check' listener (automatic backend verification polling loop)
+    // Save state references immediately for manual verification step
+    setCreatedOrderDocId(finalOrderId);
+    setCreatedBookingDocIds(finalBookingIds);
     setIsWaitingPayment(true);
     setLoading(false);
+  };
 
-    let checkCount = 0;
-    const pollInterval = setInterval(async () => {
-      checkCount++;
-      try {
-        // Query the live backend status endpoint
-        const checkResponse = await fetch(`/api/check-payment/${finalOrderId}`);
-        if (checkResponse.ok) {
-          const checkData = await checkResponse.json();
-          if (checkData && checkData.success && checkData.paymentStatus === 'paid') {
-            clearInterval(pollInterval);
-            setIsWaitingPayment(false);
-            setTimerActive(false);
-            setStep('success');
-            clearCart();
-          }
+  const submitUtrVerification = async () => {
+    if (!utrNumber.trim()) {
+      setPaymentError("Please provide a valid 12-digit UPI Transaction ID or UTR.");
+      return;
+    }
+    setSubmittingVerification(true);
+    setPaymentError(null);
+
+    try {
+      // 1. Save critical UTR log into 'Payment_Verification' collection
+      const verificationPayload = {
+        utr: utrNumber.trim(),
+        bankDetails: bankDetailsInput.trim() || 'IDFC FIRST Bank',
+        orderDocId: createdOrderDocId,
+        amount: finalTotal,
+        customerId: user?.uid || 'anonymous',
+        customerName: formData.fullName || user?.name || 'Customer Booking',
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'Payment_Verification'), verificationPayload);
+
+      // 2. Auto-promote original Order and Bookings documents to verified/paid status
+      if (createdOrderDocId) {
+        await updateDoc(doc(db, 'orders', createdOrderDocId), {
+          paymentStatus: 'paid',
+          status: 'confirmed',
+          paymentMethodDetail: 'UPI_MANUAL_VERIFICATION',
+          transactionId: utrNumber.trim()
+        });
+      }
+
+      if (createdBookingDocIds && createdBookingDocIds.length > 0) {
+        for (const bId of createdBookingDocIds) {
+          await updateDoc(doc(db, 'bookings', bId), {
+            paymentStatus: 'paid',
+            bookingStatus: 'confirmed',
+            status: 'confirmed',
+            transactionId: utrNumber.trim()
+          });
         }
-      } catch (checkErr) {
-        console.error("Reality Check polling listener exception:", checkErr);
       }
 
-      // Safety polling cancel
-      if (checkCount > 120) {
-        clearInterval(pollInterval);
-      }
-    }, 2000);
+      // Success display
+      setIsWaitingPayment(false);
+      setTimerActive(false);
+      setStep('success');
+      clearCart();
+    } catch (err: any) {
+      console.error("Failed to commit verification data:", err);
+      setPaymentError("Network error: Verification record submission failed. Please try again.");
+    } finally {
+      setSubmittingVerification(false);
+    }
   };
 
   if (cart.length === 0 && step !== 'success') {
@@ -468,25 +511,82 @@ const CheckoutPage: React.FC = () => {
                   </div>
 
                   {isWaitingPayment ? (
-                    /* Reality Check Polling HUD */
-                    <div className="bg-charcoal text-white p-8 rounded-[2rem] border border-gray-800 flex flex-col items-center justify-center text-center space-y-8 py-14 shadow-2xl">
-                      <div className="relative">
-                        <div className="w-24 h-24 border-4 border-bbBlue border-t-transparent rounded-full animate-spin" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <ShieldCheck size={32} className="text-bbBlue animate-pulse" />
-                        </div>
-                      </div>
-                      <div className="space-y-3 max-w-sm">
+                    /* Elegant physical payment verification UTR inputs form block */
+                    <div className="bg-charcoal text-white p-8 rounded-[2rem] border border-gray-850 flex flex-col justify-start text-left space-y-6 shadow-2xl relative overflow-hidden font-sans">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-bbBlue/10 rounded-full blur-3xl" />
+                      
+                      <div className="flex items-center gap-3">
                         <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] bg-emerald-950/50 py-1.5 px-4 rounded-full border border-emerald-800/30">
-                          ● Reality Check: Listening Live
+                          ● ENTER TRANSACTION UTR
                         </span>
-                        <h4 className="text-lg font-serif font-bold text-white pt-2">Waiting for UPI Confirmation</h4>
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-relaxed">
-                          Please complete the payment inside your selected UPI client app. Our system will automatically direct you once confirmed.
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-xl font-serif font-bold text-white">Confirm Your Payment</h4>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed mt-1">
+                          After completing payment to <strong className="text-white font-black whitespace-nowrap">Mr. Mohd. Shoeb</strong> on your UPI app, please enter the 12-digit transaction ID / UTR below to confirm your booking.
                         </p>
                       </div>
-                      <div className="text-[10px] font-mono text-gray-400 max-w-xs bg-white/5 py-2 px-5 rounded-full border border-white/5">
-                        DO NOT REFRESH OR ESCAPE (Timeout: {formatTime(timeLeft)})
+
+                      {/* Payee Info Box */}
+                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5 space-y-3">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Verified Payee Information (IDFC FIRST Bank)</p>
+                        <div className="grid grid-cols-2 gap-4 text-[10px]">
+                          <div>
+                            <span className="text-gray-500 block uppercase tracking-widest text-[8px] font-black">Payee Name</span>
+                            <span className="font-extrabold text-white uppercase">Mr. Mohd. Shoeb</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block uppercase tracking-widest text-[8px] font-black">Payee UPI ID</span>
+                            <span className="font-mono font-black text-bbBlue">8273865308@idfcfirst</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Manual inputs code */}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1 block">12-Digit Transaction ID / UTR</label>
+                          <input 
+                            type="text" 
+                            name="utrNumber" 
+                            placeholder="e.g. 518392018374"
+                            maxLength={12}
+                            value={utrNumber}
+                            onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, ''))}
+                            className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-bbBlue placeholder-white/20 font-mono tracking-widest font-bold"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1 block">Sender Bank Name</label>
+                          <input 
+                            type="text" 
+                            name="bankDetailsInput" 
+                            placeholder="e.g. State Bank of India, HDFC Bank"
+                            value={bankDetailsInput}
+                            onChange={(e) => setBankDetailsInput(e.target.value)}
+                            className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-bbBlue placeholder-white/20 uppercase text-xs font-bold"
+                          />
+                        </div>
+
+                        <button 
+                          onClick={submitUtrVerification}
+                          disabled={submittingVerification}
+                          className="w-full mt-4 bg-bbBlue hover:bg-blue-600 disabled:opacity-40 text-white py-5 rounded-2xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-lg shadow-bbBlue/20 transition-all font-sans"
+                        >
+                          {submittingVerification ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Submitting Verification...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck size={18} />
+                              <span>Submit UTR & Verify ₹{finalTotal}</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
                   ) : (

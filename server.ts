@@ -410,10 +410,9 @@ async function startServer() {
     res.json(safeShops);
   });
 
-  // Pure lightweight BBC generator conforming to senior guidelines
+  // Pure lightweight IDFC generator conforming to senior guidelines
   app.post('/api/create-order', (req, res) => {
-    const bbcId = `BBC_${Date.now()}`;
-    res.status(200).json({ success: true, order_id: bbcId });
+    res.status(200).json({ success: true, order_id: "IDFC_CONFIRM_" + Date.now() });
   });
 
   app.get('/api/check-payment/:orderId', async (req: any, res: any) => {
