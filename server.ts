@@ -410,32 +410,10 @@ async function startServer() {
     res.json(safeShops);
   });
 
-  // Purged Razorpay. Direct UPI Order Creation and Verification API.
-  app.post('/api/create-order', async (req, res) => {
-    console.log(`[API CREATE-ORDER] Incoming request body:`, req.body);
-    try {
-      const { amount, currency = 'INR', type } = req.body;
-      
-      if (!amount || amount < 1) {
-        console.warn(`[API CREATE-ORDER] Rejected order for insufficient amount: ${amount}`);
-        return res.status(400).json({ success: false, error: 'Amount must be valid and >= 1' });
-      }
-
-      // Generate pristine custom direct Order ID
-      const uniqueOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      console.log(`[API CREATE-ORDER] Successfully created direct order ID: ${uniqueOrderId}`);
-
-      res.json({
-        success: true,
-        order_id: uniqueOrderId,
-        orderId: uniqueOrderId,
-        amount: amount,
-        currency: currency
-      });
-    } catch (err: any) {
-      console.error('Error in /api/create-order:', err);
-      res.status(500).json({ success: false, error: err.message || 'Failed to create order' });
-    }
+  // Pure lightweight BBC generator conforming to senior guidelines
+  app.post('/api/create-order', (req, res) => {
+    const bbcId = `BBC_${Date.now()}`;
+    res.status(200).json({ success: true, order_id: bbcId });
   });
 
   app.get('/api/check-payment/:orderId', async (req: any, res: any) => {
