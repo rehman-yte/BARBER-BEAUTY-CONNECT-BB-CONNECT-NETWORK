@@ -418,7 +418,8 @@ async function startServer() {
   let razorpayInstance: any = null;
   const getRazorpayInstance = () => {
     if (!razorpayInstance) {
-      razorpayInstance = new Razorpay({
+      const RazorpayClass = (Razorpay as any).default || Razorpay;
+      razorpayInstance = new RazorpayClass({
         key_id: razorpayKeyId,
         key_secret: razorpayKeySecret,
       });
@@ -447,6 +448,7 @@ async function startServer() {
       const order = await razorpay.orders.create(options);
       res.json({
         success: true,
+        order_id: order.id,
         orderId: order.id,
         amount: order.amount,
         currency: order.currency

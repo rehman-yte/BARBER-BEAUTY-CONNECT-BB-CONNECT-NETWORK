@@ -109,12 +109,19 @@ const CheckoutPage: React.FC = () => {
         })
       });
 
+      const contentType = createOrderResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textError = await createOrderResponse.text();
+        console.error("Non-JSON backend output received:", textError);
+        throw new Error("Handshake failed. Server returned unexpected HTML content instead of order JSON.");
+      }
+
       const createOrderData = await createOrderResponse.json();
       if (!createOrderData || !createOrderData.success) {
         throw new Error(createOrderData?.error || "Could not generate transaction order ID on the server.");
       }
 
-      razorpayOrderId = createOrderData.orderId;
+      razorpayOrderId = createOrderData.order_id || createOrderData.orderId || "";
     } catch (orderErr: any) {
       console.error("Failed to generate order ID:", orderErr);
       setPaymentError(orderErr.message || "Failed to initiate secure payment checkout. Please try again.");
@@ -614,7 +621,7 @@ const CheckoutPage: React.FC = () => {
                       onClick={() => setStep(isSlotBooking ? 'cart' : 'shipping')} 
                       className="flex items-center justify-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors order-2 md:order-1"
                     >
-                      <ArrowLeft size={14} /> {isSlotBooking ? "Back to Cart" : "Back to Shipping"}
+                      <ArrowLeft size={14} /> {isSlotBooking ? "CONTINUE SLOT BOOKING" : "Back to Cart"}
                     </button>
                     <button 
                       onClick={handlePayment}
@@ -721,7 +728,15 @@ const CheckoutPage: React.FC = () => {
                     <ShieldCheck size={14} className="text-bbBlue" /> 256-bit SSL Encryption
                   </div>
                   <div className="flex items-center gap-3 text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">
-                    <Truck size={14} className="text-bbBlue" /> Priority Network Delivery
+                    {isSlotBooking ? (
+                      <>
+                        <ShieldCheck size={14} className="text-bbBlue" /> SECURE APPOINTMENT CONFIRMATION
+                      </>
+                    ) : (
+                      <>
+                        <Truck size={14} className="text-bbBlue" /> Priority Network Delivery
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
