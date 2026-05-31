@@ -460,7 +460,8 @@ async function startServer() {
         order_id: order.id,
         orderId: order.id,
         amount: order.amount,
-        currency: order.currency
+        currency: order.currency,
+        key: razorpayKeyId
       });
     } catch (err: any) {
       console.error('Error in /api/create-order:', err);

@@ -96,6 +96,7 @@ const CheckoutPage: React.FC = () => {
 
     // Step 2: Call Backend Create Order API to obtain standard Order ID
     let razorpayOrderId = "";
+    let razorpayKey = "rzp_test_SvrVkSoTGGlNX1"; // default option
     try {
       const createOrderResponse = await fetch('/api/create-order', {
         method: 'POST',
@@ -122,6 +123,9 @@ const CheckoutPage: React.FC = () => {
       }
 
       razorpayOrderId = createOrderData.order_id || createOrderData.orderId || "";
+      if (createOrderData.key) {
+        razorpayKey = createOrderData.key;
+      }
     } catch (orderErr: any) {
       console.error("Failed to generate order ID:", orderErr);
       setPaymentError(orderErr.message || "Failed to initiate secure payment checkout. Please try again.");
@@ -203,7 +207,7 @@ const CheckoutPage: React.FC = () => {
 
     // Step 4: Configure Razorpay Checkout options
     const options = {
-      key: "rzp_test_SvrVkSoTGGlNX1", // Standard Razorpay credentials as requested
+      key: razorpayKey, // Dynamic Razorpay credential synchronized perfectly from backend
       amount: finalTotal * 100, // INR in paise
       currency: "INR",
       name: "Barber & Beauty Connect",
