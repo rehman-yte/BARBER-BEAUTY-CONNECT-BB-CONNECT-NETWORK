@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 import { 
   addMarketplaceProduct, 
   getMarketplaceProducts, 
@@ -46,6 +48,73 @@ const AdminDropship: React.FC = () => {
   const [priceStr, setPriceStr] = useState('');
   const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
   const [originalCostStr, setOriginalCostStr] = useState('');
+
+  // Sizable storage states
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [imageFileName, setImageFileName] = useState('');
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadProgress(0);
+    setUploadError('');
+    setImageFileName(file.name);
+    
+    // Safety check for image types
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please choose a valid image file ending with png, jpg, jpeg, or webp.');
+      setUploadProgress(null);
+      return;
+    }
+
+    try {
+      const cleanFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const storageRef = ref(storage, `marketplace_images/${cleanFileName}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          setUploadProgress(progress);
+        },
+        (err) => {
+          console.error('[STORAGE SHIELD] Storage upload failed. Activating local security base64 stream:', err);
+          
+          // Absolute secure fallback to dataURI format so catalog links can always proceed flawlessly
+          const reader = new FileReader();
+          reader.onloadend = () => {
+             setImageUrl(reader.result as string);
+             setUploadProgress(100);
+             showToast('Firebase storage write error. Encoded image securely as base64 instead.');
+          };
+          reader.readAsDataURL(file);
+        },
+        async () => {
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            setImageUrl(downloadUrl);
+            setUploadProgress(100);
+            showToast('Permanently uploaded product image to Firebase Storage!');
+          } catch (getUrlErr: any) {
+            setUploadError('Failed to read download URL path from Storage bucket.');
+            setUploadProgress(null);
+          }
+        }
+      );
+    } catch (err: any) {
+      console.error('[STORAGE SHIELD] Storage write interface trigger exception:', err);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+         setImageUrl(reader.result as string);
+         setUploadProgress(100);
+         showToast('Offline media stream fallbacked successfully.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Product List
   const [products, setProducts] = useState<any[]>([]);
@@ -545,20 +614,68 @@ const AdminDropship: React.FC = () => {
 
                 <div>
                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Product Image Link URL
+                    Product Image (Direct Secure Upload) *
                   </label>
-                  <div className="relative">
-                    <ImageIcon className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
+                  <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-6 transition-all hover:bg-gray-50/50 flex flex-col items-center justify-center gap-3 relative overflow-hidden group">
                     <input 
-                      type="url"
-                      placeholder="Paste direct image URL or edit fetched link"
-                      value={imageUrl}
-                      onChange={(e) => {
-                        setImageUrl(e.target.value);
-                        setError('');
-                      }}
-                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
+                      type="file"
+                      accept="image/*"
+                      id="image-upload-input"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      onChange={handleImageUpload}
                     />
+                    
+                    {imageUrl ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-20 h-20 rounded-xl border border-gray-100 overflow-hidden shadow-xs relative group-hover:scale-105 transition-transform">
+                          <img 
+                            src={imageUrl} 
+                            alt="Uploaded preview" 
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <span className="text-[8px] font-mono text-emerald-600 bg-emerald-50 px-2 py-1 rounded font-black tracking-widest uppercase">
+                          ✓ UPLOAD COMPLETED
+                        </span>
+                        <span className="text-[7.5px] font-semibold text-gray-400 truncate max-w-xs">{imageFileName || 'Uploaded Image'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setImageUrl('')}
+                          className="text-[7.5px] text-red-500 font-extrabold tracking-wider uppercase underline hover:text-red-700 z-20"
+                        >
+                          Remove Photo
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center text-center">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-[#0056b3] mb-2 shadow-sm group-hover:animate-bounce">
+                          <ImageIcon className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <p className="text-[10px] font-bold text-black mb-1">
+                          Drag & Drop or Click to Select File
+                        </p>
+                        <p className="text-[8px] text-gray-400 font-medium leading-normal normal-case">
+                          Supports PNG, JPG, WEBP formats. Securely hosted permanently.
+                        </p>
+                      </div>
+                    )}
+
+                    {uploadProgress !== null && uploadProgress < 100 && (
+                      <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20">
+                        <Loader className="w-6 h-6 text-[#0056b3] animate-spin mb-2" />
+                        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Uploading: {uploadProgress}%</span>
+                        <div className="w-32 bg-gray-100 h-1 rounded-full overflow-hidden mt-1.5">
+                          <div className="bg-[#0056b3] h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {uploadError && (
+                      <p className="text-[8px] font-black text-red-500 uppercase tracking-wider text-center mt-2">
+                        ⚠️ {uploadError}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -628,8 +745,12 @@ const AdminDropship: React.FC = () => {
                           <img 
                             src={prod.imageUrl || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=100&q=80'} 
                             alt={prod.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-opacity duration-300"
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              console.warn('[IMAGE FAILSAFE] URL failed to resolve, fell back securely to preset placeholder.');
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=100&q=80';
+                            }}
                           />
                         </div>
                         <div>
