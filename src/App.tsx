@@ -16,6 +16,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import CookiesPolicy from "./pages/CookiesPolicy";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageLiveShops from "./pages/ManageLiveShops";
+import AdminDropship from "./pages/AdminDropship";
 import ShopPage from "./pages/ShopPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import MyShopping from "./pages/MyShopping";
@@ -116,6 +117,7 @@ const AppRoutes: React.FC = () => {
       {/* ADMIN PORTAL */}
       <Route path="/admin/dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/manage-live-shops" element={<ProtectedRoute allowedRole="admin"><ManageLiveShops /></ProtectedRoute>} />
+      <Route path="/admin/dropship" element={<ProtectedRoute allowedRole="admin"><AdminDropship /></ProtectedRoute>} />
       <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
       
       {/* FALLBACKS */}

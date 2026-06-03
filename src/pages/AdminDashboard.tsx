@@ -329,6 +329,15 @@ const AdminDashboard: React.FC = () => {
                 >
                   <span className="text-sm">🛠️</span> CONTROL SHOPS
                 </button>
+                <button 
+                  onClick={() => {
+                    setShowToolsDropdown(false);
+                    navigate('/admin/dropship');
+                  }}
+                  className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase text-charcoal hover:bg-gray-50 hover:text-[#0056b3] transition-all border-t border-gray-50"
+                >
+                  <span className="text-sm">📦</span> MANAGE INVENTORY / DROPSHIP
+                </button>
               </div>
             )}
           </div>

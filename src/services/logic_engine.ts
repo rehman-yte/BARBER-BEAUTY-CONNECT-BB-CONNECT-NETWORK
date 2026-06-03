@@ -500,6 +500,57 @@ export const subscribeToNotifications = (target: string, userId: string, callbac
 };
 
 /**
+ * ADMIN DROPSHIP ENGINE: MARKETPLACE METHODS
+ */
+
+export const addMarketplaceProduct = async (productData: {
+  name: string;
+  sourceUrl: string;
+  imageUrl: string;
+  price: number;
+  category: string;
+  discount?: number;
+  rating?: number;
+  reviews?: number;
+}): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, 'live_marketplace'), {
+      ...productData,
+      discount: productData.discount !== undefined ? productData.discount : 0,
+      rating: productData.rating !== undefined ? productData.rating : 5,
+      reviews: productData.reviews !== undefined ? productData.reviews : Math.floor(Math.random() * 80) + 10,
+      createdAt: new Date().toISOString()
+    });
+    return docRef.id;
+  } catch (err) {
+    console.error('Firestore addMarketplaceProduct failure:', err);
+    throw err;
+  }
+};
+
+export const getMarketplaceProducts = async (): Promise<any[]> => {
+  try {
+    const qSnapshot = await getDocs(collection(db, 'live_marketplace'));
+    return qSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (err) {
+    console.error('Firestore getMarketplaceProducts failure:', err);
+    throw err;
+  }
+};
+
+export const deleteMarketplaceProduct = async (productId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'live_marketplace', productId));
+  } catch (err) {
+    console.error('Firestore deleteMarketplaceProduct failure:', err);
+    throw err;
+  }
+};
+
+/**
  * ANALYTICS & LOGIC CALCULATIONS
  */
 

@@ -204,5 +204,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && (incoming().customerId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
+
+    // -------------------------------------------------------------------------
+    // 9. LIVE MARKETPLACE COLLECTION (ADMIN DROPSHIP ENGINE)
+    // -------------------------------------------------------------------------
+
+    match /live_marketplace/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

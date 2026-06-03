@@ -79,6 +79,23 @@
         "timestamp": { "type": "string" },
         "createdAt": { "type": "string" }
       }
+    },
+    "MarketplaceProduct": {
+      "title": "MarketplaceProduct",
+      "description": "Dropshipped products on live marketplace catalog",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sourceUrl": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "discount": { "type": "number" },
+        "rating": { "type": "number" },
+        "reviews": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price"]
     }
   },
   "firestore": {
@@ -109,6 +126,10 @@
     "/admins/{adminId}": {
       "schema": { "type": "object", "properties": { "email": { "type": "string" } } },
       "description": "Authorized administrators"
+    },
+    "/live_marketplace/{productId}": {
+      "schema": "MarketplaceProduct",
+      "description": "Admin dropship products catalog entries"
     }
   }
 }

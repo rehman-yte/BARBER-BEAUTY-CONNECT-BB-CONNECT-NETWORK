@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { ShoppingCart, Filter, Search, ChevronRight, Star, Menu, X, ShoppingBag, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
+import { getMarketplaceProducts } from '../services/logic_engine';
 
 const CATEGORIES = [
   "All Products",
@@ -104,7 +105,40 @@ const ShopPage: React.FC = () => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
-  const filteredProducts = SHOP_PRODUCTS.filter(product => {
+  const [products, setProducts] = useState<any[]>([]);
+  const [dbLoading, setDbLoading] = useState(true);
+
+  useEffect(() => {
+    const loadMarketplaceCatalog = async () => {
+      try {
+        const dbItems = await getMarketplaceProducts();
+        if (dbItems && dbItems.length > 0) {
+          const formatted = dbItems.map((p: any) => ({
+            id: p.id,
+            name: p.name || 'Unnamed Product',
+            price: Number(p.price || 0),
+            discount: Number(p.discount || 0),
+            category: p.category || 'Barber Products',
+            image: p.imageUrl || p.image || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+            rating: p.rating !== undefined ? Number(p.rating) : 5,
+            reviews: p.reviews !== undefined ? Number(p.reviews) : Math.floor(Math.random() * 80) + 10,
+            sourceUrl: p.sourceUrl || '#'
+          }));
+          setProducts(formatted);
+        } else {
+          setProducts(SHOP_PRODUCTS);
+        }
+      } catch (err) {
+        console.error("Error reading live_marketplace catalog, using fallback:", err);
+        setProducts(SHOP_PRODUCTS);
+      } finally {
+        setDbLoading(false);
+      }
+    };
+    loadMarketplaceCatalog();
+  }, []);
+
+  const filteredProducts = products.filter(product => {
     const matchesCategory = activeCategory === "All Products" || product.category === activeCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -212,7 +246,10 @@ const ShopPage: React.FC = () => {
             </h1>
 
             {user?.role === 'admin' && (
-              <button className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-xl text-[0.625rem] font-bold uppercase tracking-widest shadow-xl hover:bg-bbBlue transition-all active:scale-95">
+              <button 
+                onClick={() => navigate('/admin/dropship')}
+                className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-xl text-[0.625rem] font-bold uppercase tracking-widest shadow-xl hover:bg-bbBlue transition-all active:scale-95"
+              >
                 <Plus size={16} />
                 List New Product
               </button>
