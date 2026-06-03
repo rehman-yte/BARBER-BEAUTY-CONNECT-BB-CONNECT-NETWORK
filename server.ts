@@ -505,6 +505,23 @@ async function startServer() {
 
       console.log(`[API DROPSHIP AUTOFETCH] URL pasted: ${url}`);
 
+      // 0. Free Cloud Proxy (allorigins) wrap to bypass destination server blocker
+      let crawledContent = '';
+      try {
+        console.log(`[CORS PROXY] Wrapping fetch via allorigins proxy for: ${url}`);
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        const fRes = await fetch(proxyUrl);
+        if (fRes.ok) {
+          const originJson = await fRes.json();
+          if (originJson && originJson.contents) {
+            crawledContent = String(originJson.contents).slice(0, 7500); // Take first 7500 chars to fit prompt context
+            console.log(`[CORS PROXY] Successfully crawled ${crawledContent.length} chars of page source HTML.`);
+          }
+        }
+      } catch (crawlErr: any) {
+        console.warn('[CORS PROXY] Failed to fetch url through cloud proxy:', crawlErr.message);
+      }
+
       // 1. AI Scraping Attempt using Google Gen AI
       if (process.env.GEMINI_API_KEY) {
         try {
@@ -519,15 +536,21 @@ async function startServer() {
           });
 
           const prompt = `Analyze this e-commerce product URL: "${url}".
-Extract and predict high-quality structured product details from the URL metadata or keywords.
-Return a clean, compact JSON object conforming EXACTLY to the following structure:
+${crawledContent ? `Below is the raw page HTML source code retrieved through a cloud CORS proxy:
+"""
+${crawledContent}
+"""` : `The direct fetch returned no body. Use keywords from the URL segment to estimate details.`}
+
+Extract the clean product title (excluding long model codes or hex codes), a high-resolution image URL, and a wholesale base unit cost in INR (Rupees).
+Return a strict JSON object conforming exactly to this structure:
 {
   "name": "Product Brand & Name",
   "imageUrl": "High-resolution product image URL or a matching premium Unsplash image URL if direct link isn't extractable",
   "price": number
 }
-Ensure the price is a positive numeric float/integer representing the wholesale base cost (un-marked price) in INR (Rupees).
-Do NOT include any extra text, markdown commentary or wrappers, just return the raw JSON object.`;
+Ensure price is a positive numeric float/integer representing the un-marked wholesale cost in INR.
+If the price is unavailable, suspicious, or appears to be a generic default, specify "price": 0 so the user can enter manual prices.
+Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSON.`;
 
           const response = await ai.models.generateContent({
             model: 'gemini-3.5-flash',
@@ -540,13 +563,13 @@ Do NOT include any extra text, markdown commentary or wrappers, just return the 
           const textRes = response.text || '';
           console.log(`[API DROPSHIP AUTOFETCH] AI raw response:`, textRes);
           const parsed = JSON.parse(textRes.trim());
-          if (parsed && parsed.name && typeof parsed.price === 'number') {
+          if (parsed && typeof parsed === 'object') {
             return res.json({
               success: true,
-              source: 'gemini-ai',
-              name: parsed.name,
+              source: 'gemini-ai-proxy',
+              name: parsed.name && !parsed.name.match(/[a-zA-Z0-9]{8,15}/) ? parsed.name : '',
               imageUrl: parsed.imageUrl || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
-              price: parsed.price
+              price: typeof parsed.price === 'number' && parsed.price > 0 ? parsed.price : 0
             });
           }
         } catch (aiErr: any) {
@@ -557,22 +580,22 @@ Do NOT include any extra text, markdown commentary or wrappers, just return the 
       // 2. Semantic Fallback Parsing is super resilient!
       // This parses keywords from the URL path to form incredibly accurate name, image, and price.
       const lowerUrl = url.toLowerCase();
-      let name = 'Professional Hair Salon Classic Item';
+      let name = '';
       let imageUrl = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80';
-      let basePrice = 1499;
+      let basePrice = 0; // Return 0 to trigger prompt for manual cost input
 
       if (lowerUrl.includes('trimmer') || lowerUrl.includes('clipper') || lowerUrl.includes('shaver') || lowerUrl.includes('hair')) {
         name = 'Professional Titanium Hair Trimmer';
         imageUrl = 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=600&q=80';
-        basePrice = 1899;
+        basePrice = 0; // prompt manual
       } else if (lowerUrl.includes('shampoo') || lowerUrl.includes('serum') || lowerUrl.includes('oil') || lowerUrl.includes('creme') || lowerUrl.includes('gel')) {
         name = 'Organic Moroccan Argan Hair Serum';
         imageUrl = 'https://images.unsplash.com/photo-1608248597481-496100c80836?auto=format&fit=crop&w=600&q=80';
-        basePrice = 799;
+        basePrice = 0;
       } else if (lowerUrl.includes('spa') || lowerUrl.includes('stone') || lowerUrl.includes('massage') || lowerUrl.includes('wax')) {
         name = 'Luxury Aromatherapy Therapeutic Spa Set';
         imageUrl = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80';
-        basePrice = 1299;
+        basePrice = 0;
       } else {
         // Deduce a smart name from URL components if possible
         try {
@@ -582,7 +605,7 @@ Do NOT include any extra text, markdown commentary or wrappers, just return the 
             const lastSeg = pathSegments[pathSegments.length - 1]
               .replace(/[-_]/g, ' ')
               .replace(/\..*$/, ''); // remove extension
-            if (lastSeg.length > 5) {
+            if (lastSeg.length > 5 && !lastSeg.match(/[a-zA-Z0-9]{8,15}/)) {
               name = lastSeg.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             }
           }
@@ -591,7 +614,7 @@ Do NOT include any extra text, markdown commentary or wrappers, just return the 
 
       return res.json({
         success: true,
-        source: 'semantic-parser',
+        source: 'semantic-parser-blank',
         name,
         imageUrl,
         price: basePrice

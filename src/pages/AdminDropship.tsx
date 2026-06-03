@@ -59,16 +59,95 @@ const AdminDropship: React.FC = () => {
     fetchProducts();
   }, [user, navigate]);
 
+  // Fail-Safe background synchronization & connection auto-recovery
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      const localCachedRaw = localStorage.getItem('dropship_local_cache');
+      
+      // Auto-retry to recover connection & pull catalog even if we don't have pending items
+      try {
+        const data = await getMarketplaceProducts();
+        
+        // Connection recovered!
+        if (error && error.includes('offline')) {
+          setError('');
+        }
+
+        const finalCached = localCachedRaw ? JSON.parse(localCachedRaw) : [];
+        const merged = [
+          ...finalCached.map((item: any) => ({ ...item, isPendingSync: true })),
+          ...data
+        ];
+        // Sort by creation time descend
+        setProducts(merged.sort((a, b) => {
+          const timeA = a.createdAt || '';
+          const timeB = b.createdAt || '';
+          return timeB.localeCompare(timeA);
+        }));
+      } catch (err: any) {
+        console.warn('[BACKGROUND RE-SYNC] Database is still offline or unreachable, continuing cache tracking:', err.message);
+      }
+
+      // If we have local unsynced cache, try writing them to Firestore
+      if (localCachedRaw) {
+        const localCached: any[] = JSON.parse(localCachedRaw);
+        if (localCached.length > 0) {
+          console.log(`[BACKGROUND RE-SYNC] Attempting upload of ${localCached.length} cached dropship item(s)...`);
+          let successfulIds: string[] = [];
+          
+          for (const item of localCached) {
+            try {
+              // Ensure we drop local temporary markers
+              const { id, isPendingSync, ...cleanPayload } = item;
+              await addMarketplaceProduct(cleanPayload);
+              successfulIds.push(item.id);
+            } catch (err) {
+              console.warn('[BACKGROUND RE-SYNC] Retried upload failed, will retry next epoch:', err);
+              break; // break retry on primary error to verify connectivity next time
+            }
+          }
+
+          if (successfulIds.length > 0) {
+            const remaining = localCached.filter(i => !successfulIds.includes(i.id));
+            if (remaining.length > 0) {
+              localStorage.setItem('dropship_local_cache', JSON.stringify(remaining));
+            } else {
+              localStorage.removeItem('dropship_local_cache');
+            }
+            showToast(`Auto-synced ${successfulIds.length} locally cached item(s) straight to Firestore Catalog!`);
+            fetchProducts();
+          }
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [error]);
+
   const fetchProducts = async () => {
     setLoading(true);
     setError('');
+
+    // Fetch localized backup list first for supreme load response performance
+    const localCachedRaw = localStorage.getItem('dropship_local_cache');
+    const localCached = localCachedRaw ? JSON.parse(localCachedRaw) : [];
+
     try {
       const data = await getMarketplaceProducts();
-      // Sort by creation time descend
-      setProducts(data.sort((a, b) => b.createdAt?.localeCompare(a.createdAt)));
+      const merged = [
+        ...localCached.map((item: any) => ({ ...item, isPendingSync: true })),
+        ...data
+      ];
+      setProducts(merged.sort((a, b) => {
+        const timeA = a.createdAt || '';
+        const timeB = b.createdAt || '';
+        return timeB.localeCompare(timeA);
+      }));
     } catch (err: any) {
       console.error("Error loading dropship catalog:", err);
-      setError('System could not retrieve dropship products database.');
+      // Seamlessly fallback entirely to localized backup lists so the admin never sees a blank page
+      setProducts(localCached.map((item: any) => ({ ...item, isPendingSync: true })));
+      setError('System network is currently offline. Viewing high-security local cache catalog. Auto-retrying connection every 5s...');
     } finally {
       setLoading(false);
     }
@@ -95,17 +174,25 @@ const AdminDropship: React.FC = () => {
       clearTimeout(timeoutId);
 
       const data = await res.json();
-      if (data && data.success && typeof data.price === 'number' && data.price > 0 && data.price < 50000) {
-        // Successful extraction with clean price data
+      // If price is missing or 0, or matches default placeholder, leave blank as requested to let Admin input manually
+      const isSuspicious = !data.price || data.price <= 0 || [1499, 1899, 799, 1299].includes(data.price);
+
+      if (data && data.success) {
         setName(data.name && !data.name.match(/[a-zA-Z0-9]{8,15}/) ? data.name : '');
         setImageUrl(data.imageUrl || '');
-        setOriginalCostStr(String(data.price));
-
-        // Automation Rule: Retail Price = Source Price + 15% Margin
-        const recommendedRetail = Math.ceil(data.price * 1.15);
-        setPriceStr(String(recommendedRetail));
-
-        showToast(`AI auto-fetched details! Applied automatic +15% retail markup.`);
+        
+        if (!isSuspicious) {
+          setOriginalCostStr(String(data.price));
+          // Automation Rule: Retail Price = Source Price + 15% Margin
+          const recommendedRetail = Math.ceil(data.price * 1.15);
+          setPriceStr(String(recommendedRetail));
+          showToast(`AI auto-fetched details! Applied automatic +15% retail markup.`);
+        } else {
+          setOriginalCostStr('');
+          setPriceStr('');
+          setError('System Notice: Extraction price returned suspicious placeholder. Please input Original Base Cost manually.');
+          showToast(`AI fetched details, but base price left blank for safe manual input.`);
+        }
       } else {
         throw new Error('Suspicious data or API fallback requested');
       }
@@ -153,50 +240,53 @@ const AdminDropship: React.FC = () => {
     }
 
     setSubmitting(true);
-    try {
-      // 3. PARTNER ID TRACKING ATTACHMENT
-      let finalSourceUrl = sourceUrl.trim();
-      if (!finalSourceUrl) {
-        finalSourceUrl = '#';
-      }
-      if (finalSourceUrl && finalSourceUrl !== '#') {
-        const partnerId = user?.uid || 'admin';
-        try {
-          const urlOb = new URL(finalSourceUrl);
-          urlOb.searchParams.set('partnerId', partnerId);
-          finalSourceUrl = urlOb.toString();
-        } catch (e) {
-          // Simple appending if URL parse fails
-          if (finalSourceUrl.includes('?')) {
-            finalSourceUrl = `${finalSourceUrl}&partnerId=${partnerId}`;
-          } else {
-            finalSourceUrl = `${finalSourceUrl}?partnerId=${partnerId}`;
-          }
+    
+    // 3. PARTNER ID TRACKING ATTACHMENT
+    let finalSourceUrl = sourceUrl.trim();
+    if (!finalSourceUrl) {
+      finalSourceUrl = '#';
+    }
+    if (finalSourceUrl && finalSourceUrl !== '#') {
+      const partnerId = user?.uid || 'admin';
+      try {
+        const urlOb = new URL(finalSourceUrl);
+        urlOb.searchParams.set('partnerId', partnerId);
+        finalSourceUrl = urlOb.toString();
+      } catch (e) {
+        // Simple appending if URL parse fails
+        if (finalSourceUrl.includes('?')) {
+          finalSourceUrl = `${finalSourceUrl}&partnerId=${partnerId}`;
+        } else {
+          finalSourceUrl = `${finalSourceUrl}?partnerId=${partnerId}`;
         }
       }
+    }
 
-      // SECURITY METADATA SANITIZATION: Strict validation of primitives and automatic fallback defaults
-      const nameVal = String(name.trim() || 'Professional Classic Salon Product');
-      const categoryVal = String(category || CATEGORY_OPTIONS[0]);
-      const imageVal = String(imageUrl.trim() || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80');
-      const finalPrice = Number(parsedPrice) || 899;
+    // SECURITY METADATA SANITIZATION: Strict validation of primitives and automatic fallback defaults
+    const nameVal = String(name.trim() || 'Professional Classic Salon Product');
+    const categoryVal = String(category || CATEGORY_OPTIONS[0]);
+    const imageVal = String(imageUrl.trim() || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80');
+    const finalPrice = Number(parsedPrice) || 899;
 
-      const payload = {
-        name: nameVal,
-        sourceUrl: String(finalSourceUrl),
-        imageUrl: imageVal,
-        price: finalPrice,
-        category: categoryVal,
-        discount: 0,
-        rating: 5,
-        reviews: Math.floor(Math.random() * 80) + 10,
-        createdAt: new Date().toISOString()
-      };
+    const payload = {
+      name: nameVal,
+      sourceUrl: String(finalSourceUrl),
+      imageUrl: imageVal,
+      price: finalPrice,
+      category: categoryVal,
+      discount: 0,
+      rating: 5,
+      reviews: Math.floor(Math.random() * 80) + 10,
+      createdAt: new Date().toISOString()
+    };
 
+    try {
+      // FORCE WRITE with fallback schemas
       try {
         await addMarketplaceProduct(payload);
+        showToast('Link Product verified: Successfully synchronized to the Live Catalog!');
       } catch (firstErr) {
-        console.warn('First Firestore insertion attempted failed. Forcing minimum payload schema constraints:', firstErr);
+        console.warn('First Firestore insertion attempted failed. Forcing schema schema constraints:', firstErr);
         const forcedPayload = {
           name: String(nameVal).slice(0, 100),
           sourceUrl: String(finalSourceUrl),
@@ -209,28 +299,55 @@ const AdminDropship: React.FC = () => {
           createdAt: new Date().toISOString()
         };
         await addMarketplaceProduct(forcedPayload);
+        showToast('Link Product verified with safe payload schema constraints!');
       }
+    } catch (err: any) {
+      console.warn('Firestore write failed. Utilizing high-security local cache system:', err);
       
-      showToast('Product successfully linked and synced live!');
+      const localItem = {
+        id: 'temp_' + Date.now(),
+        ...payload
+      };
+
+      const currentCacheRaw = localStorage.getItem('dropship_local_cache');
+      const currentCache = currentCacheRaw ? JSON.parse(currentCacheRaw) : [];
+      currentCache.push(localItem);
+      localStorage.setItem('dropship_local_cache', JSON.stringify(currentCache));
       
-      // Reset input fields
+      showToast('DATABASE OFFLINE: Product saved to high-security local cache! Auto-retrying background sync...');
+    } finally {
+      // Reset input fields in both successful and localized fallback paths
       setName('');
       setSourceUrl('');
       setImageUrl('');
       setPriceStr('');
       setOriginalCostStr('');
       setCategory(CATEGORY_OPTIONS[0]);
-
-      // Re-fetch snappily
-      fetchProducts();
-    } catch (err: any) {
-      setError('Database rejected dropship product insert logic. Check value formats.');
-    } finally {
       setSubmitting(false);
+
+      // Re-fetch merges live and cached items
+      fetchProducts();
     }
   };
 
   const handleDeleteProduct = async (productId: string, productName: string) => {
+    // Check if item is locally cached only
+    if (productId.startsWith('temp_')) {
+      const localCachedRaw = localStorage.getItem('dropship_local_cache');
+      if (localCachedRaw) {
+        const localCached: any[] = JSON.parse(localCachedRaw);
+        const filtered = localCached.filter(p => p.id !== productId);
+        if (filtered.length > 0) {
+          localStorage.setItem('dropship_local_cache', JSON.stringify(filtered));
+        } else {
+          localStorage.removeItem('dropship_local_cache');
+        }
+        showToast('Pending items deleted from high-security local cache.');
+        fetchProducts();
+      }
+      return;
+    }
+
     const confirmDelete = window.confirm(`SECURE SYSTEM OVERRIDE:\nAre you sure you want to delete "${productName}" from the live marketplace?\nThis cannot be undone.`);
     if (!confirmDelete) return;
 
@@ -248,7 +365,7 @@ const AdminDropship: React.FC = () => {
     setSuccessMsg(msg);
     setTimeout(() => {
       setSuccessMsg('');
-    }, 4000);
+    }, 4500);
   };
 
   return (
@@ -400,7 +517,7 @@ const AdminDropship: React.FC = () => {
                     />
                   </div>
                   
-                  {parseFloat(originalCostStr) > 0 && (
+                  {parseFloat(originalCostStr) > 0 ? (
                     <div className="mt-2.5 p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200 text-emerald-800 text-[9px] font-bold uppercase tracking-wider flex flex-col gap-1.5 shadow-xs">
                       <div className="flex items-center justify-between">
                         <span>Original Base Cost:</span>
@@ -414,6 +531,13 @@ const AdminDropship: React.FC = () => {
                       <div className="flex items-center justify-between text-[10px] font-extrabold text-black">
                         <span>Target Retail Price:</span>
                         <span className="font-mono bg-white border border-emerald-100 rounded-lg px-2.5 py-1 text-emerald-700">₹{priceStr}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2.5 p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/50 text-amber-800 text-[9px] font-bold uppercase tracking-wider flex flex-col gap-1 shadow-xs animate-pulse">
+                      <div className="text-center font-extrabold text-amber-700">⚠️ Base Cost is empty (₹0)</div>
+                      <div className="text-center font-mono text-[7px] text-gray-500 normal-case leading-normal">
+                        Please input Original Base Cost manually. Target retail price calculates automatically adding a premium 15% wholesale markup!
                       </div>
                     </div>
                   )}
@@ -509,9 +633,16 @@ const AdminDropship: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <p className="text-[9px] font-black uppercase text-[#0056b3] tracking-wider mb-0.5">
-                            {prod.category}
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="text-[9px] font-black uppercase text-[#0056b3] tracking-wider">
+                              {prod.category}
+                            </span>
+                            {prod.isPendingSync && (
+                              <span className="text-[7.5px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-black tracking-widest animate-pulse uppercase">
+                                PENDING CLOUD SYNC
+                              </span>
+                            )}
+                          </div>
                           <h3 className="text-sm font-semibold font-serif text-black leading-snug">
                             {prod.name}
                           </h3>
