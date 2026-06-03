@@ -79,6 +79,19 @@
         "timestamp": { "type": "string" },
         "createdAt": { "type": "string" }
       }
+    },
+    "MarketplaceProduct": {
+      "title": "Marketplace Product",
+      "description": "Admin listed marketplace products on the platform",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "sourceLink": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price"]
     }
   },
   "firestore": {
@@ -101,6 +114,10 @@
     "/notifications/{notifId}": {
       "schema": "Notification",
       "description": "System-wide and targeted notifications"
+    },
+    "/marketplace_products/{productId}": {
+      "schema": "MarketplaceProduct",
+      "description": "Admin listed products in the platform marketplace"
     },
     "/settings/{settingId}": {
       "schema": { "type": "object" },

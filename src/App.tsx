@@ -16,6 +16,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import CookiesPolicy from "./pages/CookiesPolicy";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageLiveShops from "./pages/ManageLiveShops";
+import AdminProductManager from "./pages/AdminProductManager";
 import ShopPage from "./pages/ShopPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import MyShopping from "./pages/MyShopping";
@@ -104,7 +105,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/customer-dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       <Route path="/customer/dashboard" element={<ProtectedRoute allowedRole="customer"><CustomerDashboard /></ProtectedRoute>} />
       <Route path="/my-shopping" element={<ProtectedRoute allowedRole={['customer', 'admin']}><MyShopping /></ProtectedRoute>} />
-      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'admin']}><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute allowedRole={['customer', 'partner', 'admin']}><CheckoutPage /></ProtectedRoute>} />
       <Route path="/shop/:id" element={<ProtectedRoute allowedRole={['customer', 'admin']}><ShopDetail /></ProtectedRoute>} />
       
       {/* PARTNER PORTAL */}
@@ -116,6 +117,7 @@ const AppRoutes: React.FC = () => {
       {/* ADMIN PORTAL */}
       <Route path="/admin/dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/manage-live-shops" element={<ProtectedRoute allowedRole="admin"><ManageLiveShops /></ProtectedRoute>} />
+      <Route path="/admin/product-manager" element={<ProtectedRoute allowedRole="admin"><AdminProductManager /></ProtectedRoute>} />
       <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
       
       {/* FALLBACKS */}

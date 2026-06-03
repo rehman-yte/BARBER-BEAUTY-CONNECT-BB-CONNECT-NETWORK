@@ -204,5 +204,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && (incoming().customerId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
+
+    // -------------------------------------------------------------------------
+    // 9. MARKETPLACE PRODUCTS COLLECTION
+    // -------------------------------------------------------------------------
+
+    match /marketplace_products/{productId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }

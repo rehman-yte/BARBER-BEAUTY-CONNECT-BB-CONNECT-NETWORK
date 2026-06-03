@@ -559,3 +559,49 @@ export const calculateWaitTime = (partnerId: string, allBookings: any[]): number
   const active = allBookings.filter(b => b.shopId === partnerId && b.status === 'Accepted');
   return active.length * 20; // 20 mins per active booking
 };
+
+// --- MARKETPLACE PRODUCTS DATABASE LOGIC ---
+export const getMarketplaceProducts = async (): Promise<any[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'marketplace_products'));
+    return querySnapshot.docs.map(docSnapshot => {
+      const data = docSnapshot.data() as any;
+      return {
+        id: docSnapshot.id,
+        ...data,
+        name: data.name || '',
+        price: data.price || 0,
+        imageUrl: data.imageUrl || '',
+        sourceLink: data.sourceLink || '',
+        createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : null
+      };
+    });
+  } catch (err) {
+    console.error('Firestore getMarketplaceProducts failure:', err);
+    throw err;
+  }
+};
+
+export const addMarketplaceProduct = async (productData: { name: string; price: number; imageUrl: string; sourceLink: string }): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, 'marketplace_products'), {
+      ...productData,
+      createdAt: Timestamp.now()
+    });
+    return docRef.id;
+  } catch (err) {
+    console.error('Firestore addMarketplaceProduct failure:', err);
+    throw err;
+  }
+};
+
+export const deleteMarketplaceProduct = async (productId: string): Promise<boolean> => {
+  try {
+    const docRef = doc(db, 'marketplace_products', productId);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.error('Firestore deleteMarketplaceProduct failure:', err);
+    throw err;
+  }
+};
