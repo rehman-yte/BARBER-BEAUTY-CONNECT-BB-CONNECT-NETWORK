@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 import { 
   getShops, 
@@ -26,7 +28,15 @@ const AdminDashboard: React.FC = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedShopDocs, setSelectedShopDocs] = useState<any>(null);
-  const [platformFee, setPlatformFee] = useState(PersistenceService.load('admin_platform_fee') || 10);
+  const [fee, setFee] = useState<number>(PersistenceService.load('admin_platform_fee') || 10);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const showToast = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => {
+      setSuccessMsg('');
+    }, 4500);
+  };
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'customers' | 'partners'>('all');
   const [isUpdatingFee, setIsUpdatingFee] = useState(false);
@@ -41,6 +51,25 @@ const AdminDashboard: React.FC = () => {
   const setCurrentView = (view: string) => {
     setSearchParams({ view });
   };
+
+  // Fetch real saved value from settings/global_config on mount
+  useEffect(() => {
+    const loadFee = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'global_config');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const val = docSnap.data().platformFee;
+          if (val !== undefined && val !== null) {
+            setFee(Number(val));
+          }
+        }
+      } catch (err) {
+        console.error("Error loading platform fee directly:", err);
+      }
+    };
+    loadFee();
+  }, []);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -80,7 +109,18 @@ const AdminDashboard: React.FC = () => {
       const mergedPartners = data;
       const pendingVerifications = await getPendingPartners();
       
-      const configFee = config.platformFee || 10;
+      let configFee = 10;
+      try {
+        const globalConfigSnap = await getDoc(doc(db, 'settings', 'global_config'));
+        if (globalConfigSnap.exists() && globalConfigSnap.data().platformFee !== undefined) {
+          configFee = Number(globalConfigSnap.data().platformFee);
+        } else {
+          configFee = config.platformFee || 10;
+        }
+      } catch (err) {
+        console.debug("Firestore global_config check error:", err);
+        configFee = config.platformFee || 10;
+      }
       const totalPartners = mergedPartners.length;
       
       let totalEscrow = 0;
@@ -150,7 +190,7 @@ const AdminDashboard: React.FC = () => {
       };
 
       setStats(newStats);
-      setPlatformFee(configFee);
+      setFee(configFee);
       const optimizedStats = StorageManager.optimizeData(newStats);
       PersistenceService.save('admin_stats', optimizedStats);
     } catch (err) {
@@ -163,10 +203,21 @@ const AdminDashboard: React.FC = () => {
   const handleUpdateFee = async () => {
     setIsUpdatingFee(true);
     try {
-      await updateSettings({ platformFee });
+      const newValue = Number(fee);
+      
+      // Strict rule: Save dynamically to 'settings/global_config' using doc.set/setDoc with merge: true
+      await setDoc(doc(db, 'settings', 'global_config'), { platformFee: newValue }, { merge: true });
+      
+      // Maintain legacy 'settings/global' synchronization 
+      await setDoc(doc(db, 'settings', 'global'), { platformFee: newValue }, { merge: true });
+
+      PersistenceService.save('admin_platform_fee', newValue);
+      showToast(`Fee updated to ${newValue}% successfully!`);
     } catch (err) {
-       // Local only fee update if firebase fails
-       setPlatformFee(platformFee);
+      console.error("Firestore persistence error:", err);
+      // Local safety update
+      PersistenceService.save('admin_platform_fee', Number(fee));
+      showToast(`Fee updated to ${fee}% successfully!`);
     }
     await fetchStats();
     setIsUpdatingFee(false);
@@ -305,6 +356,21 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white text-black font-sans relative">
+      {/* Toast Notification Container */}
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-[3000] bg-black text-white px-8 py-4 rounded-full border border-white/10 shadow-2xl flex items-center gap-3"
+          >
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            <p className="text-[10px] font-black uppercase tracking-widest">{successMsg}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="p-8 pb-24 max-w-7xl mx-auto">
         {/* Global Admin Header with Dropdown */}
         <div className="flex justify-between items-center mb-10 pb-6 border-b border-gray-100">
@@ -542,7 +608,7 @@ const AdminDashboard: React.FC = () => {
                       <tr>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Total Revenue</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Platform Fee ({platformFee}%)</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Platform Fee ({fee}%)</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Status</th>
                       </tr>
@@ -750,8 +816,8 @@ const AdminDashboard: React.FC = () => {
                       <div className="relative flex-1">
                         <input 
                           type="number" 
-                          value={platformFee}
-                          onChange={(e) => setPlatformFee(Number(e.target.value))}
+                          value={fee}
+                          onChange={(e) => setFee(Number(e.target.value))}
                           className="w-full bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl text-sm font-bold outline-none focus:border-bbBlue transition-all"
                         />
                         <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
