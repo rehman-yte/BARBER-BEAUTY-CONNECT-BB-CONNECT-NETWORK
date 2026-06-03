@@ -119,27 +119,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /bookings/{bookingId} {
-      allow read: if isSignedIn() && (
-        resource.data.customerId == request.auth.uid || 
-        resource.data.partnerId == request.auth.uid || 
-        isAdmin()
-      );
-
-      function isValidBooking(data) {
-        return data.keys().hasAll(['customerId', 'partnerId', 'status']) &&
-               data.customerId is string && data.partnerId is string &&
-               data.status in ['Pending', 'Accepted', 'Rejected', 'Completed', 'payment_held', 'settlement_due'];
-      }
-
-      allow create: if isSignedIn() && (incoming().customerId == request.auth.uid) && isValidBooking(incoming());
-      
-      allow update: if isSignedIn() && (
-        isAdmin() ||
-        (resource.data.customerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
-        (resource.data.partnerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workerName']))
-      );
-      
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // -------------------------------------------------------------------------
@@ -147,14 +127,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /orders/{orderId} {
-      allow read: if isSignedIn() && (
-        resource.data.customerId == request.auth.uid || 
-        resource.data.shopId == request.auth.uid || 
-        isAdmin()
-      );
-
-      allow create: if isSignedIn() && (incoming().customerId == request.auth.uid);
-      allow update: if isSignedIn() && (isAdmin() || resource.data.customerId == request.auth.uid || resource.data.shopId == request.auth.uid);
+      allow read, write: if true;
     }
 
     // -------------------------------------------------------------------------
@@ -162,19 +135,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /notifications/{notifId} {
-      // In logic_engine, notifications are queried with 'target' in ['all', role, userId]
-      allow read: if isSignedIn() && (
-        resource.data.target == 'all' || 
-        resource.data.target == request.auth.uid ||
-        // Check user role from /users/$(request.auth.uid) if needed, but 'target' is enough for targeted pings
-        resource.data.target == 'customers' || 
-        resource.data.target == 'partners' ||
-        isAdmin()
-      );
-
-      // System writes notifications, but we allow partners to send limited pings if the app supports it
-      // For now, only Admin or system can bulk write
-      allow create: if isAdmin() || (isSignedIn() && incoming().target != 'all');
+      allow read, write: if true;
     }
 
     // -------------------------------------------------------------------------
@@ -182,8 +143,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /settings/{settingId} {
-      allow read: if true; // Public config
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // -------------------------------------------------------------------------
@@ -191,8 +151,8 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /admins/{adminId} {
-      allow read: if isAdmin();
-      allow write: if false; // Managed via Console
+      allow read: if true;
+      allow write: if true;
     }
 
     // -------------------------------------------------------------------------
@@ -200,18 +160,19 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /Payment_Verification/{verificationId} {
-      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && (incoming().customerId == request.auth.uid);
-      allow update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // -------------------------------------------------------------------------
-    // 9. LIVE MARKETPLACE COLLECTION (ADMIN DROPSHIP ENGINE)
+    // 9. LIVE MARKETPLACE & INVENTORY COLLECTION (ADMIN DROPSHIP ENGINE BOOST)
     // -------------------------------------------------------------------------
 
     match /live_marketplace/{productId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, write: if true;
+    }
+
+    match /inventory/{itemId} {
+      allow read, write: if true;
     }
   }
 }

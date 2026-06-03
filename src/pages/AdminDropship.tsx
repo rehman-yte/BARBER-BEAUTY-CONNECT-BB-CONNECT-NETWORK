@@ -45,7 +45,7 @@ const AdminDropship: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [priceStr, setPriceStr] = useState('');
   const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
-  const [originalCost, setOriginalCost] = useState<number | null>(null);
+  const [originalCostStr, setOriginalCostStr] = useState('');
 
   // Product List
   const [products, setProducts] = useState<any[]>([]);
@@ -95,67 +95,46 @@ const AdminDropship: React.FC = () => {
       clearTimeout(timeoutId);
 
       const data = await res.json();
-      if (data && data.success) {
-        setName(data.name || '');
+      if (data && data.success && typeof data.price === 'number' && data.price > 0 && data.price < 50000) {
+        // Successful extraction with clean price data
+        setName(data.name && !data.name.match(/[a-zA-Z0-9]{8,15}/) ? data.name : '');
         setImageUrl(data.imageUrl || '');
-        setOriginalCost(data.price || 0);
+        setOriginalCostStr(String(data.price));
 
         // Automation Rule: Retail Price = Source Price + 15% Margin
-        const recommendedRetail = Math.ceil((data.price || 0) * 1.15);
+        const recommendedRetail = Math.ceil(data.price * 1.15);
         setPriceStr(String(recommendedRetail));
 
         showToast(`AI auto-fetched details! Applied automatic +15% retail markup.`);
       } else {
-        throw new Error(data.error || 'Empty extraction response');
+        throw new Error('Suspicious data or API fallback requested');
       }
     } catch (err: any) {
-      console.warn('AI autofetch timed out or failed (e.g. cloud blocker). Engaging resilient semantic fallback parsing:', err);
+      console.warn('AI autofetch timed out or failed (e.g. cloud blocker/suspicious data). Leaving Original Base Cost as EMPTY:', err);
       clearTimeout(timeoutId);
 
-      // Parse keywords from the pasted URL path to form incredibly accurate name, image, and price.
-      const lowerUrl = sourceUrl.trim().toLowerCase();
-      let guessedName = 'Professional Classic Salon Product';
-      let guessedImage = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80';
-      let guessedBasePrice = 1499;
-
-      if (lowerUrl.includes('trimmer') || lowerUrl.includes('clipper') || lowerUrl.includes('shaver') || lowerUrl.includes('hair')) {
-        guessedName = 'Professional Titanium Hair Trimmer';
-        guessedImage = 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=600&q=80';
-        guessedBasePrice = 1899;
-      } else if (lowerUrl.includes('shampoo') || lowerUrl.includes('serum') || lowerUrl.includes('oil') || lowerUrl.includes('creme') || lowerUrl.includes('gel')) {
-        guessedName = 'Organic Moroccan Argan Hair Serum';
-        guessedImage = 'https://images.unsplash.com/photo-1608248597481-496100c80836?auto=format&fit=crop&w=600&q=80';
-        guessedBasePrice = 799;
-      } else if (lowerUrl.includes('spa') || lowerUrl.includes('stone') || lowerUrl.includes('massage') || lowerUrl.includes('wax')) {
-        guessedName = 'Luxury Aromatherapy Therapeutic Spa Set';
-        guessedImage = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80';
-        guessedBasePrice = 1299;
-      } else {
-        // Dissect URL path to guess a product name
-        try {
-          const urlOb = new URL(sourceUrl.trim());
-          const pathname = urlOb.pathname;
-          const segments = pathname.split('/').filter(Boolean);
-          if (segments.length > 0) {
-            const rawSeg = segments[segments.length - 1].replace(/[-_]/g, ' ').replace(/\..*$/, '');
-            if (rawSeg.length > 3) {
-              guessedName = rawSeg.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-            }
-          }
-        } catch (_) {}
-      }
-
-      setName(guessedName);
-      setImageUrl(guessedImage);
-      setOriginalCost(guessedBasePrice);
-      
-      const recommendedRetail = Math.ceil(guessedBasePrice * 1.15);
-      setPriceStr(String(recommendedRetail));
+      // Reset values to blank for safe manual override
+      setName('');
+      setImageUrl('');
+      setOriginalCostStr('');
+      setPriceStr('');
 
       setError('System notice: Destination server has slow response or bot blockers. Switched to direct manual edit.');
-      showToast('Offline semantic generator activated. Product details unlocked.');
+      showToast('Direct manual override enabled. Fields left blank for accuracy.');
     } finally {
       setIsAutofetching(false);
+    }
+  };
+
+  const handleOriginalCostChange = (val: string) => {
+    setOriginalCostStr(val);
+    setError('');
+    const parsed = parseFloat(val);
+    if (!isNaN(parsed) && parsed > 0) {
+      const markupAmount = Math.ceil(parsed * 1.15);
+      setPriceStr(String(markupAmount));
+    } else {
+      setPriceStr('');
     }
   };
 
@@ -210,7 +189,8 @@ const AdminDropship: React.FC = () => {
         category: categoryVal,
         discount: 0,
         rating: 5,
-        reviews: Math.floor(Math.random() * 80) + 10
+        reviews: Math.floor(Math.random() * 80) + 10,
+        createdAt: new Date().toISOString()
       };
 
       try {
@@ -225,7 +205,8 @@ const AdminDropship: React.FC = () => {
           category: String(categoryVal),
           discount: 0,
           rating: 5,
-          reviews: 42
+          reviews: 42,
+          createdAt: new Date().toISOString()
         };
         await addMarketplaceProduct(forcedPayload);
       }
@@ -237,7 +218,7 @@ const AdminDropship: React.FC = () => {
       setSourceUrl('');
       setImageUrl('');
       setPriceStr('');
-      setOriginalCost(null);
+      setOriginalCostStr('');
       setCategory(CATEGORY_OPTIONS[0]);
 
       // Re-fetch snappily
@@ -366,12 +347,30 @@ const AdminDropship: React.FC = () => {
 
                 <div>
                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
+                    Original Base Cost (Wholesale INR) *
+                  </label>
+                  <div className="relative">
+                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="e.g. 1000 (Calculates +15% Markup automatically)"
+                      value={originalCostStr}
+                      onChange={(e) => handleOriginalCostChange(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
                     Product Brand & Name *
                   </label>
                   <input 
                     type="text"
                     required
-                    placeholder="Auto-populated or enter manually"
+                    placeholder="Enter Brand/Name manually or edit fetched one"
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
@@ -391,7 +390,7 @@ const AdminDropship: React.FC = () => {
                       type="number"
                       required
                       min="1"
-                      placeholder="e.g. 2499"
+                      placeholder="Calculated automatically or custom adjust"
                       value={priceStr}
                       onChange={(e) => {
                         setPriceStr(e.target.value);
@@ -401,15 +400,15 @@ const AdminDropship: React.FC = () => {
                     />
                   </div>
                   
-                  {originalCost !== null && (
+                  {parseFloat(originalCostStr) > 0 && (
                     <div className="mt-2.5 p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200 text-emerald-800 text-[9px] font-bold uppercase tracking-wider flex flex-col gap-1.5 shadow-xs">
                       <div className="flex items-center justify-between">
                         <span>Original Base Cost:</span>
-                        <span className="font-mono text-gray-600">₹{originalCost}</span>
+                        <span className="font-mono text-gray-600">₹{parseFloat(originalCostStr)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>Margin Applied (+15% Markup):</span>
-                        <span className="font-mono text-emerald-600">+ ₹{Math.ceil(originalCost * 0.15)}</span>
+                        <span className="font-mono text-emerald-600">+ ₹{Math.ceil(parseFloat(originalCostStr) * 0.15)}</span>
                       </div>
                       <div className="border-t border-emerald-200/50 my-1"></div>
                       <div className="flex items-center justify-between text-[10px] font-extrabold text-black">
@@ -428,7 +427,7 @@ const AdminDropship: React.FC = () => {
                     <ImageIcon className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
                     <input 
                       type="url"
-                      placeholder="Auto-populated or paste images.com/sample.jpg"
+                      placeholder="Paste direct image URL or edit fetched link"
                       value={imageUrl}
                       onChange={(e) => {
                         setImageUrl(e.target.value);
