@@ -251,6 +251,21 @@ const ProductShowcase: React.FC = () => {
                     )}
                   </button>
                   <button 
+                    onClick={() => {
+                      if (!isLoggedIn) {
+                        setShowAuthModal(true);
+                        return;
+                      }
+                      if (selectedProduct) {
+                        addToCart(selectedProduct);
+                        navigate('/checkout');
+                      }
+                    }}
+                    className="flex-1 py-4 bg-black text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] hover:bg-gray-800 transition-all active:scale-[0.98]"
+                  >
+                    Buy Now
+                  </button>
+                  <button 
                     onClick={closeModal}
                     className="flex-1 py-4 border border-gray-200 text-charcoal rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] hover:bg-gray-50 transition-all active:scale-[0.98]"
                   >

@@ -307,12 +307,23 @@ const ShopPage: React.FC = () => {
                         )}
                       </div>
                       
-                      <button 
-                        onClick={() => addToCart(product)}
-                        className="w-full py-2 bg-bbBlue text-white rounded-lg text-[0.625rem] font-bold uppercase tracking-widest hover:bg-bbBlue-deep transition-all active:scale-95 shadow-sm"
-                      >
-                        Add to Cart
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => addToCart(product)}
+                          className="flex-1 py-2 bg-gray-100 text-charcoal rounded-lg text-[0.625rem] font-bold uppercase tracking-widest hover:bg-gray-250 transition-all active:scale-95 shadow-sm"
+                        >
+                          Add to Cart
+                        </button>
+                        <button 
+                          onClick={() => {
+                            addToCart(product);
+                            navigate('/checkout');
+                          }}
+                          className="flex-1 py-2 bg-bbBlue text-white rounded-lg text-[0.625rem] font-bold uppercase tracking-widest hover:bg-bbBlue-deep transition-all active:scale-95 shadow-sm"
+                        >
+                          Buy Now
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

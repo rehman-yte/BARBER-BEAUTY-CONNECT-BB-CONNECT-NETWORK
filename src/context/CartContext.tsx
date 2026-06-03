@@ -33,14 +33,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cart]);
 
   const addToCart = (product: any) => {
-    // Affiliate Link protection - Redirect through Admin's affiliate link immediately if available
-    const affiliateUrl = product.sourceUrl || product.source_url;
-    if (affiliateUrl && affiliateUrl !== '#' && affiliateUrl.trim() !== '') {
-      console.log(`[AFFILIATE REDIRECT] Redirecting customer straight to Admin affiliate resource: ${affiliateUrl}`);
-      window.location.href = affiliateUrl;
-      return;
-    }
-
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {

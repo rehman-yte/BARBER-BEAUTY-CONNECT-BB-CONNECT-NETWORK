@@ -39,82 +39,13 @@ const AdminDropship: React.FC = () => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [isAutofetching, setIsAutofetching] = useState(false);
 
   // Form input states
   const [name, setName] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [priceStr, setPriceStr] = useState('');
   const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
-  const [originalCostStr, setOriginalCostStr] = useState('');
-
-  // Sizable storage states
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [uploadError, setUploadError] = useState('');
-  const [imageFileName, setImageFileName] = useState('');
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadProgress(0);
-    setUploadError('');
-    setImageFileName(file.name);
-    
-    // Safety check for image types
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Please choose a valid image file ending with png, jpg, jpeg, or webp.');
-      setUploadProgress(null);
-      return;
-    }
-
-    try {
-      const cleanFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const storageRef = ref(storage, `marketplace_images/${cleanFileName}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          setUploadProgress(progress);
-        },
-        (err) => {
-          console.error('[STORAGE SHIELD] Storage upload failed. Activating local security base64 stream:', err);
-          
-          // Absolute secure fallback to dataURI format so catalog links can always proceed flawlessly
-          const reader = new FileReader();
-          reader.onloadend = () => {
-             setImageUrl(reader.result as string);
-             setUploadProgress(100);
-             showToast('Firebase storage write error. Encoded image securely as base64 instead.');
-          };
-          reader.readAsDataURL(file);
-        },
-        async () => {
-          try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            setImageUrl(downloadUrl);
-            setUploadProgress(100);
-            showToast('Permanently uploaded product image to Firebase Storage!');
-          } catch (getUrlErr: any) {
-            setUploadError('Failed to read download URL path from Storage bucket.');
-            setUploadProgress(null);
-          }
-        }
-      );
-    } catch (err: any) {
-      console.error('[STORAGE SHIELD] Storage write interface trigger exception:', err);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-         setImageUrl(reader.result as string);
-         setUploadProgress(100);
-         showToast('Offline media stream fallbacked successfully.');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const [description, setDescription] = useState('');
 
   // Product List
   const [products, setProducts] = useState<any[]>([]);
@@ -131,9 +62,8 @@ const AdminDropship: React.FC = () => {
   // Fail-Safe background synchronization & connection auto-recovery
   useEffect(() => {
     const intervalId = setInterval(async () => {
-      const localCachedRaw = localStorage.getItem('dropship_local_cache');
+      const localCachedRaw = localStorage.getItem('manual_local_cache');
       
-      // Auto-retry to recover connection & pull catalog even if we don't have pending items
       try {
         const data = await getMarketplaceProducts();
         
@@ -154,36 +84,35 @@ const AdminDropship: React.FC = () => {
           return timeB.localeCompare(timeA);
         }));
       } catch (err: any) {
-        console.warn('[BACKGROUND RE-SYNC] Database is still offline or unreachable, continuing cache tracking:', err.message);
+        console.warn('[BACKGROUND RE-SYNC] Database is still offline or unreachable:', err.message);
       }
 
       // If we have local unsynced cache, try writing them to Firestore
       if (localCachedRaw) {
         const localCached: any[] = JSON.parse(localCachedRaw);
         if (localCached.length > 0) {
-          console.log(`[BACKGROUND RE-SYNC] Attempting upload of ${localCached.length} cached dropship item(s)...`);
+          console.log(`[BACKGROUND RE-SYNC] Attempting upload of ${localCached.length} cached items...`);
           let successfulIds: string[] = [];
           
           for (const item of localCached) {
             try {
-              // Ensure we drop local temporary markers
               const { id, isPendingSync, ...cleanPayload } = item;
               await addMarketplaceProduct(cleanPayload);
               successfulIds.push(item.id);
             } catch (err) {
               console.warn('[BACKGROUND RE-SYNC] Retried upload failed, will retry next epoch:', err);
-              break; // break retry on primary error to verify connectivity next time
+              break; 
             }
           }
 
           if (successfulIds.length > 0) {
             const remaining = localCached.filter(i => !successfulIds.includes(i.id));
             if (remaining.length > 0) {
-              localStorage.setItem('dropship_local_cache', JSON.stringify(remaining));
+              localStorage.setItem('manual_local_cache', JSON.stringify(remaining));
             } else {
-              localStorage.removeItem('dropship_local_cache');
+              localStorage.removeItem('manual_local_cache');
             }
-            showToast(`Auto-synced ${successfulIds.length} locally cached item(s) straight to Firestore Catalog!`);
+            showToast(`Auto-synced ${successfulIds.length} locally cached items straight to Firestore Catalog!`);
             fetchProducts();
           }
         }
@@ -197,8 +126,7 @@ const AdminDropship: React.FC = () => {
     setLoading(true);
     setError('');
 
-    // Fetch localized backup list first for supreme load response performance
-    const localCachedRaw = localStorage.getItem('dropship_local_cache');
+    const localCachedRaw = localStorage.getItem('manual_local_cache');
     const localCached = localCachedRaw ? JSON.parse(localCachedRaw) : [];
 
     try {
@@ -213,84 +141,11 @@ const AdminDropship: React.FC = () => {
         return timeB.localeCompare(timeA);
       }));
     } catch (err: any) {
-      console.error("Error loading dropship catalog:", err);
-      // Seamlessly fallback entirely to localized backup lists so the admin never sees a blank page
+      console.error("Error loading products catalog:", err);
       setProducts(localCached.map((item: any) => ({ ...item, isPendingSync: true })));
-      setError('System network is currently offline. Viewing high-security local cache catalog. Auto-retrying connection every 5s...');
+      setError('System network is currently offline. Viewing local cache catalog. Auto-retrying connection every 5s...');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAutofetchDetails = async () => {
-    if (!sourceUrl.trim()) {
-      setError('Please provide a Source Purchase URL first to invoke AI Auto-fetch.');
-      return;
-    }
-    setError('');
-    setIsAutofetching(true);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    try {
-      const res = await fetch('/api/dropship/autofetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: sourceUrl.trim() }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      const data = await res.json();
-      // If price is missing or 0, or matches default placeholder, leave blank as requested to let Admin input manually
-      const isSuspicious = !data.price || data.price <= 0 || [1499, 1899, 799, 1299].includes(data.price);
-
-      if (data && data.success) {
-        setName(data.name && !data.name.match(/[a-zA-Z0-9]{8,15}/) ? data.name : '');
-        setImageUrl(data.imageUrl || '');
-        
-        if (!isSuspicious) {
-          setOriginalCostStr(String(data.price));
-          // Automation Rule: Retail Price = Source Price + 15% Margin
-          const recommendedRetail = Math.ceil(data.price * 1.15);
-          setPriceStr(String(recommendedRetail));
-          showToast(`AI auto-fetched details! Applied automatic +15% retail markup.`);
-        } else {
-          setOriginalCostStr('');
-          setPriceStr('');
-          setError('System Notice: Extraction price returned suspicious placeholder. Please input Original Base Cost manually.');
-          showToast(`AI fetched details, but base price left blank for safe manual input.`);
-        }
-      } else {
-        throw new Error('Suspicious data or API fallback requested');
-      }
-    } catch (err: any) {
-      console.warn('AI autofetch timed out or failed (e.g. cloud blocker/suspicious data). Leaving Original Base Cost as EMPTY:', err);
-      clearTimeout(timeoutId);
-
-      // Reset values to blank for safe manual override
-      setName('');
-      setImageUrl('');
-      setOriginalCostStr('');
-      setPriceStr('');
-
-      setError('System notice: Destination server has slow response or bot blockers. Switched to direct manual edit.');
-      showToast('Direct manual override enabled. Fields left blank for accuracy.');
-    } finally {
-      setIsAutofetching(false);
-    }
-  };
-
-  const handleOriginalCostChange = (val: string) => {
-    setOriginalCostStr(val);
-    setError('');
-    const parsed = parseFloat(val);
-    if (!isNaN(parsed) && parsed > 0) {
-      const markupAmount = Math.ceil(parsed * 1.15);
-      setPriceStr(String(markupAmount));
-    } else {
-      setPriceStr('');
     }
   };
 
@@ -300,49 +155,30 @@ const AdminDropship: React.FC = () => {
     setSuccessMsg('');
 
     // Field Validations
-    if (!name.trim()) return setError('Product Name is required.');
-    if (!priceStr.trim()) return setError('Your Price is required.');
+    if (!name.trim()) return setError('Product Title is required.');
+    if (!priceStr.trim()) return setError('Retail Price is required.');
+    if (!imageUrl.trim()) return setError('Product Image URL is required.');
     
     const parsedPrice = parseFloat(priceStr);
     if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      return setError('Your Price must be a positive numeric value.');
+      return setError('Retail Price must be a positive numeric value.');
     }
 
     setSubmitting(true);
     
-    // 3. PARTNER ID TRACKING ATTACHMENT
-    let finalSourceUrl = sourceUrl.trim();
-    if (!finalSourceUrl) {
-      finalSourceUrl = '#';
-    }
-    if (finalSourceUrl && finalSourceUrl !== '#') {
-      const partnerId = user?.uid || 'admin';
-      try {
-        const urlOb = new URL(finalSourceUrl);
-        urlOb.searchParams.set('partnerId', partnerId);
-        finalSourceUrl = urlOb.toString();
-      } catch (e) {
-        // Simple appending if URL parse fails
-        if (finalSourceUrl.includes('?')) {
-          finalSourceUrl = `${finalSourceUrl}&partnerId=${partnerId}`;
-        } else {
-          finalSourceUrl = `${finalSourceUrl}?partnerId=${partnerId}`;
-        }
-      }
-    }
-
-    // SECURITY METADATA SANITIZATION: Strict validation of primitives and automatic fallback defaults
-    const nameVal = String(name.trim() || 'Professional Classic Salon Product');
+    const nameVal = String(name.trim());
     const categoryVal = String(category || CATEGORY_OPTIONS[0]);
-    const imageVal = String(imageUrl.trim() || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80');
-    const finalPrice = Number(parsedPrice) || 899;
+    const imageVal = String(imageUrl.trim());
+    const finalPrice = Number(parsedPrice);
+    const descriptionVal = String(description.trim() || 'No description provided.');
 
     const payload = {
       name: nameVal,
-      sourceUrl: String(finalSourceUrl),
+      sourceUrl: '#',
       imageUrl: imageVal,
       price: finalPrice,
       category: categoryVal,
+      description: descriptionVal,
       discount: 0,
       rating: 5,
       reviews: Math.floor(Math.random() * 80) + 10,
@@ -350,74 +186,70 @@ const AdminDropship: React.FC = () => {
     };
 
     try {
-      // FORCE WRITE with fallback schemas
       try {
         await addMarketplaceProduct(payload);
-        showToast('Link Product verified: Successfully synchronized to the Live Catalog!');
+        showToast('Successfully synchronized product to the Live Catalog!');
       } catch (firstErr) {
-        console.warn('First Firestore insertion attempted failed. Forcing schema schema constraints:', firstErr);
+        console.warn('First Firestore insertion attempted failed. Forcing schema constraints:', firstErr);
         const forcedPayload = {
           name: String(nameVal).slice(0, 100),
-          sourceUrl: String(finalSourceUrl),
+          sourceUrl: '#',
           imageUrl: String(imageVal),
           price: Number(finalPrice),
           category: String(categoryVal),
+          description: descriptionVal,
           discount: 0,
           rating: 5,
           reviews: 42,
           createdAt: new Date().toISOString()
         };
         await addMarketplaceProduct(forcedPayload);
-        showToast('Link Product verified with safe payload schema constraints!');
+        showToast('Successfully synchronized product with safe constraints!');
       }
     } catch (err: any) {
-      console.warn('Firestore write failed. Utilizing high-security local cache system:', err);
+      console.warn('Firestore write failed. Utilizing local cache system:', err);
       
       const localItem = {
         id: 'temp_' + Date.now(),
         ...payload
       };
 
-      const currentCacheRaw = localStorage.getItem('dropship_local_cache');
+      const currentCacheRaw = localStorage.getItem('manual_local_cache');
       const currentCache = currentCacheRaw ? JSON.parse(currentCacheRaw) : [];
       currentCache.push(localItem);
-      localStorage.setItem('dropship_local_cache', JSON.stringify(currentCache));
+      localStorage.setItem('manual_local_cache', JSON.stringify(currentCache));
       
-      showToast('DATABASE OFFLINE: Product saved to high-security local cache! Auto-retrying background sync...');
+      showToast('DATABASE OFFLINE: Product saved to manual local cache! Auto-retrying background sync...');
     } finally {
-      // Reset input fields in both successful and localized fallback paths
       setName('');
-      setSourceUrl('');
       setImageUrl('');
       setPriceStr('');
-      setOriginalCostStr('');
+      setDescription('');
       setCategory(CATEGORY_OPTIONS[0]);
       setSubmitting(false);
 
-      // Re-fetch merges live and cached items
       fetchProducts();
     }
   };
 
   const handleDeleteProduct = async (productId: string, productName: string) => {
-    // Check if item is locally cached only
     if (productId.startsWith('temp_')) {
-      const localCachedRaw = localStorage.getItem('dropship_local_cache');
+      const localCachedRaw = localStorage.getItem('manual_local_cache');
       if (localCachedRaw) {
         const localCached: any[] = JSON.parse(localCachedRaw);
         const filtered = localCached.filter(p => p.id !== productId);
         if (filtered.length > 0) {
-          localStorage.setItem('dropship_local_cache', JSON.stringify(filtered));
+          localStorage.setItem('manual_local_cache', JSON.stringify(filtered));
         } else {
-          localStorage.removeItem('dropship_local_cache');
+          localStorage.removeItem('manual_local_cache');
         }
-        showToast('Pending items deleted from high-security local cache.');
+        showToast('Pending item deleted from local cache.');
         fetchProducts();
       }
       return;
     }
 
-    const confirmDelete = window.confirm(`SECURE SYSTEM OVERRIDE:\nAre you sure you want to delete "${productName}" from the live marketplace?\nThis cannot be undone.`);
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${productName}" from the live marketplace?`);
     if (!confirmDelete) return;
 
     try {
@@ -426,7 +258,7 @@ const AdminDropship: React.FC = () => {
       setProducts(prev => prev.filter(p => p.id !== productId));
       showToast('Product permanently purged from catalog.');
     } catch (err: any) {
-      setError('purge command failed to execute in Firestore rules.');
+      setError('Purge command failed to execute in Firestore rules.');
     }
   };
 
@@ -464,10 +296,10 @@ const AdminDropship: React.FC = () => {
             <ArrowLeft className="w-3 h-3" /> Back to command dashboard
           </button>
           <h1 className="text-4xl font-serif font-bold text-black tracking-tight uppercase flex items-center gap-3">
-            <ShoppingBag className="w-8 h-8 text-[#0056b3]" /> Dropship Inventory Control
+            <ShoppingBag className="w-8 h-8 text-[#0056b3]" /> Manage Inventory
           </h1>
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">
-            Automated Shopify-style item importer and sync engine
+            Add and update products manually inside the localized store catalog
           </p>
         </div>
 
@@ -479,84 +311,26 @@ const AdminDropship: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           
-          {/* Column 1: Shopify-style Linker Form */}
+          {/* Column 1: Manual Input Form */}
           <div className="lg:col-span-1">
-            <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm sticky top-28">
+            <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm justify-between flex flex-col">
               <div className="mb-6">
                 <span className="text-[8px] font-black uppercase text-[#0056b3] bg-[#0056b3]/10 px-2.5 py-1 rounded-full tracking-wider">
-                  SOURCE CONNECTOR
+                  NATIVE CONTROL
                 </span>
                 <h2 className="text-xl font-serif font-bold text-black uppercase mt-3">Link New Product</h2>
-                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Sync items to customer store grid</p>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Direct insert parameters to live catalog</p>
               </div>
 
               <form onSubmit={handleCreateProduct} className="space-y-5">
                 <div>
                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Source Purchase URL (Dropship Link) *
-                  </label>
-                  <div className="relative">
-                    <LinkIcon className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
-                    <input 
-                      type="url"
-                      required
-                      placeholder="e.g. https://alibaba.com/trimmer-source"
-                      value={sourceUrl}
-                      onChange={(e) => {
-                        setSourceUrl(e.target.value);
-                        setError('');
-                      }}
-                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={isAutofetching || submitting}
-                    onClick={handleAutofetchDetails}
-                    className="w-full mt-2.5 bg-gray-900 text-white hover:bg-[#0056b3] disabled:bg-gray-100 disabled:text-gray-400 py-3 rounded-2xl font-black uppercase text-[9px] tracking-wider transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer border border-transparent"
-                  >
-                    {isAutofetching ? (
-                      <>
-                        <Loader className="w-3.5 h-3.5 animate-spin text-[#0056b3]" /> EXTRACTING PRODUCT WITH GEMINI AI...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" /> ⚡ AI AUTO-FETCH DETAILS
-                      </>
-                    )}
-                  </button>
-                  <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-1.5">
-                    Pasting a source URL & launching AI extracts Title, High-Res Image, and Base Cost dynamically.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Original Base Cost (Wholesale INR) *
-                  </label>
-                  <div className="relative">
-                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
-                    <input 
-                      type="number"
-                      required
-                      min="1"
-                      placeholder="e.g. 1000 (Calculates +15% Markup automatically)"
-                      value={originalCostStr}
-                      onChange={(e) => handleOriginalCostChange(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Product Brand & Name *
+                    Product Title *
                   </label>
                   <input 
                     type="text"
                     required
-                    placeholder="Enter Brand/Name manually or edit fetched one"
+                    placeholder="e.g. Premium Pro Cordless Hair Trimmer"
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
@@ -568,120 +342,7 @@ const AdminDropship: React.FC = () => {
 
                 <div>
                   <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Your Retail Price (INR) *
-                  </label>
-                  <div className="relative">
-                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
-                    <input 
-                      type="number"
-                      required
-                      min="1"
-                      placeholder="Calculated automatically or custom adjust"
-                      value={priceStr}
-                      onChange={(e) => {
-                        setPriceStr(e.target.value);
-                        setError('');
-                      }}
-                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
-                    />
-                  </div>
-                  
-                  {parseFloat(originalCostStr) > 0 ? (
-                    <div className="mt-2.5 p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200 text-emerald-800 text-[9px] font-bold uppercase tracking-wider flex flex-col gap-1.5 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <span>Original Base Cost:</span>
-                        <span className="font-mono text-gray-600">₹{parseFloat(originalCostStr)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Margin Applied (+15% Markup):</span>
-                        <span className="font-mono text-emerald-600">+ ₹{Math.ceil(parseFloat(originalCostStr) * 0.15)}</span>
-                      </div>
-                      <div className="border-t border-emerald-200/50 my-1"></div>
-                      <div className="flex items-center justify-between text-[10px] font-extrabold text-black">
-                        <span>Target Retail Price:</span>
-                        <span className="font-mono bg-white border border-emerald-100 rounded-lg px-2.5 py-1 text-emerald-700">₹{priceStr}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2.5 p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/50 text-amber-800 text-[9px] font-bold uppercase tracking-wider flex flex-col gap-1 shadow-xs animate-pulse">
-                      <div className="text-center font-extrabold text-amber-700">⚠️ Base Cost is empty (₹0)</div>
-                      <div className="text-center font-mono text-[7px] text-gray-500 normal-case leading-normal">
-                        Please input Original Base Cost manually. Target retail price calculates automatically adding a premium 15% wholesale markup!
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Product Image (Direct Secure Upload) *
-                  </label>
-                  <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-6 transition-all hover:bg-gray-50/50 flex flex-col items-center justify-center gap-3 relative overflow-hidden group">
-                    <input 
-                      type="file"
-                      accept="image/*"
-                      id="image-upload-input"
-                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      onChange={handleImageUpload}
-                    />
-                    
-                    {imageUrl ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-20 h-20 rounded-xl border border-gray-100 overflow-hidden shadow-xs relative group-hover:scale-105 transition-transform">
-                          <img 
-                            src={imageUrl} 
-                            alt="Uploaded preview" 
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <span className="text-[8px] font-mono text-emerald-600 bg-emerald-50 px-2 py-1 rounded font-black tracking-widest uppercase">
-                          ✓ UPLOAD COMPLETED
-                        </span>
-                        <span className="text-[7.5px] font-semibold text-gray-400 truncate max-w-xs">{imageFileName || 'Uploaded Image'}</span>
-                        <button
-                          type="button"
-                          onClick={() => setImageUrl('')}
-                          className="text-[7.5px] text-red-500 font-extrabold tracking-wider uppercase underline hover:text-red-700 z-20"
-                        >
-                          Remove Photo
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center text-center">
-                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-[#0056b3] mb-2 shadow-sm group-hover:animate-bounce">
-                          <ImageIcon className="w-5 h-5 animate-pulse" />
-                        </div>
-                        <p className="text-[10px] font-bold text-black mb-1">
-                          Drag & Drop or Click to Select File
-                        </p>
-                        <p className="text-[8px] text-gray-400 font-medium leading-normal normal-case">
-                          Supports PNG, JPG, WEBP formats. Securely hosted permanently.
-                        </p>
-                      </div>
-                    )}
-
-                    {uploadProgress !== null && uploadProgress < 100 && (
-                      <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20">
-                        <Loader className="w-6 h-6 text-[#0056b3] animate-spin mb-2" />
-                        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Uploading: {uploadProgress}%</span>
-                        <div className="w-32 bg-gray-100 h-1 rounded-full overflow-hidden mt-1.5">
-                          <div className="bg-[#0056b3] h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                        </div>
-                      </div>
-                    )}
-
-                    {uploadError && (
-                      <p className="text-[8px] font-black text-red-500 uppercase tracking-wider text-center mt-2">
-                        ⚠️ {uploadError}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
-                    Store Catalog Category
+                    Store Catalog Category *
                   </label>
                   <select
                     value={category}
@@ -694,15 +355,86 @@ const AdminDropship: React.FC = () => {
                   </select>
                 </div>
 
+                <div>
+                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
+                    Your Retail Price (INR) *
+                  </label>
+                  <div className="relative">
+                    <IndianRupee className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="e.g. 1299"
+                      value={priceStr}
+                      onChange={(e) => {
+                        setPriceStr(e.target.value);
+                        setError('');
+                      }}
+                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
+                    Product Description *
+                  </label>
+                  <textarea 
+                    required
+                    rows={3}
+                    placeholder="Write detailed specifications & description..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 px-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">
+                    Product Image Link URL *
+                  </label>
+                  <div className="relative">
+                    <ImageIcon className="w-3.5 h-3.5 text-gray-400 absolute left-5 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="url"
+                      required
+                      placeholder="e.g. https://images.unsplash.com/photo-..."
+                      value={imageUrl}
+                      onChange={(e) => {
+                        setImageUrl(e.target.value);
+                        setError('');
+                      }}
+                      className="w-full bg-gray-50 border border-gray-200 pl-11 pr-5 py-3.5 rounded-2xl font-bold text-xs outline-none focus:bg-white focus:border-[#0056b3] transition-all"
+                    />
+                  </div>
+                  {imageUrl.trim() && (
+                    <div className="mt-2 text-center">
+                      <div className="w-16 h-16 rounded-xl border border-gray-200 overflow-hidden mx-auto bg-white shadow-xs">
+                        <img 
+                          src={imageUrl} 
+                          alt="Manual product link preview" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=100&q=80';
+                          }}
+                        />
+                      </div>
+                      <span className="text-[8px] font-mono text-gray-400 uppercase block mt-1">Image Preview</span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="pt-4">
                   <button
                     type="submit"
-                    disabled={submitting || isAutofetching}
+                    disabled={submitting}
                     className="w-full bg-black text-white hover:bg-[#0056b3] disabled:bg-gray-200 disabled:text-gray-400 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {submitting ? (
                       <>
-                        <Loader className="w-3.5 h-3.5 animate-spin" /> IMPERIAL CONNECTOR SYNCHRONIZING...
+                        <Loader className="w-3.5 h-3.5 animate-spin" /> SYNCHRONIZING TO CATALOG...
                       </>
                     ) : (
                       <>
@@ -767,20 +499,15 @@ const AdminDropship: React.FC = () => {
                           <h3 className="text-sm font-semibold font-serif text-black leading-snug">
                             {prod.name}
                           </h3>
+                          {prod.description && (
+                            <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">
+                              {prod.description}
+                            </p>
+                          )}
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <span className="text-xs font-bold font-mono text-black">
                               ₹{prod.price}
                             </span>
-                            {prod.sourceUrl && prod.sourceUrl !== '#' && (
-                              <a 
-                                href={prod.sourceUrl} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="text-[8px] font-black uppercase text-gray-400 hover:text-[#0056b3] tracking-widest flex items-center gap-1 transition-all"
-                              >
-                                <ExternalLink className="w-2.5 h-2.5" /> Direct Source
-                              </a>
-                            )}
                           </div>
                         </div>
                       </div>

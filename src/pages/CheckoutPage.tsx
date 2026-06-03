@@ -455,41 +455,146 @@ const CheckoutPage: React.FC = () => {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-8"
                 >
-                  <h3 className="text-2xl font-serif font-bold text-charcoal mb-8">Shipping Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Full Name</label>
-                      <input name="fullName" value={formData.fullName} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Phone Number</label>
-                      <input name="phone" value={formData.phone} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono" />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Delivery Address</label>
-                      <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all resize-none" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">City</label>
-                      <input name="city" value={formData.city} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Pincode</label>
-                      <input name="pincode" value={formData.pincode} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono" />
-                    </div>
-                  </div>
-                  <div className="pt-8 flex justify-between">
-                    <button onClick={() => setStep('cart')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
-                      <ArrowLeft size={14} /> Back to Cart
-                    </button>
-                    <button 
-                      onClick={() => setStep('payment')}
-                      disabled={!formData.address || !formData.phone}
-                      className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl disabled:opacity-50"
-                    >
-                      Continue to Payment
-                    </button>
-                  </div>
+                  {isSlotBooking ? (
+                    <>
+                      <h3 className="text-2xl font-serif font-bold text-charcoal mb-8">Shipping Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Full Name</label>
+                          <input name="fullName" value={formData.fullName} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Phone Number</label>
+                          <input name="phone" value={formData.phone} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono" />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Delivery Address</label>
+                          <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all resize-none" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">City</label>
+                          <input name="city" value={formData.city} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest ml-2">Pincode</label>
+                          <input name="pincode" value={formData.pincode} onChange={handleInputChange} className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-bbBlue transition-all font-mono" />
+                        </div>
+                      </div>
+                      <div className="pt-8 flex justify-between">
+                        <button onClick={() => setStep('cart')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
+                          <ArrowLeft size={14} /> Back to Cart
+                        </button>
+                        <button 
+                          onClick={() => setStep('payment')}
+                          disabled={!formData.address || !formData.phone}
+                          className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl disabled:opacity-50"
+                        >
+                          Continue to Payment
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mb-4">
+                        <span className="text-[0.625rem] font-black uppercase text-bbBlue bg-bbBlue/10 px-2.5 py-1 rounded-full tracking-wider">
+                          NATIVE PRODUCT DISPATCH ONLY
+                        </span>
+                        <h3 className="text-2xl font-serif font-bold text-charcoal mt-3">Internal Order Verification Form</h3>
+                        <p className="text-xs text-gray-400 mt-1">Please provide accurate verification details to initiate direct delivery.</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-black text-gray-500 uppercase tracking-widest ml-1">Customer Name *</label>
+                          <input 
+                            type="text"
+                            required
+                            name="fullName" 
+                            placeholder="e.g. Mohd Shoeb"
+                            value={formData.fullName} 
+                            onChange={handleInputChange} 
+                            className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-bbBlue transition-all font-bold text-xs" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-black text-gray-500 uppercase tracking-widest ml-1">WhatsApp Number *</label>
+                          <input 
+                            type="text"
+                            required
+                            name="phone" 
+                            placeholder="e.g. +91 8273865308 (For order tracking & receipt updates)"
+                            value={formData.phone} 
+                            onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} 
+                            className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-bbBlue transition-all font-mono font-bold text-xs" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[0.625rem] font-black text-gray-500 uppercase tracking-widest ml-1">Delivery Address *</label>
+                          <textarea 
+                            required
+                            name="address" 
+                            placeholder="Enter your complete home or shop delivery address"
+                            value={formData.address} 
+                            onChange={handleInputChange} 
+                            rows={4} 
+                            className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-bbBlue transition-all resize-none text-xs font-bold" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-8 flex justify-between items-center">
+                        <button onClick={() => setStep('cart')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
+                          <ArrowLeft size={14} /> Back to Cart
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
+                              setPaymentError("Name, WhatsApp Number, and Delivery Address are required.");
+                              return;
+                            }
+                            setPaymentError(null);
+                            setLoading(true);
+                            try {
+                              const orderPayload = {
+                                customerName: formData.fullName.trim(),
+                                whatsappNumber: formData.phone.trim(),
+                                deliveryAddress: formData.address.trim(),
+                                items: cart.map(item => ({
+                                  id: item.id,
+                                  name: item.name,
+                                  price: item.price,
+                                  quantity: item.quantity,
+                                  category: item.category || 'Product',
+                                  image: item.image || ''
+                                })),
+                                totalAmount: totalPrice,
+                                status: 'pending',
+                                createdAt: new Date().toISOString()
+                              };
+                              await addDoc(collection(db, 'customer_orders'), orderPayload);
+                              setStep('success');
+                              clearCart();
+                            } catch (err: any) {
+                              console.error("Firestore customer_orders write failed:", err);
+                              setPaymentError("Could not place order. Server connectivity error, please try again.");
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          disabled={loading || !formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()}
+                          className="bg-black hover:bg-bbBlue text-white px-10 py-4 rounded-full font-black uppercase text-[0.7rem] tracking-widest transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer shadow-lg active:scale-95"
+                        >
+                          {loading ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> PLACING ORDER...
+                            </>
+                          ) : (
+                            'CONFIRM & PLACE ORDER ⚡'
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               )}
 
