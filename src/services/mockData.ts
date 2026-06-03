@@ -190,6 +190,15 @@ export const updateBooking = async (bookingId: string, updates: any) => {
 
 export const getSettings = async (): Promise<any> => {
   try {
+    const configRef = doc(db, 'settings', 'global_config');
+    const configSnap = await getDoc(configRef);
+    if (configSnap.exists()) {
+      const configData = configSnap.data();
+      if (configData.platformFee !== undefined) {
+        return configData;
+      }
+    }
+
     const docRef = doc(db, 'settings', 'global');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) return docSnap.data();

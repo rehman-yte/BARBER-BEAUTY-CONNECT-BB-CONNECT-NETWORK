@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 import PartnerAuthModal from './PartnerAuthModal';
 
@@ -29,7 +29,7 @@ const PartnerCTA: React.FC = () => {
             onClick={() => navigate('/partner-auth')}
             className="bg-bbBlue-deep text-white px-[2.5rem] py-[1.25rem] rounded-full font-bold uppercase tracking-[0.3em] text-[0.75rem] shadow-xl shadow-bbBlue/20 hover:bg-charcoal transition-all active:scale-95"
           >
-            JOIN AS A PARTNER
+            JOIN OUR NETWORK
           </button>
         </motion.div>
       </div>

@@ -53,8 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const parsed = JSON.parse(saved);
       
       // Aggressive Flag Sync for Partners
-      const isRegistered = localStorage.getItem("registration_complete") === 'true' || 
-                          localStorage.getItem(`bb_registered_${parsed.uid}`) === 'true';
+      const isRegistered = localStorage.getItem(`bb_registered_${parsed.uid}`) === 'true';
                           
       if (parsed && parsed.role === 'partner' && isRegistered) {
         parsed.onboardingComplete = true;
@@ -103,8 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         const REGISTERED_KEY = `bb_registered_${firebaseUser.uid}`;
-        const LEGACY_REG_KEY = "registration_complete";
-        const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true' || localStorage.getItem(LEGACY_REG_KEY) === 'true';
+        const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
 
         // OPTIMIZATION: Immediate Recognition for Registered Partners
         if (isRegisteredCache && storedRole === 'partner') {
@@ -131,7 +129,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Keep cache in sync
           localStorage.setItem(REGISTERED_KEY, 'true');
-          localStorage.setItem(LEGACY_REG_KEY, 'true');
           
           // Verify with DB in background to sync latest status
           getDoc(doc(db, 'partners', firebaseUser.uid)).then(docSnap => {
@@ -143,6 +140,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 photoURL: data.ownerPicture,
                 onboardingComplete: true
               });
+            } else {
+              localStorage.removeItem(REGISTERED_KEY);
+              setUser(prev => prev ? { ...prev, onboardingComplete: false } : null);
             }
           }).catch(e => console.warn("Background partner sync failed:", e));
           
@@ -174,7 +174,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (partnerDoc.exists()) {
             const partnerData = partnerDoc.data();
             localStorage.setItem(REGISTERED_KEY, 'true');
-            localStorage.setItem(LEGACY_REG_KEY, 'true');
             
             setUser({
               uid: firebaseUser.uid,
