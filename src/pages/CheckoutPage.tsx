@@ -7,7 +7,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
-import { getSettings, getMarketplaceProducts } from '../services/logic_engine';
+import { getSettings } from '../services/logic_engine';
 
 // Purged Razorpay Script Integrations. Using Direct UPI Intent Interface.
 
@@ -22,8 +22,6 @@ const CheckoutPage: React.FC = () => {
   );
 
   const [feePercent, setFeePercent] = useState<number>(10);
-  const [marketplaceProducts, setMarketplaceProducts] = useState<any[]>([]);
-  const [productsLoading, setProductsLoading] = useState<boolean>(true);
   
   useEffect(() => {
     let active = true;
@@ -37,22 +35,7 @@ const CheckoutPage: React.FC = () => {
         console.error("Failed to load settings in CheckoutPage:", err);
       }
     };
-    const fetchProducts = async () => {
-      try {
-        const productsData = await getMarketplaceProducts();
-        if (active) {
-          setMarketplaceProducts(productsData);
-        }
-      } catch (err) {
-        console.error("Failed to load catalog products in CheckoutPage:", err);
-      } finally {
-        if (active) {
-          setProductsLoading(false);
-        }
-      }
-    };
     fetchSettings();
-    fetchProducts();
     return () => {
       active = false;
     };
@@ -338,96 +321,18 @@ const CheckoutPage: React.FC = () => {
 
   if (cart.length === 0 && step !== 'success') {
     return (
-      <div className="min-h-screen bg-gray-50/50 pb-24 font-sans">
-        {/* Header styling branding matches Swiss/Modern high contrast style */}
-        <div className="max-w-6xl mx-auto px-[5%] pt-12 mb-10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-200">
-            <div>
-              <span className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.3em] block">
-                BB CONNECT NETWORK
-              </span>
-              <h1 className="text-3xl font-serif font-bold text-black uppercase tracking-tight mt-1 flex items-center gap-2.5">
-                🛍️ global affiliate showcase
-              </h1>
-            </div>
-            <div className="text-right">
-              <span className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em] bg-white py-1.5 px-3.5 rounded-full border border-gray-200">
-                Context: Synchronized Marketplace
-              </span>
-            </div>
-          </div>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
+        <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+          <Truck className="text-gray-200" size={40} />
         </div>
-
-        <div className="max-w-6xl mx-auto px-[5%]">
-          {productsLoading ? (
-            <div className="py-24 text-center">
-              <div className="w-10 h-10 border-4 border-bbBlue border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Querying Global Inventory...</p>
-            </div>
-          ) : marketplaceProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {marketplaceProducts.map((product) => (
-                <motion.div 
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                  key={product.id}
-                  className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden flex flex-col justify-between hover:shadow-lg transition-all group"
-                >
-                  <div>
-                    {/* Image space */}
-                    <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden border-b border-gray-100">
-                      <img 
-                        src={product.imageUrl} 
-                        alt={product.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                      <span className="absolute top-4 right-4 bg-black text-white font-mono text-[11px] font-black px-4 py-2 rounded-full border border-white/10 shadow-md">
-                        ₹{product.price}
-                      </span>
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="p-6">
-                      <h3 className="text-sm font-bold text-black font-serif uppercase tracking-tight leading-snug line-clamp-2">
-                        {product.name}
-                      </h3>
-                      <p className="text-[8px] text-gray-400 font-mono mt-2 uppercase tracking-widest leading-none">Catalog Ref ID: {product.id}</p>
-                    </div>
-                  </div>
-
-                  {/* Purchase CTA */}
-                  <div className="p-6 pt-0">
-                    {product.sourceLink ? (
-                      <a 
-                        href={product.sourceLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-full bg-black text-white hover:bg-bbBlue py-4 rounded-2xl font-black uppercase text-[9px] tracking-[0.2em] transition-all shadow-md flex items-center justify-center gap-2 hover:gap-3"
-                      >
-                        Buy Now ↗
-                      </a>
-                    ) : (
-                      <button 
-                        disabled
-                        className="w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-black uppercase text-[9px] tracking-[0.2em] cursor-not-allowed"
-                      >
-                        Ask Counter Desk
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20 bg-white border border-gray-200 rounded-[2.5rem] px-6">
-              <Truck className="text-gray-300 mx-auto mb-4 animate-bounce" size={40} />
-              <h3 className="text-xl font-serif font-bold text-black uppercase mb-1">Central catalog is empty</h3>
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Ask administrators to upload affiliate products to synchronize catalog.</p>
-            </div>
-          )}
-        </div>
+        <h2 className="text-3xl font-serif font-bold text-charcoal mb-4">Your cart is empty</h2>
+        <p className="text-gray-400 uppercase tracking-widest text-[0.625rem] mb-8">Start adding premium essentials to your inventory</p>
+        <button 
+          onClick={() => navigate('/shop')}
+          className="bg-bbBlue text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest shadow-xl shadow-bbBlue/20 hover:bg-blue-600 transition-all"
+        >
+          Return to Shop
+        </button>
       </div>
     );
   }
