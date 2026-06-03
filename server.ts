@@ -9,8 +9,19 @@ import crypto from 'crypto';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Resolve paths dynamically for CJS/ESM compatibility
+// @ts-ignore
+const localFilename = typeof __filename !== 'undefined' ? __filename : '';
+// @ts-ignore
+const localDirname = typeof __dirname !== 'undefined' ? __dirname : '';
+
+const __filename = typeof import.meta !== 'undefined' && import.meta.url 
+  ? fileURLToPath(import.meta.url) 
+  : localFilename;
+
+const __dirname = typeof import.meta !== 'undefined' && import.meta.url 
+  ? path.dirname(__filename) 
+  : localDirname;
 
 // Initialize Firebase for Backend Database Sync
 const firebaseConfig = {

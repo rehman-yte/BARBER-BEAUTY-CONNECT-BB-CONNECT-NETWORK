@@ -240,6 +240,9 @@ const Navbar: React.FC = () => {
                         <Link to="/admin/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
                           <span className="opacity-50">🔐</span> Admin Control
                         </Link>
+                        <Link to="/admin/manage-live-shops" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                          <span className="opacity-50">🛠️</span> CONTROL SHOPS
+                        </Link>
                         <Link to="/admin/dashboard?view=verification" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
                           <span className="opacity-50">🛡️</span> Partner Vetting
                         </Link>

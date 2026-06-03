@@ -20,6 +20,7 @@ import { PersistenceService, StorageManager } from '../services/PersistenceServi
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
   const [stats, setStats] = useState<any>(PersistenceService.load('admin_stats'));
   const [loading, setLoading] = useState(!PersistenceService.load('admin_stats'));
   const [error, setError] = useState('');
@@ -305,6 +306,34 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-white text-black font-sans relative">
       <main className="p-8 pb-24 max-w-7xl mx-auto">
+        {/* Global Admin Header with Dropdown */}
+        <div className="flex justify-between items-center mb-10 pb-6 border-b border-gray-100">
+          <div>
+            <span className="text-[8px] font-black uppercase text-[#0056b3] bg-[#0056b3]/10 px-2 py-1 rounded-full tracking-wider">SYSTEM LEVEL: ADMINISTRATOR</span>
+          </div>
+          <div className="relative">
+            <button 
+              onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+              className="bg-black text-white hover:bg-[#0056b3] px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all shadow-md border border-white/10"
+            >
+              🛠️ QUICK ACTIONS <span className="text-[7px]">{showToolsDropdown ? '▲' : '▼'}</span>
+            </button>
+            {showToolsDropdown && (
+              <div className="absolute right-0 mt-3 w-56 bg-white border border-gray-100 shadow-2xl rounded-2xl py-1 z-[1100] overflow-hidden">
+                <button 
+                  onClick={() => {
+                    setShowToolsDropdown(false);
+                    navigate('/admin/manage-live-shops');
+                  }}
+                  className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase text-charcoal hover:bg-gray-50 hover:text-[#0056b3] transition-all"
+                >
+                  <span className="text-sm">🛠️</span> CONTROL SHOPS
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {currentView === 'overview' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="mb-12">

@@ -124,7 +124,7 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
       q = query(collection(db, 'partners'), where('status', '==', 'approved'), where('category', '==', category));
     }
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(docSnapshot => {
+    const results = querySnapshot.docs.map(docSnapshot => {
       const data = docSnapshot.data() as any;
       return { 
         id: docSnapshot.id, 
@@ -139,6 +139,8 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
         adminApproved: data.adminApproved || data.status === 'approved' || data.status === 'active'
       };
     });
+    // Instantly hide shop on Explore Page if isActive is explicitly false
+    return results.filter(shop => shop.isActive !== false);
   } catch (err) {
     console.error("getApprovedPartners error:", err);
     // Fallback if index/composite index is missing: filter in memory
@@ -146,6 +148,7 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
     return all.filter(shop => {
       const isApproved = shop.status === 'approved' || shop.adminApproved === true;
       if (!isApproved) return false;
+      if (shop.isActive === false) return false;
       if (category && shop.category !== category) return false;
       return true;
     });
