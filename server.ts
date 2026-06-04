@@ -8,6 +8,7 @@ import { stringify } from 'csv-stringify/sync';
 import crypto from 'crypto';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import Razorpay from 'razorpay';
 
 // Resolve paths dynamically for CJS/ESM compatibility
 // @ts-ignore
@@ -419,6 +420,63 @@ async function startServer() {
       return s;
     });
     res.json(safeShops);
+  });
+
+  // Razorpay Client configuration (Keys can be overriden seamlessly in .env)
+  const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
+  const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ClmQ5hGuQe2v5CDa75lgADqm';
+
+  const razorpayClient = new Razorpay({
+    key_id: RAZORPAY_KEY_ID,
+    key_secret: RAZORPAY_KEY_SECRET
+  });
+
+  app.post('/api/razorpay/create-order', async (req, res) => {
+    try {
+      const { amount } = req.body;
+      if (!amount) {
+        return res.status(400).json({ success: false, error: 'Amount is required' });
+      }
+      
+      const options = {
+        amount: Math.round(Number(amount) * 100), // convert to paise
+        currency: "INR",
+        receipt: `receipt_order_${Date.now()}`
+      };
+      
+      const order = await razorpayClient.orders.create(options);
+      res.json({
+        success: true,
+        orderId: order.id,
+        keyId: RAZORPAY_KEY_ID
+      });
+    } catch (error: any) {
+      console.error("Razorpay order generation error:", error);
+      res.status(500).json({ success: false, error: error.message || 'Failed to generate Razorpay order' });
+    }
+  });
+
+  app.post('/api/razorpay/verify-payment', async (req, res) => {
+    try {
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Missing verification fields' });
+      }
+
+      const generated_signature = crypto
+        .createHmac('sha256', RAZORPAY_KEY_SECRET)
+        .update(razorpay_order_id + "|" + razorpay_payment_id)
+        .digest('hex');
+
+      if (generated_signature === razorpay_signature) {
+        res.json({ success: true, message: 'Payment verified securely' });
+      } else {
+        res.status(400).json({ success: false, error: 'Invalid signature verification' });
+      }
+    } catch (error: any) {
+      console.error("Razorpay verification error:", error);
+      res.status(500).json({ success: false, error: error.message || 'Verification failed' });
+    }
   });
 
   // Pure lightweight IDFC generator conforming to senior guidelines

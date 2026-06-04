@@ -263,6 +263,200 @@ const CheckoutPage: React.FC = () => {
     setLoading(false);
   };
 
+  const handleRazorpayPayment = async () => {
+    setLoading(true);
+    setPaymentError(null);
+
+    try {
+      // 1. Load Razorpay SDK Script
+      const scriptLoaded = await new Promise((resolve) => {
+        if ((window as any).Razorpay) {
+          resolve(true);
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+      });
+
+      if (!scriptLoaded) {
+        throw new Error("Failed to load Razorpay payment gateway script. Please check your internet connection.");
+      }
+
+      // 2. Call backend to create Razorpay Order
+      const res = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: finalTotal })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to create order on secure server.");
+      }
+
+      const { orderId, keyId } = await res.json();
+
+      // 3. Save pending transaction record to Firestore first so it maintains state
+      let finalOrderId = '';
+      let finalBookingIds: string[] = [];
+
+      try {
+        const orderData = {
+          customerId: user?.uid,
+          customerName: formData.fullName || user?.name || 'Customer Booking',
+          shippingAddress: isSlotBooking ? {
+            address: 'N/A - Direct Service Slot Booking (Bypassed)',
+            city: 'N/A',
+            pincode: 'N/A',
+            state: 'N/A'
+          } : {
+            address: formData.address,
+            city: formData.city,
+            pincode: formData.pincode,
+            state: formData.state
+          },
+          items: cart,
+          totalAmount: finalTotal,
+          platformFee: feeAmount,
+          status: 'payment_held', // initial pending status before signature validation
+          paymentStatus: 'unpaid',
+          paymentMethod: 'RAZORPAY_GATEWAY',
+          razorpayOrderId: orderId,
+          transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
+          createdAt: serverTimestamp()
+        };
+
+        const orderRef = await addDoc(collection(db, 'orders'), orderData);
+        finalOrderId = orderRef.id;
+
+        if (isSlotBooking) {
+          for (const item of cart) {
+            if (
+              (item.category && String(item.category).toLowerCase().includes('service')) || 
+              (item.name && String(item.name).includes('(Booking)')) || 
+              item.type === 'booking'
+            ) {
+              const bookingDocData = {
+                customerId: user?.uid,
+                customerName: formData.fullName || user?.name || 'Customer Booking',
+                partnerId: item.shopId || item.partnerId || '',
+                shopId: item.shopId || item.partnerId || '',
+                shopName: item.shopName || 'Partner Salon',
+                service: item.serviceName || item.name || 'Grooming Service',
+                serviceName: item.serviceName || item.name || 'Grooming Service',
+                price: item.price,
+                date: item.date || new Date().toDateString(),
+                time: item.time || '10:00',
+                status: 'payment_held', // pending
+                bookingStatus: 'pending_payment',
+                paymentStatus: 'unpaid',
+                paymentMethod: 'RAZORPAY_GATEWAY',
+                razorpayOrderId: orderId,
+                createdAt: new Date().toISOString()
+              };
+              const bookingRef = await addDoc(collection(db, 'bookings'), bookingDocData);
+              finalBookingIds.push(bookingRef.id);
+            }
+          }
+        }
+      } catch (dbErr: any) {
+        console.error("Firestore initialization failed:", dbErr);
+        throw new Error("Database error while initializing payment order. Please try again.");
+      }
+
+      // 4. Trigger Razorpay checkout modal
+      const options = {
+        key: keyId,
+        amount: Math.round(finalTotal * 100),
+        currency: "INR",
+        name: "Barber & Beauty Connect",
+        description: isSlotBooking ? "Premium Professional Booking" : "Premium Products Shop checkout",
+        image: "https://api.dicebear.com/7.x/bottts/svg?seed=bbconnect",
+        order_id: orderId,
+        handler: async function (response: any) {
+          setLoading(true);
+          try {
+            // Validate signature on backend
+            const verifyRes = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            if (!verifyRes.ok) {
+              const verifyErr = await verifyRes.json().catch(() => ({}));
+              throw new Error(verifyErr.error || "Signature verification failed.");
+            }
+
+            // Signature valid! Promote Firestore documents to PAID and CONFIRMED status
+            if (finalOrderId) {
+              await updateDoc(doc(db, 'orders', finalOrderId), {
+                paymentStatus: 'paid',
+                status: 'confirmed',
+                paymentMethodDetail: 'RAZORPAY_SECURE_VERIFICATION',
+                transactionId: response.razorpay_payment_id
+              });
+            }
+
+            if (finalBookingIds.length > 0) {
+              for (const bId of finalBookingIds) {
+                await updateDoc(doc(db, 'bookings', bId), {
+                  paymentStatus: 'paid',
+                  bookingStatus: 'confirmed',
+                  status: 'confirmed',
+                  transactionId: response.razorpay_payment_id
+                });
+              }
+            }
+
+            // Clean up and proceed to success
+            setTimerActive(false);
+            setStep('success');
+            clearCart();
+          } catch (verificationErr: any) {
+            console.error("Signature verification error:", verificationErr);
+            setPaymentError(verificationErr.message || "Payment verification failed. Please contact admin.");
+          } finally {
+            setLoading(false);
+          }
+        },
+        prefill: {
+          name: formData.fullName || user?.name || "",
+          email: formData.email || user?.email || "",
+          contact: formData.phone || ""
+        },
+        theme: {
+          color: "#0F52BA"
+        },
+        modal: {
+          ondismiss: function () {
+            console.log("Razorpay checkout modal closed by customer.");
+            setLoading(false);
+          }
+        }
+      };
+
+      const razorpayInstance = new (window as any).Razorpay(options);
+      razorpayInstance.open();
+
+    } catch (paymentErr: any) {
+      console.error("Razorpay initiation failed:", paymentErr);
+      setPaymentError(paymentErr.message || "Could not launch Razorpay checkout. Please check the config.");
+      setLoading(false);
+    }
+  };
+
   const submitUtrVerification = async () => {
     if (!utrNumber.trim()) {
       setPaymentError("Please provide a valid 12-digit UPI Transaction ID or UTR.");
@@ -703,9 +897,30 @@ const CheckoutPage: React.FC = () => {
                   ) : (
                     /* Three prominent Metro-Style branded buttons */
                     <div className="space-y-4">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 pl-1 font-sans">Select UPI App to Trigger Intent</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 pl-1 font-sans">Select Payment Method</p>
                       
                       <div className="grid grid-cols-1 gap-4 font-sans">
+                        {/* Razorpay Secure Gateway */}
+                        <button 
+                          onClick={handleRazorpayPayment}
+                          disabled={loading || timeLeft === 0}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border-2 border-bbBlue bg-blue-50/10 hover:bg-blue-50/30 hover:shadow-lg transition-all text-left duration-200 group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 rounded-2xl bg-bbBlue flex items-center justify-center font-serif font-black text-white text-lg shadow-md shadow-bbBlue/30">
+                              R
+                            </div>
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-wider text-charcoal group-hover:text-bbBlue transition-colors">Instant Razorpay Secure Gateway</p>
+                              <p className="text-[9px] text-gray-400 uppercase tracking-widest mt-1">Cards, Netbanking, UPI & Wallets (Automatic Verification)</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 font-sans">
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-emerald-500 text-white py-1 px-3 rounded-full border border-emerald-600">RECOMMENDED</span>
+                            <Check className="text-bbBlue" size={18} />
+                          </div>
+                        </button>
+
                         {/* Google Pay */}
                         <button 
                           onClick={() => handlePayment('GPay')}
