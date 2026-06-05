@@ -231,13 +231,11 @@ const CheckoutPage: React.FC = () => {
               throw new Error("Payment transaction verification failed on standard gateway.");
             }
 
-            // Immediately promote Firestore documents to PAID and place into HELD (ESCROW) status
-            const currentHeldAt = new Date().toISOString();
+            // Immediately promote Firestore documents to PAID and HELD (ESCROW) status
             if (finalOrderId) {
               await updateDoc(doc(db, 'orders', finalOrderId), {
                 paymentStatus: 'paid',
                 status: 'payment_held',
-                heldAt: currentHeldAt,
                 paymentMethodDetail: 'RAZORPAY_STANDARD_FRONTEND_VERIFIED',
                 transactionId: response.razorpay_payment_id
               });
@@ -247,9 +245,9 @@ const CheckoutPage: React.FC = () => {
               for (const bId of finalBookingIds) {
                 await updateDoc(doc(db, 'bookings', bId), {
                   paymentStatus: 'paid',
-                  bookingStatus: 'held_escrow',
+                  bookingStatus: 'payment_held',
                   status: 'payment_held',
-                  heldAt: currentHeldAt,
+                  heldAt: new Date().toISOString(), // 5-minute escrow timer begins now
                   transactionId: response.razorpay_payment_id
                 });
               }

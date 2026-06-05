@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, query, collection, where, orderBy, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, orderBy } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -33,6 +33,45 @@ import {
 
 /* UI_CLEANUP_FINAL - LOCKED - SUCCESS */
 
+interface EscrowTimerProps {
+  heldAt?: string;
+  onTimeout: () => void;
+}
+
+const EscrowTimer: React.FC<EscrowTimerProps> = ({ heldAt, onTimeout }) => {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    if (!heldAt) return;
+    
+    const calculateTime = () => {
+      const remainingMs = (new Date(heldAt).getTime() + 5 * 60 * 1000) - Date.now();
+      if (remainingMs <= 0) {
+        setTimeLeft('Expired');
+        onTimeout();
+        return false;
+      } else {
+        const mins = Math.floor(remainingMs / 60000);
+        const secs = Math.floor((remainingMs % 60000) / 1000);
+        setTimeLeft(`${mins}m ${secs}s`);
+        return true;
+      }
+    };
+    
+    calculateTime();
+    const interval = setInterval(() => {
+      const keepGoing = calculateTime();
+      if (!keepGoing) {
+        clearInterval(interval);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [heldAt, onTimeout]);
+
+  return <span className="font-mono text-[0.5625rem] text-red-500 font-bold animate-pulse">{timeLeft}</span>;
+};
+
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout, updateUser } = useAuth();
@@ -48,109 +87,6 @@ const PartnerDashboard: React.FC = () => {
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // 1-second interval ticker for live countdown rendering
-  const [ticker, setTicker] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTicker(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Calculate remaining time for a payment-held booking (5 minutes max check)
-  const getHeldTimeLeft = (heldAtStr?: string) => {
-    if (!heldAtStr) return 0;
-    const heldTime = new Date(heldAtStr).getTime();
-    const now = Date.now();
-    const diffMs = now - heldTime;
-    const remainingMs = (5 * 60 * 1000) - diffMs;
-    return remainingMs > 0 ? remainingMs : 0;
-  };
-
-  // Trigger simulated Razorpay Auto-Refund and mark booking & order as failed/rejected
-  const triggerAutoRefundAndReject = async (booking: any) => {
-    console.log(`[RAZORPAY AUTO-REFUND] Initializing auto-refund for expired/rejected booking ${booking.id}. Order: ${booking.razorpayOrderId}`);
-    try {
-      // 1. Update Booking status to rejected
-      await updateBooking(booking.id, {
-        status: 'rejected',
-        bookingStatus: 'refunded',
-        paymentStatus: 'refunded',
-        refundedAt: new Date().toISOString(),
-        refundReference: 'REFUND_AUTO_' + Math.random().toString(36).substring(2, 10).toUpperCase()
-      });
-
-      // 2. Locate and update any matching Order status to rejected (simulated refund status)
-      if (booking.razorpayOrderId) {
-        try {
-          const qOrder = query(collection(db, 'orders'), where('razorpayOrderId', '==', booking.razorpayOrderId));
-          const orderSnap = await getDocs(qOrder);
-          for (const docSnap of orderSnap.docs) {
-            await updateDoc(doc(db, 'orders', docSnap.id), {
-              status: 'rejected',
-              paymentStatus: 'refunded',
-              refundedAt: new Date().toISOString(),
-              refundId: 'rfnd_' + Math.random().toString(36).substring(2, 10).toUpperCase()
-            });
-          }
-        } catch (orderErr) {
-          console.error("Failed to auto-update matching order status:", orderErr);
-        }
-      }
-    } catch (err) {
-      console.error("[RAZORPAY AUTO-REFUND] Error execution failed:", err);
-    }
-  };
-
-  // Core acceptance flow
-  const handleAcceptBooking = async (booking: any) => {
-    try {
-      await updateBooking(booking.id, {
-        status: 'confirmed',
-        bookingStatus: 'confirmed',
-        confirmedAt: new Date().toISOString()
-      });
-
-      if (booking.razorpayOrderId) {
-        try {
-          const qOrder = query(collection(db, 'orders'), where('razorpayOrderId', '==', booking.razorpayOrderId));
-          const orderSnap = await getDocs(qOrder);
-          for (const docSnap of orderSnap.docs) {
-            await updateDoc(doc(db, 'orders', docSnap.id), {
-              status: 'confirmed',
-              confirmedAt: new Date().toISOString()
-            });
-          }
-        } catch (orderErr) {
-          console.error("Failed to update matching order status on acceptance:", orderErr);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to accept booking:", err);
-    }
-  };
-
-  const handleRejectBooking = async (booking: any) => {
-    await triggerAutoRefundAndReject(booking);
-  };
-
-  // Background countdown timer monitor
-  useEffect(() => {
-    const expiredBookings = bookings.filter(b => {
-      if (b.status !== 'payment_held') return false;
-      const heldTimeStr = b.heldAt || b.createdAt;
-      if (!heldTimeStr) return false;
-      const heldTime = new Date(heldTimeStr).getTime();
-      const now = Date.now();
-      return (now - heldTime) >= (5 * 60 * 1000); // 5 mins in ms
-    });
-
-    expiredBookings.forEach(b => {
-      console.log(`[TIMEOUT MONITOR] Expiring payment hold for booking ${b.id}`);
-      triggerAutoRefundAndReject(b);
-    });
-  }, [bookings, ticker]);
 
   // Marketplace check from URL - reactive to search changes
   useEffect(() => {
@@ -205,6 +141,40 @@ const PartnerDashboard: React.FC = () => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioRef.current.volume = 0.8;
   }, []);
+
+  // Periodic background scanner for auto-refunds (5-min escrow countdown)
+  useEffect(() => {
+    const handleAutoRefunds = async () => {
+      const now = Date.now();
+      const FIVE_MINUTES = 5 * 60 * 1000;
+      for (const b of bookings) {
+        if (b.status === 'payment_held' && b.heldAt) {
+          const heldTime = new Date(b.heldAt).getTime();
+          if (now - heldTime >= FIVE_MINUTES) {
+            console.log(`[Auto-Refund Hook] Booking ${b.id} expired. Auto-refunding payment...`);
+            try {
+              await fetch('/api/razorpay/refund', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  paymentId: b.transactionId,
+                  amount: b.price,
+                  bookingId: b.id
+                })
+              });
+            } catch (err) {
+              console.error(`[Auto-Refund Hook Error] bookingId=${b.id}:`, err);
+            }
+          }
+        }
+      }
+    };
+
+    const interval = setInterval(handleAutoRefunds, 10000); // scan every 10 seconds
+    return () => clearInterval(interval);
+  }, [bookings]);
 
   // UI REAL-TIME ENGINE: Snapshot Listeners for zero-latency updates
   useEffect(() => {
@@ -854,34 +824,87 @@ const PartnerDashboard: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-8 py-6 text-center">
-                              <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                                b.status === 'payment_held' ? 'bg-amber-100 text-amber-700 animate-pulse' : b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
-                                b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
-                                'bg-bbBlue/10 text-bbBlue'
-                              }`}>
-                                {b.status === 'payment_held' ? <>HELD (ESCROW)<span className="block text-[0.45rem] font-mono text-red-500 font-bold mt-1">REFUND IN {(() => { const rem = getHeldTimeLeft(b.heldAt || b.createdAt); const m = Math.floor(rem / 60000); const s = Math.floor((rem % 60000) / 1000); return `${m}m ${s}s`; })()}</span></> : b.status}
-                              </span>
+                              <div className="flex flex-col items-center gap-1">
+                                <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
+                                  b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                  b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
+                                  'bg-bbBlue/10 text-bbBlue'
+                                }`}>
+                                  {b.status === 'payment_held' ? 'HELD (ESCROW)' : b.status}
+                                </span>
+                                {b.status === 'payment_held' && b.heldAt && (
+                                  <EscrowTimer 
+                                    heldAt={b.heldAt} 
+                                    onTimeout={async () => {
+                                      console.log(`Booking ${b.id} timeout reached, trigger auto-refund.`);
+                                      try {
+                                        await fetch('/api/razorpay/refund', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ paymentId: b.transactionId, amount: b.price, bookingId: b.id })
+                                        });
+                                      } catch (err) {
+                                        console.error('Trigger checkout check failed for bookingId:', b.id, err);
+                                      }
+                                    }} 
+                                  />
+                                )}
+                              </div>
                             </td>
                             <td className="px-8 py-6 text-center">
                               {b.status === 'payment_held' ? (
-                                <div className="flex gap-1.5 justify-center items-center">
-                                  <button onClick={async (e) => { e.stopPropagation(); await handleAcceptBooking(b); }} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-[0.5rem] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm">Accept</button>
-                                  <button onClick={async (e) => { e.stopPropagation(); if (window.confirm("Reject this booking and return escrow payment to customer?")) { await handleRejectBooking(b); } }} className="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-[0.5rem] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm">Reject</button>
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const confirmAccept = window.confirm("Are you sure you want to ACCEPT this booking? This will confirm the slot permanently.");
+                                      if (confirmAccept) {
+                                        await updateBooking(b.id, { 
+                                          status: 'confirmed', 
+                                          acceptedAt: new Date().toISOString() 
+                                        });
+                                      }
+                                    }}
+                                    className="px-4 py-2 bg-green-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95"
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
+                                      if (confirmReject) {
+                                        try {
+                                          await fetch('/api/razorpay/refund', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ paymentId: b.transactionId, amount: b.price, bookingId: b.id })
+                                          });
+                                        } catch (refErr) {
+                                          console.error("Refund dispatch error:", refErr);
+                                        }
+                                      }
+                                    }}
+                                    className="px-4 py-2 bg-red-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg active:scale-95"
+                                  >
+                                    Reject
+                                  </button>
                                 </div>
-                              ) : b.status !== 'completed' && (
-                                <button 
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const confirm = window.confirm("Clear this service? This will request feedback from customer.");
-                                    if(confirm) {
-                                      await updateBooking(b.id, { status: 'completed', completedAt: new Date().toISOString() });
-                                      // Force reload or state update logic is already in fetchData interval
-                                    }
-                                  }}
-                                  className="px-4 py-2 bg-black text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg active:scale-95"
-                                >
-                                  Clear Call
-                                </button>
+                              ) : (
+                                b.status !== 'completed' && b.status !== 'rejected' && b.status !== 'failed' && b.status !== 'cancelled' && b.status !== 'Cancelled' && (
+                                  <button 
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const confirm = window.confirm("Clear this service? This will request feedback from customer.");
+                                      if(confirm) {
+                                        await updateBooking(b.id, { status: 'completed', completedAt: new Date().toISOString() });
+                                      }
+                                    }}
+                                    className="px-4 py-2 bg-black text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg active:scale-95"
+                                  >
+                                    Clear Call
+                                  </button>
+                                )
                               )}
                             </td>
                             <td className="px-8 py-6 text-right">

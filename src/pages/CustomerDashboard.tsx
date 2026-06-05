@@ -50,12 +50,29 @@ const CustomerDashboard: React.FC = () => {
         }
 
         // AUTO-REFUND LOGIC: Check for expired held payments
-        // This logic should ideally be on the server, but keeping it here for now as requested
-        // However, we can't easily update localStorage anymore, so we'll just log it
-        // or we could implement a server-side auto-refund endpoint later
-        data.forEach((booking: any) => {
-          if (booking.status === 'payment_held' && booking.expiryTime < Date.now()) {
-            console.warn(`Booking ${booking.id} has expired. Auto-refund should be triggered.`);
+        const now = Date.now();
+        const FIVE_MINUTES = 5 * 60 * 1000;
+        data.forEach(async (booking: any) => {
+          if (booking.status === 'payment_held' && booking.heldAt) {
+            const heldTime = new Date(booking.heldAt).getTime();
+            if (now - heldTime >= FIVE_MINUTES) {
+              console.log(`[Auto-Refund Customer Engine] Booking ${booking.id} has expired. Auto-refunding payment...`);
+              try {
+                await fetch('/api/razorpay/refund', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    paymentId: booking.transactionId,
+                    amount: booking.price,
+                    bookingId: booking.id
+                  })
+                });
+              } catch (err) {
+                console.error(`[Auto-Refund Customer Engine Error] bookingId=${booking.id}:`, err);
+              }
+            }
           }
         });
       } catch (error) {
