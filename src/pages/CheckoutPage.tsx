@@ -116,154 +116,11 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handlePayment = async (provider: 'GPay' | 'PhonePe' | 'Paytm') => {
-    setLoading(true);
-    setPaymentError(null);
-
-    let createdOrderId = "";
-    try {
-      /* Commented out to bypass potential server-side html resolution issues
-      const createOrderResponse = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          amount: finalTotal,
-          currency: "INR",
-          type: isSlotBooking ? "slot_booking" : "product_purchase"
-        })
-      });
-
-      const contentType = createOrderResponse.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const textError = await createOrderResponse.text();
-        console.error("Non-JSON backend output received:", textError);
-        throw new Error("Handshake failed. Server returned unexpected HTML content instead of order JSON.");
-      }
-
-      const createOrderData = await createOrderResponse.json();
-      if (!createOrderData || !createOrderData.success) {
-        throw new Error(createOrderData?.error || "Could not generate transaction order ID on the server.");
-      }
-
-      createdOrderId = createOrderData.order_id || createOrderData.orderId || "";
-      */
-
-      // REPLACE with hardcoded JSON conformant to protocol
-      const order = { success: true, order_id: "SBM_" + Date.now() };
-      createdOrderId = order.order_id;
-    } catch (orderErr: any) {
-      console.error("Failed to generate order ID:", orderErr);
-      setPaymentError(orderErr.message || "Failed to initiate secure payment checkout. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    // Write initial pending transaction records to Firestore prior to handoff
-    let finalOrderId = '';
-    let finalBookingIds: string[] = [];
-
-    try {
-      // Write initial Order document
-      const orderData = {
-        customerId: user?.uid,
-        customerName: formData.fullName || user?.name || 'Customer Booking',
-        shippingAddress: isSlotBooking ? {
-          address: 'N/A - Direct Service Slot Booking (Bypassed)',
-          city: 'N/A',
-          pincode: 'N/A',
-          state: 'N/A'
-        } : {
-          address: formData.address,
-          city: formData.city,
-          pincode: formData.pincode,
-          state: formData.state
-        },
-        items: cart,
-        totalAmount: finalTotal, // Includes platform / service fee
-        platformFee: feeAmount,
-        status: 'payment_held', // initial pending status before signature validation
-        paymentStatus: 'unpaid',
-        paymentMethod: 'UPI_INTENT',
-        razorpayOrderId: createdOrderId, // compatible fallback storage key
-        transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
-        createdAt: serverTimestamp()
-      };
-
-      const orderRef = await addDoc(collection(db, 'orders'), orderData);
-      finalOrderId = orderRef.id;
-
-      // Write initial Booking documents if slot booking
-      if (isSlotBooking) {
-        for (const item of cart) {
-          if (
-            (item.category && String(item.category).toLowerCase().includes('service')) || 
-            (item.name && String(item.name).includes('(Booking)')) || 
-            item.type === 'booking'
-          ) {
-            const bookingDocData = {
-              customerId: user?.uid,
-              customerName: formData.fullName || user?.name || 'Customer Booking',
-              partnerId: item.shopId || item.partnerId || '',
-              shopId: item.shopId || item.partnerId || '',
-              shopName: item.shopName || 'Partner Salon',
-              service: item.serviceName || item.name || 'Grooming Service',
-              serviceName: item.serviceName || item.name || 'Grooming Service',
-              price: item.price,
-              date: item.date || new Date().toDateString(),
-              time: item.time || '10:00',
-              status: 'payment_held', // pending
-              bookingStatus: 'pending_payment',
-              paymentStatus: 'unpaid',
-              paymentMethod: 'UPI_INTENT',
-              razorpayOrderId: createdOrderId, // compatible fallback storage key
-              createdAt: new Date().toISOString()
-            };
-            const bookingRef = await addDoc(collection(db, 'bookings'), bookingDocData);
-            finalBookingIds.push(bookingRef.id);
-          }
-        }
-      }
-    } catch (saveError: any) {
-      console.error("Database sync failed prior to checkout:", saveError);
-      setPaymentError("Could not initialize order state database entry. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    // Step 3: Trigger exact requested direct UPI Intent Deep Link URL
-    // upi://pay?pa=8273865308@idfcfirst&pn=Mohd_Shoeb&am=275&cu=INR&tn=BB_Connect_Booking
-    const upiParams = `pa=8273865308@idfcfirst&pn=Mohd_Shoeb&am=${finalTotal}&cu=INR&tn=BB_Connect_Booking`;
-    let upiIntentUrl = `upi://pay?${upiParams}`;
-
-    if (provider === 'GPay') {
-      upiIntentUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-    } else if (provider === 'PhonePe') {
-      upiIntentUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=com.phonepe.app;end`;
-    } else if (provider === 'Paytm') {
-      upiIntentUrl = `intent://pay?${upiParams}#Intent;scheme=upi;package=net.one97.paytm;end`;
-    }
-
-    console.log(`[UPI INTENT] Redirection to ${provider} utilizing direct window.open(): ${upiIntentUrl}`);
-
-    try {
-      window.open(upiIntentUrl, '_blank');
-      // Fallback redirect for desktop browsers/iOS
-      setTimeout(() => {
-        window.open(`upi://pay?${upiParams}`, '_blank');
-      }, 500);
-    } catch (redirectErr) {
-      window.open(`upi://pay?${upiParams}`, '_blank');
-    }
-
-    // Save state references immediately for manual verification step
-    setCreatedOrderDocId(finalOrderId);
-    setCreatedBookingDocIds(finalBookingIds);
-    setIsWaitingPayment(true);
-    setLoading(false);
+    // Redirect through secure automatic Razorpay Gateway flows instead of manual UPI matching
+    return handleRazorpayPayment(provider);
   };
 
-  const handleRazorpayPayment = async () => {
+  const handleRazorpayPayment = async (provider?: 'GPay' | 'PhonePe' | 'Paytm') => {
     setLoading(true);
     setPaymentError(null);
 
@@ -375,7 +232,9 @@ const CheckoutPage: React.FC = () => {
         amount: Math.round(finalTotal * 100),
         currency: "INR",
         name: "Barber & Beauty Connect",
-        description: isSlotBooking ? "Premium Professional Booking" : "Premium Products Shop checkout",
+        description: isSlotBooking 
+          ? (provider ? `${provider} Secure Booking` : "Premium Professional Booking") 
+          : (provider ? `${provider} Secure Shopping` : "Premium Products Shop checkout"),
         image: "https://api.dicebear.com/7.x/bottts/svg?seed=bbconnect",
         order_id: orderId,
         handler: async function (response: any) {
@@ -434,7 +293,8 @@ const CheckoutPage: React.FC = () => {
         prefill: {
           name: formData.fullName || user?.name || "",
           email: formData.email || user?.email || "",
-          contact: formData.phone || ""
+          contact: formData.phone || "",
+          method: "upi" // Instruct Razorpay checkout to open and offer UPI methods automatically
         },
         theme: {
           color: "#0F52BA"
