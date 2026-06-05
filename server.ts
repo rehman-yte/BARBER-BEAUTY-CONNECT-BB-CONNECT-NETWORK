@@ -426,7 +426,9 @@ async function startServer() {
   const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
   const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ClmQ5hGuQe2v5CDa75lgADqm';
 
-  const razorpayClient = new Razorpay({
+  // Support both ES module and CommonJS default import styles safely
+  const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+  const razorpayClient = new RazorpayConstructor({
     key_id: RAZORPAY_KEY_ID,
     key_secret: RAZORPAY_KEY_SECRET
   });
@@ -434,17 +436,35 @@ async function startServer() {
   app.post('/api/razorpay/create-order', async (req, res) => {
     try {
       const { amount } = req.body;
-      if (!amount) {
-        return res.status(400).json({ success: false, error: 'Amount is required' });
+      if (amount === undefined || amount === null) {
+        return res.status(400).json({
+          success: false,
+          error: "Amount validation error: Parameter 'amount' is required"
+        });
       }
-      
+
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Amount validation error: Intercepted invalid amount '${amount}'. Amount must be a positive number.`
+        });
+      }
+
+      // Convert amount explicitly to paise by multiplying by 100
+      const amountInPaise = Math.round(parsedAmount * 100);
+
       const options = {
-        amount: Math.round(Number(amount) * 100), // convert to paise
+        amount: amountInPaise,
         currency: "INR",
         receipt: `receipt_order_${Date.now()}`
       };
-      
+
+      console.log(`[Razorpay Order Create] Intercepted booking amount: ₹${parsedAmount}. Creating order for ${amountInPaise} paise.`);
+
       const order = await razorpayClient.orders.create(options);
+      
+      console.log(`[Razorpay Order Success] Order ID: ${order.id}`);
       res.json({
         success: true,
         orderId: order.id,
@@ -452,7 +472,33 @@ async function startServer() {
       });
     } catch (error: any) {
       console.error("Razorpay order generation error:", error);
-      res.status(500).json({ success: false, error: error.message || 'Failed to generate Razorpay order' });
+      
+      const errorMsg = error.message || String(error);
+      let errorDetail = "Failed to communicate with Razorpay secure server.";
+      
+      // Determine error category based on API response behavior and status codes
+      if (
+        error.statusCode === 401 || 
+        errorMsg.toLowerCase().includes("auth") || 
+        errorMsg.toLowerCase().includes("key") || 
+        errorMsg.toLowerCase().includes("credential") || 
+        errorMsg.toLowerCase().includes("unauthorized")
+      ) {
+        errorDetail = "Authentication failure: Please verify that process.env.RAZORPAY_KEY_ID and process.env.RAZORPAY_KEY_SECRET (or fallback test keys) are valid and correctly formatted.";
+      } else if (
+        error.statusCode === 400 || 
+        errorMsg.toLowerCase().includes("amount") || 
+        errorMsg.toLowerCase().includes("bad request") || 
+        errorMsg.toLowerCase().includes("invalid")
+      ) {
+        errorDetail = "Amount validation error or invalid request parameters passed to Razorpay API (e.g., non-integer paise amount or currency mismatch).";
+      }
+
+      res.status(500).json({
+        success: false,
+        error: errorDetail,
+        originalError: errorMsg
+      });
     }
   });
 
