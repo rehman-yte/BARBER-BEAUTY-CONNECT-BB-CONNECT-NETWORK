@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, query, collection, where, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, orderBy, getDocs, updateDoc } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -48,6 +48,109 @@ const PartnerDashboard: React.FC = () => {
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 1-second interval ticker for live countdown rendering
+  const [ticker, setTicker] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTicker(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate remaining time for a payment-held booking (5 minutes max check)
+  const getHeldTimeLeft = (heldAtStr?: string) => {
+    if (!heldAtStr) return 0;
+    const heldTime = new Date(heldAtStr).getTime();
+    const now = Date.now();
+    const diffMs = now - heldTime;
+    const remainingMs = (5 * 60 * 1000) - diffMs;
+    return remainingMs > 0 ? remainingMs : 0;
+  };
+
+  // Trigger simulated Razorpay Auto-Refund and mark booking & order as failed/rejected
+  const triggerAutoRefundAndReject = async (booking: any) => {
+    console.log(`[RAZORPAY AUTO-REFUND] Initializing auto-refund for expired/rejected booking ${booking.id}. Order: ${booking.razorpayOrderId}`);
+    try {
+      // 1. Update Booking status to rejected
+      await updateBooking(booking.id, {
+        status: 'rejected',
+        bookingStatus: 'refunded',
+        paymentStatus: 'refunded',
+        refundedAt: new Date().toISOString(),
+        refundReference: 'REFUND_AUTO_' + Math.random().toString(36).substring(2, 10).toUpperCase()
+      });
+
+      // 2. Locate and update any matching Order status to rejected (simulated refund status)
+      if (booking.razorpayOrderId) {
+        try {
+          const qOrder = query(collection(db, 'orders'), where('razorpayOrderId', '==', booking.razorpayOrderId));
+          const orderSnap = await getDocs(qOrder);
+          for (const docSnap of orderSnap.docs) {
+            await updateDoc(doc(db, 'orders', docSnap.id), {
+              status: 'rejected',
+              paymentStatus: 'refunded',
+              refundedAt: new Date().toISOString(),
+              refundId: 'rfnd_' + Math.random().toString(36).substring(2, 10).toUpperCase()
+            });
+          }
+        } catch (orderErr) {
+          console.error("Failed to auto-update matching order status:", orderErr);
+        }
+      }
+    } catch (err) {
+      console.error("[RAZORPAY AUTO-REFUND] Error execution failed:", err);
+    }
+  };
+
+  // Core acceptance flow
+  const handleAcceptBooking = async (booking: any) => {
+    try {
+      await updateBooking(booking.id, {
+        status: 'confirmed',
+        bookingStatus: 'confirmed',
+        confirmedAt: new Date().toISOString()
+      });
+
+      if (booking.razorpayOrderId) {
+        try {
+          const qOrder = query(collection(db, 'orders'), where('razorpayOrderId', '==', booking.razorpayOrderId));
+          const orderSnap = await getDocs(qOrder);
+          for (const docSnap of orderSnap.docs) {
+            await updateDoc(doc(db, 'orders', docSnap.id), {
+              status: 'confirmed',
+              confirmedAt: new Date().toISOString()
+            });
+          }
+        } catch (orderErr) {
+          console.error("Failed to update matching order status on acceptance:", orderErr);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to accept booking:", err);
+    }
+  };
+
+  const handleRejectBooking = async (booking: any) => {
+    await triggerAutoRefundAndReject(booking);
+  };
+
+  // Background countdown timer monitor
+  useEffect(() => {
+    const expiredBookings = bookings.filter(b => {
+      if (b.status !== 'payment_held') return false;
+      const heldTimeStr = b.heldAt || b.createdAt;
+      if (!heldTimeStr) return false;
+      const heldTime = new Date(heldTimeStr).getTime();
+      const now = Date.now();
+      return (now - heldTime) >= (5 * 60 * 1000); // 5 mins in ms
+    });
+
+    expiredBookings.forEach(b => {
+      console.log(`[TIMEOUT MONITOR] Expiring payment hold for booking ${b.id}`);
+      triggerAutoRefundAndReject(b);
+    });
+  }, [bookings, ticker]);
 
   // Marketplace check from URL - reactive to search changes
   useEffect(() => {
@@ -752,15 +855,20 @@ const PartnerDashboard: React.FC = () => {
                             </td>
                             <td className="px-8 py-6 text-center">
                               <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                                b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                b.status === 'payment_held' ? 'bg-amber-100 text-amber-700 animate-pulse' : b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
                                 b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
                                 'bg-bbBlue/10 text-bbBlue'
                               }`}>
-                                {b.status}
+                                {b.status === 'payment_held' ? <>HELD (ESCROW)<span className="block text-[0.45rem] font-mono text-red-500 font-bold mt-1">REFUND IN {(() => { const rem = getHeldTimeLeft(b.heldAt || b.createdAt); const m = Math.floor(rem / 60000); const s = Math.floor((rem % 60000) / 1000); return `${m}m ${s}s`; })()}</span></> : b.status}
                               </span>
                             </td>
                             <td className="px-8 py-6 text-center">
-                              {b.status !== 'completed' && (
+                              {b.status === 'payment_held' ? (
+                                <div className="flex gap-1.5 justify-center items-center">
+                                  <button onClick={async (e) => { e.stopPropagation(); await handleAcceptBooking(b); }} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-[0.5rem] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm">Accept</button>
+                                  <button onClick={async (e) => { e.stopPropagation(); if (window.confirm("Reject this booking and return escrow payment to customer?")) { await handleRejectBooking(b); } }} className="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-[0.5rem] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm">Reject</button>
+                                </div>
+                              ) : b.status !== 'completed' && (
                                 <button 
                                   onClick={async (e) => {
                                     e.stopPropagation();
