@@ -422,17 +422,6 @@ async function startServer() {
     res.json(safeShops);
   });
 
-  // Razorpay Client configuration (Keys can be overriden seamlessly in .env)
-  const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
-  const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ClmQ5hGuQe2v5CDa75lgADqm';
-
-  // Support both ES module and CommonJS default import styles safely
-  const RazorpayConstructor = (Razorpay as any).default || Razorpay;
-  const razorpayClient = new RazorpayConstructor({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET
-  });
-
   app.post('/api/razorpay/create-order', async (req, res) => {
     try {
       const { amount } = req.body;
@@ -443,7 +432,7 @@ async function startServer() {
         });
       }
 
-      const parsedAmount = Number(amount);
+      const parsedAmount = parseFloat(String(amount));
       if (isNaN(parsedAmount) || parsedAmount <= 0) {
         return res.status(400).json({
           success: false,
@@ -451,8 +440,18 @@ async function startServer() {
         });
       }
 
-      // Convert amount explicitly to paise by multiplying by 100
-      const amountInPaise = Math.round(parsedAmount * 100);
+      // 1. Dynamic Environment Configuration (Initialized inside handler to handle serverless cold-starts safely)
+      const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
+      const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ClmQ5hGuQe2v5CDa75lgADqm';
+
+      const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+      const razorpayClient = new RazorpayConstructor({
+        key_id: RAZORPAY_KEY_ID,
+        key_secret: RAZORPAY_KEY_SECRET
+      });
+
+      // 2. Strict Integer Casting (Paise Conversion)
+      const amountInPaise = Math.floor(parsedAmount * 100);
 
       const options = {
         amount: amountInPaise,
@@ -476,7 +475,6 @@ async function startServer() {
       const errorMsg = error.message || String(error);
       let errorDetail = "Failed to communicate with Razorpay secure server.";
       
-      // Determine error category based on API response behavior and status codes
       if (
         error.statusCode === 401 || 
         errorMsg.toLowerCase().includes("auth") || 
@@ -508,6 +506,8 @@ async function startServer() {
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return res.status(400).json({ success: false, error: 'Missing verification fields' });
       }
+
+      const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ClmQ5hGuQe2v5CDa75lgADqm';
 
       const generated_signature = crypto
         .createHmac('sha256', RAZORPAY_KEY_SECRET)
