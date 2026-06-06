@@ -141,10 +141,40 @@ const CheckoutPage: React.FC = () => {
         throw new Error("Razorpay billing component was not found or is still loading. Please try again.");
       }
 
-      // 2. Load standard frontend environment key safely or default to live key id
-      const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
+      // 2. Call backend to generate a real Razorpay Order ID to prevent gateway compliance errors (e.g. Something went wrong)
+      let backendOrderId = '';
+      let usedKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
 
-      const clientGeneratedOrderId = "order_client_" + Date.now();
+      try {
+        const orderResponse = await fetch('/api/razorpay/create-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount: finalTotal })
+        });
+        
+        if (!orderResponse.ok) {
+          const errData = await orderResponse.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to register transaction order on backend gateway.");
+        }
+        
+        const orderResult = await orderResponse.json();
+        if (orderResult.success && orderResult.orderId) {
+          backendOrderId = orderResult.orderId;
+          if (orderResult.keyId) {
+            usedKeyId = orderResult.keyId;
+          }
+          console.log(`[Razorpay Backend Sync] Registered Razorpay Order ID: ${backendOrderId}`);
+        } else {
+          throw new Error(orderResult.error || "Invalid response schema returned from backend order generation.");
+        }
+      } catch (backendErr: any) {
+        console.error("Back-end Razorpay order registration failed:", backendErr);
+        throw new Error(backendErr.message || "Failed to initialize secure checkout transaction on backend. Please retry.");
+      }
+
+      const clientGeneratedOrderId = backendOrderId || ("order_fallback_" + Date.now());
 
       // 3. SAFE LOCAL STATE CAPTURE: Fast capture to local state with explicit 'PENDING_PAYMENT' status
       try {
@@ -233,7 +263,7 @@ const CheckoutPage: React.FC = () => {
 
       // 5. Trigger standard Razorpay overlay checkout modal directly via standard rzp1 setup
       const options = {
-        key: keyId,
+        key: usedKeyId,
         amount: Math.round((finalTotal || totalPrice || 0) * 100),
         currency: "INR",
         name: "Barber & Beauty Connect",
@@ -241,6 +271,7 @@ const CheckoutPage: React.FC = () => {
           ? (provider ? `${provider} Secure Booking` : "Premium Professional Booking") 
           : (provider ? `${provider} Secure Shopping` : "Premium Products Shop checkout"),
         image: "https://api.dicebear.com/7.x/bottts/svg?seed=bbconnect",
+        order_id: backendOrderId || undefined, // PASS THE REAL BACKEND-GENERATED ORDER ID
         handler: async function (response: any) {
           setLoading(true);
           try {
