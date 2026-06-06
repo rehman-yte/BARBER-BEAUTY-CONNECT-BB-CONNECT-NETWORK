@@ -152,6 +152,7 @@ const PartnerDashboard: React.FC = () => {
           const heldTime = new Date(b.heldAt).getTime();
           if (now - heldTime >= FIVE_MINUTES) {
             console.log(`[Auto-Refund Hook] Booking ${b.id} expired. Auto-refunding payment...`);
+            setBookings((prev) => prev.filter((item) => item.id !== b.id));
             try {
               await fetch('/api/razorpay/refund', {
                 method: 'POST',
@@ -859,6 +860,7 @@ const PartnerDashboard: React.FC = () => {
                                       e.stopPropagation();
                                       const confirmAccept = window.confirm("Are you sure you want to ACCEPT this booking? This will confirm the slot permanently.");
                                       if (confirmAccept) {
+                                        setBookings(prev => prev.filter(item => item.id !== b.id));
                                         await updateBooking(b.id, { 
                                           status: 'confirmed', 
                                           acceptedAt: new Date().toISOString() 
@@ -874,6 +876,7 @@ const PartnerDashboard: React.FC = () => {
                                       e.stopPropagation();
                                       const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
                                       if (confirmReject) {
+                                        setBookings(prev => prev.filter(item => item.id !== b.id));
                                         try {
                                           await fetch('/api/razorpay/refund', {
                                             method: 'POST',

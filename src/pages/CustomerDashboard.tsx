@@ -88,7 +88,7 @@ const CustomerDashboard: React.FC = () => {
 
   const filteredBookings = bookings.filter(b => {
     if (activeTab === 'pending') return b.status === 'payment_held';
-    if (activeTab === 'failed') return b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned';
+    if (activeTab === 'failed') return b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.status === 'REFUNDED/FAILED' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned';
     return b.status === 'approved' || b.status === 'confirmed';
   });
 
@@ -106,7 +106,7 @@ const CustomerDashboard: React.FC = () => {
   const stats = {
     approved: bookings.filter(b => b.status === 'approved' || b.status === 'confirmed').length,
     pending: bookings.filter(b => b.status === 'payment_held').length,
-    failed: bookings.filter(b => b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned').length,
+    failed: bookings.filter(b => b.status === 'rejected' || b.status === 'failed' || b.status === 'Cancelled' || b.status === 'cancelled' || b.status === 'REFUNDED/FAILED' || b.paymentStatus === 'failed' || b.paymentStatus === 'abandoned').length,
   };
 
   // Sync with actual details
@@ -211,7 +211,7 @@ const CustomerDashboard: React.FC = () => {
                    <div className={`absolute top-0 left-0 w-full h-[0.375rem] ${
                      booking.status === 'payment_held' ? 'bg-bbBlue animate-pulse' : 
                      booking.status === 'confirmed' ? 'bg-green-500' : 
-                     (booking.status === 'failed' || booking.status === 'rejected' || booking.status === 'Cancelled' || booking.status === 'cancelled') ? 'bg-red-500' : 'bg-gray-300'
+                     (booking.status === 'failed' || booking.status === 'rejected' || booking.status === 'Cancelled' || booking.status === 'cancelled' || booking.status === 'REFUNDED/FAILED') ? 'bg-red-500' : 'bg-gray-300'
                    }`}></div>
 
                    <div className="flex justify-between items-start mb-[2.5rem]">
@@ -228,7 +228,7 @@ const CustomerDashboard: React.FC = () => {
                          </svg>
                       </div>
                       <p className="text-[0.5625rem] font-bold text-gray-300 uppercase tracking-widest">
-                        {(booking.status === 'Cancelled' || booking.status === 'cancelled') ? 'ABND-' : 'TRX-'}{booking.transactionId?.slice(-6)}
+                        {(booking.status === 'Cancelled' || booking.status === 'cancelled' || booking.status === 'REFUNDED/FAILED') ? 'ABND-' : 'TRX-'}{booking.transactionId?.slice(-6)}
                       </p>
                    </div>
 
