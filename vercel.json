@@ -3,7 +3,7 @@
   "trailingSlash": false,
   "functions": {
     "api/index.ts": {
-      "includeFiles": "*.{csv,json}"
+      "includeFiles": "../*.{csv,json}"
     }
   },
   "rewrites": [
