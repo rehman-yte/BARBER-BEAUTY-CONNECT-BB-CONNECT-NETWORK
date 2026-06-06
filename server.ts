@@ -45,8 +45,9 @@ if (!fs.existsSync(CONFIG_PATH)) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify({ platformFee: 10, broadcasts: [] }));
 }
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
@@ -818,9 +819,11 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();

@@ -1,7 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": ["master_data.csv", "admin_config.json"]
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
