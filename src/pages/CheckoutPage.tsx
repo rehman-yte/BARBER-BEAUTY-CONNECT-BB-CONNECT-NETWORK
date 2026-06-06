@@ -141,23 +141,8 @@ const CheckoutPage: React.FC = () => {
         throw new Error("Razorpay billing component was not found or is still loading. Please try again.");
       }
 
-      // 2. Load key resolving environment key safely mimicking os.environ or client parameters
-      let keyId = 'rzp_live_SxWUwa55Svm5Vt';
-      try {
-        const fetchOsEnvironKey = () => {
-          try {
-            return (window as any).os?.environ?.get('RAZORPAY_KEY_ID') || (process as any)?.env?.RAZORPAY_KEY_ID;
-          } catch {
-            return null;
-          }
-        };
-        const activeEnvKey = fetchOsEnvironKey() || import.meta.env.VITE_RAZORPAY_KEY_ID;
-        if (activeEnvKey) {
-          keyId = activeEnvKey;
-        }
-      } catch (err) {
-        console.warn("Environmental variable retrieval warning:", err);
-      }
+      // 2. Load standard frontend environment key safely or default to live key id
+      const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
 
       const clientGeneratedOrderId = "order_client_" + Date.now();
 
