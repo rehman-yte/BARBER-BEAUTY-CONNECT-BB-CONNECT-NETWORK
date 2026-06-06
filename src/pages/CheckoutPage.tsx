@@ -136,29 +136,24 @@ const CheckoutPage: React.FC = () => {
     setPaymentError(null);
 
     try {
-      // 1. Force safety checks to make sure Razorpay SDK script is present
+      // 1. Instantly verify Razorpay script is present (preloaded in head)
       if (!(window as any).Razorpay) {
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.async = false;
-        document.body.appendChild(script);
-        // Wait a small instant to avoid immediate call crash if delay happens
-        await new Promise((r) => setTimeout(r, 600));
-      }
-
-      if (!(window as any).Razorpay) {
-        throw new Error("Razorpay billing component or script still loading. Please try again.");
+        throw new Error("Razorpay billing component was not found or is still loading. Please try again.");
       }
 
       // 2. Load key resolving environment key safely mimicking os.environ or client parameters
       let keyId = 'rzp_live_SxWUwa55Svm5Vt';
       try {
-        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RAZORPAY_KEY_ID) {
-          keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
-        } else if (typeof process !== 'undefined' && process.env && process.env.RAZORPAY_KEY_ID) {
-          keyId = process.env.RAZORPAY_KEY_ID;
-        } else if (typeof (window as any).process !== 'undefined' && (window as any).process.env && (window as any).process.env.RAZORPAY_KEY_ID) {
-          keyId = (window as any).process.env.RAZORPAY_KEY_ID;
+        const fetchOsEnvironKey = () => {
+          try {
+            return (window as any).os?.environ?.get('RAZORPAY_KEY_ID') || (process as any)?.env?.RAZORPAY_KEY_ID;
+          } catch {
+            return null;
+          }
+        };
+        const activeEnvKey = fetchOsEnvironKey() || import.meta.env.VITE_RAZORPAY_KEY_ID;
+        if (activeEnvKey) {
+          keyId = activeEnvKey;
         }
       } catch (err) {
         console.warn("Environmental variable retrieval warning:", err);
@@ -166,7 +161,7 @@ const CheckoutPage: React.FC = () => {
 
       const clientGeneratedOrderId = "order_client_" + Date.now();
 
-      // 3. SAFE LOCAL STATE CAPTURE: Fast capture to browser local state matching HELD (ESCROW) status
+      // 3. SAFE LOCAL STATE CAPTURE: Fast capture to local state with explicit 'HELD (ESCROW)' status
       try {
         const payloadToStore = {
           customerId: user?.uid,
@@ -251,7 +246,7 @@ const CheckoutPage: React.FC = () => {
         // Resiliently allow checkout page overlay to proceed even if Firestore write had latency
       }
 
-      // 5. Trigger standard Razorpay overlay checkout modal directly
+      // 5. Trigger standard Razorpay overlay checkout modal directly via standard rzp1 setup
       const options = {
         key: keyId,
         amount: Math.round((finalTotal || totalPrice || 0) * 100),
@@ -318,8 +313,8 @@ const CheckoutPage: React.FC = () => {
         }
       };
 
-      const razorpayInstance = new (window as any).Razorpay(options);
-      razorpayInstance.open();
+      const rzp1 = new (window as any).Razorpay(options);
+      rzp1.open();
 
     } catch (paymentErr: any) {
       console.error("Razorpay initiation failed:", paymentErr);
