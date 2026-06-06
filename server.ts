@@ -41,21 +41,17 @@ const MASTER_DATA_PATH = path.join(__dirname, 'master_data.csv');
 const CONFIG_PATH = path.join(__dirname, 'admin_config.json');
 
 // Initialize config if not exists
-try {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ platformFee: 10, broadcasts: [] }));
-  }
-} catch (e) {
-  console.warn("Failed to check/create config file safely (likely read-only serverless environment):", e);
+if (!fs.existsSync(CONFIG_PATH)) {
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify({ platformFee: 10, broadcasts: [] }));
 }
 
 export const app = express();
 
-// Synchronous registrations of all routes/middlewares to prevent serverless timing/404 issues on Vercel
-const PORT = 3000;
+async function startServer() {
+  const PORT = 3000;
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Helper to read CSV
   const readMasterData = () => {
@@ -98,35 +94,18 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Helper to write CSV
   const writeMasterData = (data: any[]) => {
-    try {
-      const stringified = stringify(data, {
-        header: true,
-        cast: {
-          boolean: (value) => String(value),
-          object: (value) => JSON.stringify(value)
-        }
-      });
-      fs.writeFileSync(MASTER_DATA_PATH, stringified);
-    } catch (e) {
-      console.warn("Failed to write master_data in read-only serverless environment:", e);
-    }
+    const stringified = stringify(data, {
+      header: true,
+      cast: {
+        boolean: (value) => String(value),
+        object: (value) => JSON.stringify(value)
+      }
+    });
+    fs.writeFileSync(MASTER_DATA_PATH, stringified);
   };
 
-  const readConfig = () => {
-    try {
-      return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-    } catch (e) {
-      console.warn("Failed to read admin_config from disk, fallback default config used.");
-      return { platformFee: 10, broadcasts: [] };
-    }
-  };
-  const writeConfig = (config: any) => {
-    try {
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(config));
-    } catch (e) {
-      console.warn("Failed to write config in read-only serverless environment:", e);
-    }
-  };
+  const readConfig = () => JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+  const writeConfig = (config: any) => fs.writeFileSync(CONFIG_PATH, JSON.stringify(config));
 
   // Admin Configuration
   const ADMIN_MOBILE = '8273865308';
@@ -912,25 +891,24 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
   }, 30000); // Check every 30 seconds
 
   // Vite middleware for development
-  async function initViteAndListen() {
-    if (process.env.NODE_ENV !== 'production') {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-    } else {
-      app.use(express.static(path.join(__dirname, 'dist')));
-      app.get('*all', (req, res) => {
-        res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-      });
-    }
-
-    if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
-      app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on http://localhost:${PORT}`);
-      });
-    }
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*all', (req, res) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
   }
 
-  initViteAndListen();
+  if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
+}
+
+startServer();
