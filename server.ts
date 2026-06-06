@@ -51,11 +51,11 @@ try {
 
 export const app = express();
 
-async function startServer() {
-  const PORT = 3000;
+// Synchronous registrations of all routes/middlewares to prevent serverless timing/404 issues on Vercel
+const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Helper to read CSV
   const readMasterData = () => {
@@ -912,24 +912,25 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
   }, 30000); // Check every 30 seconds
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    });
+  async function initViteAndListen() {
+    if (process.env.NODE_ENV !== 'production') {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      app.use(express.static(path.join(__dirname, 'dist')));
+      app.get('*all', (req, res) => {
+        res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      });
+    }
+
+    if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+      });
+    }
   }
 
-  if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
-}
-
-startServer();
+  initViteAndListen();
