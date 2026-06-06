@@ -531,14 +531,14 @@ async function startServer() {
 
       if (bookingId) {
         await updateDoc(doc(db, 'bookings', bookingId), {
-          status: 'cancelled',
+          status: 'REFUNDED/FAILED',
           bookingStatus: 'refunded',
           paymentStatus: 'refunded',
           statusReason: 'Partner Rejected / 5-min Expired (Auto-Refunded)',
           refundId: refundResult.id,
           refundedAt: new Date().toISOString()
         });
-        console.log(`[Backend Firestore Sync] Marked booking ${bookingId} as cancelled (refunded) successfully.`);
+        console.log(`[Backend Firestore Sync] Marked booking ${bookingId} as REFUNDED/FAILED successfully.`);
       }
 
       res.json({ success: true, refundId: refundResult.id });
@@ -549,12 +549,12 @@ async function startServer() {
       if (req.body.bookingId) {
         try {
           await updateDoc(doc(db, 'bookings', req.body.bookingId), {
-            status: 'cancelled',
+            status: 'REFUNDED/FAILED',
             bookingStatus: 'refunded',
             paymentStatus: 'refunded',
             statusReason: `Refund processed (Status synced on error: ${error.message || String(error)})`
           });
-          console.log(`[Backend Firestore Sync Fallback] Gracefully marked booking ${req.body.bookingId} as cancelled on error.`);
+          console.log(`[Backend Firestore Sync Fallback] Gracefully marked booking ${req.body.bookingId} as REFUNDED/FAILED on error.`);
         } catch (dbErr) {
           console.error("Failed to update fallback booking status:", dbErr);
         }
@@ -804,6 +804,91 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
     console.warn(`[API 404 RESCUE] Unmatched API route requested: ${req.method} ${req.url}`);
     res.status(404).json({ error: 'API route not found' });
   });
+
+  // 5-MINUTE AUTO-REFUND WATCHER LOOP (PURE JAVASCRIPT ACTIVE BACKGROUND WATCHER)
+  const FIVE_MINUTES_MS = 5 * 60 * 1000;
+  setInterval(async () => {
+    try {
+      console.log("[Escrow Timer Watcher] Active check starting...");
+      const bookingsCollection = collection(db, 'bookings');
+      // Look for any bookings currently in 'payment_held' (escrow) state
+      const q = query(bookingsCollection, where('status', '==', 'payment_held'));
+      const qSnapshot = await getDocs(q);
+      const nowMs = Date.now();
+
+      for (const bookingDoc of qSnapshot.docs) {
+        try {
+          const bookingData = bookingDoc.data();
+          const bookingId = bookingDoc.id;
+
+          const startTimeStr = bookingData.heldAt || bookingData.createdAt;
+          if (!startTimeStr) continue;
+
+          const startTimeMs = new Date(startTimeStr).getTime();
+          if (isNaN(startTimeMs)) continue;
+
+          // If currentTime - createdAt > 300000 (5 minutes) and status is still 'payment_held'
+          if (nowMs - startTimeMs > FIVE_MINUTES_MS) {
+            console.log(`[Escrow Timer Watcher] Booking ${bookingId} has been HELD for > 5 minutes. Initializing auto-refund...`);
+            const paymentId = bookingData.transactionId;
+            const price = bookingData.price;
+
+            if (paymentId) {
+              const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
+              const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ClmQ5hGuQe2v5CDa75lgADqm';
+
+              const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+              const rzp = new RazorpayConstructor({
+                key_id: RAZORPAY_KEY_ID,
+                key_secret: RAZORPAY_KEY_SECRET
+              });
+
+              console.log(`[Escrow Timer Watcher] Issuing Razorpay Refund for payment ID: ${paymentId}`);
+              const refundOptions: any = { payment_id: paymentId };
+              if (price) {
+                refundOptions.amount = Math.round(parseFloat(String(price)) * 100);
+              }
+
+              try {
+                const refundRes = await rzp.payments.refund(paymentId, refundOptions);
+                console.log(`[Escrow Timer Watcher Success] Refund ID ${refundRes.id} generated for booking ${bookingId}`);
+
+                await updateDoc(doc(db, 'bookings', bookingId), {
+                  status: 'REFUNDED/FAILED',
+                  bookingStatus: 'refunded',
+                  paymentStatus: 'refunded',
+                  statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
+                  refundId: refundRes.id,
+                  refundedAt: new Date().toISOString()
+                });
+              } catch (gatewayErr: any) {
+                console.error(`[Escrow Timer Watcher Warning] Gateway refund failed, fallback to direct state switch:`, gatewayErr);
+                await updateDoc(doc(db, 'bookings', bookingId), {
+                  status: 'REFUNDED/FAILED',
+                  bookingStatus: 'refunded',
+                  paymentStatus: 'refunded',
+                  statusReason: `5-Minute Escrow Expiry Timeout (State synced: ${gatewayErr.message || String(gatewayErr)})`,
+                  refundedAt: new Date().toISOString()
+                });
+              }
+            } else {
+              console.warn(`[Escrow Timer Watcher Warning] Booking ${bookingId} missing transaction UID. Forcing cancel...`);
+              await updateDoc(doc(db, 'bookings', bookingId), {
+                status: 'REFUNDED/FAILED',
+                bookingStatus: 'failed',
+                paymentStatus: 'failed',
+                statusReason: '5-Minute Escrow Expiry Timeout (No payment record)'
+              });
+            }
+          }
+        } catch (individualErr) {
+          console.error(`[Escrow Timer Watcher] Error checking slot booking ${bookingDoc.id}:`, individualErr);
+        }
+      }
+    } catch (loopErr) {
+      console.error("[Escrow Timer Watcher] Error during execution run:", loopErr);
+    }
+  }, 30000); // Check every 30 seconds
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {

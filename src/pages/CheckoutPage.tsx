@@ -146,7 +146,7 @@ const CheckoutPage: React.FC = () => {
 
       const clientGeneratedOrderId = "order_client_" + Date.now();
 
-      // 3. SAFE LOCAL STATE CAPTURE: Fast capture to local state with explicit 'HELD (ESCROW)' status
+      // 3. SAFE LOCAL STATE CAPTURE: Fast capture to local state with explicit 'PENDING_PAYMENT' status
       try {
         const payloadToStore = {
           customerId: user?.uid,
@@ -154,7 +154,7 @@ const CheckoutPage: React.FC = () => {
           items: cart,
           totalAmount: finalTotal,
           fees: feeAmount,
-          status: 'HELD (ESCROW)', // Explicit status flag mapping as requested in user prompt
+          status: 'PENDING_PAYMENT', // Temp status
           createdAt: new Date().toISOString()
         };
         localStorage.setItem('bb_held_escrow_booking_payload', JSON.stringify(payloadToStore));
@@ -185,7 +185,7 @@ const CheckoutPage: React.FC = () => {
           items: cart,
           totalAmount: finalTotal,
           platformFee: feeAmount,
-          status: 'payment_held', // Database-side value loaded and checked by locked portals
+          status: 'PENDING_PAYMENT', // Unpaid booking initial order status
           paymentStatus: 'unpaid',
           paymentMethod: 'RAZORPAY_GATEWAY',
           razorpayOrderId: clientGeneratedOrderId,
@@ -214,7 +214,7 @@ const CheckoutPage: React.FC = () => {
                 price: item.price,
                 date: item.date || new Date().toDateString(),
                 time: item.time || '10:00',
-                status: 'payment_held', // maps to HELD (ESCROW) in locked portals
+                status: 'PENDING_PAYMENT', // Initial state, not shown in HELD (ESCROW) tab
                 bookingStatus: 'pending_payment',
                 paymentStatus: 'unpaid',
                 paymentMethod: 'RAZORPAY_GATEWAY',
@@ -265,6 +265,7 @@ const CheckoutPage: React.FC = () => {
                   bookingStatus: 'payment_held',
                   status: 'payment_held',
                   heldAt: new Date().toISOString(), // 5-minute escrow timer begins now
+                  createdAt: new Date().toISOString(), // 5-minute escrow timer begins now (recorded high-res ISO string)
                   transactionId: response.razorpay_payment_id
                 });
               }
@@ -291,9 +292,33 @@ const CheckoutPage: React.FC = () => {
           color: "#0F52BA"
         },
         modal: {
-          ondismiss: function () {
+          ondismiss: async function () {
             console.log("Razorpay checkout modal closed by customer.");
             setLoading(false);
+            // Instantly transition unpaid states directly to REFUNDED/FAILED
+            if (finalOrderId) {
+              try {
+                await updateDoc(doc(db, 'orders', finalOrderId), {
+                  status: 'REFUNDED/FAILED',
+                  paymentStatus: 'failed'
+                });
+              } catch (e) {
+                console.warn("Failed to mark order as REFUNDED/FAILED on dismiss:", e);
+              }
+            }
+            if (finalBookingIds.length > 0) {
+              for (const bId of finalBookingIds) {
+                try {
+                  await updateDoc(doc(db, 'bookings', bId), {
+                    status: 'REFUNDED/FAILED',
+                    bookingStatus: 'failed',
+                    paymentStatus: 'failed'
+                  });
+                } catch (e) {
+                  console.warn("Failed to mark booking as REFUNDED/FAILED on dismiss:", e);
+                }
+              }
+            }
           }
         }
       };
