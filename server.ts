@@ -41,8 +41,12 @@ const MASTER_DATA_PATH = path.join(__dirname, 'master_data.csv');
 const CONFIG_PATH = path.join(__dirname, 'admin_config.json');
 
 // Initialize config if not exists
-if (!fs.existsSync(CONFIG_PATH)) {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify({ platformFee: 10, broadcasts: [] }));
+try {
+  if (!fs.existsSync(CONFIG_PATH)) {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ platformFee: 10, broadcasts: [] }));
+  }
+} catch (e) {
+  console.warn("Failed to check/create config file safely (likely read-only serverless environment):", e);
 }
 
 export const app = express();
@@ -94,18 +98,35 @@ async function startServer() {
 
   // Helper to write CSV
   const writeMasterData = (data: any[]) => {
-    const stringified = stringify(data, {
-      header: true,
-      cast: {
-        boolean: (value) => String(value),
-        object: (value) => JSON.stringify(value)
-      }
-    });
-    fs.writeFileSync(MASTER_DATA_PATH, stringified);
+    try {
+      const stringified = stringify(data, {
+        header: true,
+        cast: {
+          boolean: (value) => String(value),
+          object: (value) => JSON.stringify(value)
+        }
+      });
+      fs.writeFileSync(MASTER_DATA_PATH, stringified);
+    } catch (e) {
+      console.warn("Failed to write master_data in read-only serverless environment:", e);
+    }
   };
 
-  const readConfig = () => JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-  const writeConfig = (config: any) => fs.writeFileSync(CONFIG_PATH, JSON.stringify(config));
+  const readConfig = () => {
+    try {
+      return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    } catch (e) {
+      console.warn("Failed to read admin_config from disk, fallback default config used.");
+      return { platformFee: 10, broadcasts: [] };
+    }
+  };
+  const writeConfig = (config: any) => {
+    try {
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(config));
+    } catch (e) {
+      console.warn("Failed to write config in read-only serverless environment:", e);
+    }
+  };
 
   // Admin Configuration
   const ADMIN_MOBILE = '8273865308';
