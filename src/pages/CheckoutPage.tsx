@@ -135,6 +135,14 @@ const CheckoutPage: React.FC = () => {
     setLoading(true);
     setPaymentError(null);
 
+    // Live session lock check: if expired or uninitialized, handle beautifully
+    const isExpired = timeLeft <= 0 || !timerActive;
+    if (isExpired) {
+      console.log("[Force Fresh Order Session] Timer was expired at 00:00 or active session uninitialized. Resetting timer and error cleanly.");
+      setTimeLeft(110);
+      setTimerActive(true);
+    }
+
     try {
       // 1. Instantly verify Razorpay script is present (preloaded in head)
       if (!(window as any).Razorpay) {
@@ -166,6 +174,11 @@ const CheckoutPage: React.FC = () => {
             usedKeyId = orderResult.keyId;
           }
           console.log(`[Razorpay Backend Sync] Registered Razorpay Order ID: ${backendOrderId}`);
+          
+          // Clear any countdown locks or stale elapsed messages immediately, and ensure active threshold is restored
+          setTimeLeft(110);
+          setTimerActive(true);
+          setPaymentError(null);
         } else {
           throw new Error(orderResult.error || "Invalid response schema returned from backend order generation.");
         }
@@ -832,7 +845,7 @@ const CheckoutPage: React.FC = () => {
                         {/* Razorpay Secure Gateway */}
                         <button 
                           onClick={handleRazorpayPayment}
-                          disabled={loading || timeLeft === 0}
+                          disabled={loading}
                           className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border-2 border-bbBlue bg-blue-50/10 hover:bg-blue-50/30 hover:shadow-lg transition-all text-left duration-200 group cursor-pointer"
                         >
                           <div className="flex items-center gap-5">
@@ -853,7 +866,7 @@ const CheckoutPage: React.FC = () => {
                         {/* Google Pay */}
                         <button 
                           onClick={() => handlePayment('GPay')}
-                          disabled={loading || timeLeft === 0}
+                          disabled={loading}
                           className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-blue-500 hover:shadow-lg transition-all text-left duration-200 group"
                         >
                           <div className="flex items-center gap-5">
@@ -874,7 +887,7 @@ const CheckoutPage: React.FC = () => {
                         {/* PhonePe */}
                         <button 
                           onClick={() => handlePayment('PhonePe')}
-                          disabled={loading || timeLeft === 0}
+                          disabled={loading}
                           className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-purple-500 hover:shadow-lg transition-all text-left duration-200 group"
                         >
                           <div className="flex items-center gap-5">
@@ -895,7 +908,7 @@ const CheckoutPage: React.FC = () => {
                         {/* Paytm */}
                         <button 
                           onClick={() => handlePayment('Paytm')}
-                          disabled={loading || timeLeft === 0}
+                          disabled={loading}
                           className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-cyan-500 hover:shadow-lg transition-all text-left duration-200 group"
                         >
                           <div className="flex items-center gap-5">
