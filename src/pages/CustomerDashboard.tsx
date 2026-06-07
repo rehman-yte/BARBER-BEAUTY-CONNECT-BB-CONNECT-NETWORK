@@ -6,12 +6,15 @@ import { getBookings, submitRating } from "../services/logic_engine";
 import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
+import { db } from "../lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 
 interface BookingDetailsModalProps {
   booking: any;
   onClose: () => void;
   isEscrowVerified: (b: any) => boolean;
   isRejectFailed: (b: any) => boolean;
+  onExpired?: (bookingId: string, transactionId: string, price: any) => void;
 }
 
 const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
@@ -19,6 +22,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   onClose,
   isEscrowVerified,
   isRejectFailed,
+  onExpired,
 }) => {
   const isPendingEscrow = isEscrowVerified(booking);
   const failedOrRejected = isRejectFailed(booking);
@@ -29,17 +33,39 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   useEffect(() => {
     if (!isPendingEscrow || !booking.heldAt) return;
 
+    let intervalId: any = null;
+
     const calculateSeconds = () => {
       const heldTime = new Date(booking.heldAt).getTime();
       const expirationTime = heldTime + 5 * 60 * 1000; // 5 minutes
       const remaining = Math.max(0, Math.floor((expirationTime - Date.now()) / 1000));
       setSecondsLeft(remaining);
+
+      if (remaining <= 0) {
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        if (onExpired) {
+          onExpired(booking.id, booking.transactionId, booking.price);
+        }
+      }
     };
 
     calculateSeconds();
-    const interval = setInterval(calculateSeconds, 1000);
-    return () => clearInterval(interval);
-  }, [booking, isPendingEscrow]);
+    
+    const heldTime = new Date(booking.heldAt).getTime();
+    const expirationTime = heldTime + 5 * 60 * 1000;
+    const initialRemaining = Math.max(0, Math.floor((expirationTime - Date.now()) / 1000));
+
+    if (initialRemaining > 0) {
+      intervalId = setInterval(calculateSeconds, 1000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [booking, isPendingEscrow, onExpired]);
 
   const formatCountdown = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -262,12 +288,29 @@ const CustomerDashboard: React.FC = () => {
         const now = Date.now();
         const FIVE_MINUTES = 5 * 60 * 1000;
         data.forEach(async (booking: any) => {
-          if (booking.status === "payment_held" && booking.heldAt) {
+          const s = String(booking.status || "").toLowerCase();
+          if (s === "payment_held" && booking.heldAt) {
             const heldTime = new Date(booking.heldAt).getTime();
             if (now - heldTime >= FIVE_MINUTES) {
               console.log(
                 `[Auto-Refund Customer Engine] Booking ${booking.id} has expired. Auto-refunding payment...`,
               );
+              
+              // Move out of escrow tab instantly
+              setBookings(prev => prev.map(b => {
+                if (b.id === booking.id) {
+                  return {
+                    ...b,
+                    status: 'REJECTED_TIMEOUT',
+                    bookingStatus: 'failed',
+                    paymentStatus: 'failed',
+                    statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
+                    message: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+                  };
+                }
+                return b;
+              }));
+
               try {
                 await fetch("/api/razorpay/refund", {
                   method: "POST",
@@ -279,6 +322,14 @@ const CustomerDashboard: React.FC = () => {
                     amount: booking.price,
                     bookingId: booking.id,
                   }),
+                });
+
+                // Mutate database status
+                await updateDoc(doc(db, 'bookings', booking.id), {
+                  status: 'REJECTED_TIMEOUT',
+                  bookingStatus: 'failed',
+                  paymentStatus: 'failed',
+                  statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
                 });
               } catch (err) {
                 console.error(`[Auto-Refund Customer Engine Error] bookingId=${booking.id}:`, err);
@@ -298,10 +349,11 @@ const CustomerDashboard: React.FC = () => {
   }, [user]);
 
   const isEscrowVerified = (b: any) => {
+    const s = String(b.status || "").toLowerCase();
     const paymentStatusStr = String(b.paymentStatus || "").toUpperCase();
     const hasValidTxId = b.transactionId && b.transactionId.trim() !== "";
     return (
-      b.status === "payment_held" &&
+      s === "payment_held" &&
       hasValidTxId &&
       paymentStatusStr !== "UNPAID" &&
       paymentStatusStr !== "PENDING" &&
@@ -310,30 +362,96 @@ const CustomerDashboard: React.FC = () => {
   };
 
   const isRejectFailed = (b: any) => {
+    const s = String(b.status || "").toLowerCase();
+    const ps = String(b.paymentStatus || "").toLowerCase();
+    
     // 1. Explicit failed/rejected/cancelled statuses
     if (
-      b.status === "rejected" ||
-      b.status === "failed" ||
-      b.status === "Cancelled" ||
-      b.status === "cancelled" ||
-      b.status === "REFUNDED/FAILED" ||
-      b.paymentStatus === "failed" ||
-      b.paymentStatus === "abandoned"
+      s === "rejected" ||
+      s === "failed" ||
+      s === "cancelled" ||
+      s === "refunded/failed" ||
+      s === "rejected_timeout" ||
+      ps === "failed" ||
+      ps === "abandoned"
     ) {
       return true;
     }
 
     // 2. Initial order/slot states that were never paid (dropped/unpaid/pending, or pending_payment)
-    if (b.status === "PENDING_PAYMENT" || b.bookingStatus === "pending_payment") {
+    if (s === "pending_payment" || b.bookingStatus === "pending_payment" || s === "pending_payment") {
       return true;
     }
 
     // 3. Or if status says payment_held but the actual payment was unpaid, pending, failed, or has no valid transaction ID
-    if (b.status === "payment_held") {
+    if (s === "payment_held") {
       return !isEscrowVerified(b);
     }
 
     return false;
+  };
+
+  const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
+    console.log(`[Auto-Refund Modal Trigger] Booking ${bookingId} has expired. Direct database and view update...`);
+    
+    // 1. Mutate local representation instantly to avoid timing lag
+    setBookings(prev => prev.map(b => {
+      if (b.id === bookingId) {
+        return {
+          ...b,
+          status: 'REJECTED_TIMEOUT',
+          bookingStatus: 'failed',
+          paymentStatus: 'failed',
+          statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
+          message: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+        };
+      }
+      return b;
+    }));
+    
+    // If the selected booking is currently open, sync description immediately
+    setSelectedBooking((prev: any) => {
+      if (prev && prev.id === bookingId) {
+        return {
+          ...prev,
+          status: 'REJECTED_TIMEOUT',
+          bookingStatus: 'failed',
+          paymentStatus: 'failed',
+          statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
+          message: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+        };
+      }
+      return prev;
+    });
+
+    // 2. Execute silent background fetch to initiate refund & update DB
+    try {
+      await fetch("/api/razorpay/refund", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          paymentId: transactionId,
+          amount: price,
+          bookingId: bookingId
+        })
+      });
+    } catch (err) {
+      console.error("[Silent Auto-Refund Error]:", err);
+    }
+
+    // 3. Direct Firestore document backup write
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), {
+        status: 'REJECTED_TIMEOUT',
+        bookingStatus: 'failed',
+        paymentStatus: 'failed',
+        statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+      });
+    } catch (dbErr) {
+      console.error("[Silent DB Mutate Error]:", dbErr);
+    }
   };
 
   const filteredBookings = bookings.filter((b) => {
@@ -607,6 +725,7 @@ const CustomerDashboard: React.FC = () => {
             onClose={() => setSelectedBooking(null)}
             isEscrowVerified={isEscrowVerified}
             isRejectFailed={isRejectFailed}
+            onExpired={handleExpired}
           />
         )}
       </AnimatePresence>

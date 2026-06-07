@@ -275,8 +275,27 @@ const CheckoutPage: React.FC = () => {
         handler: async function (response: any) {
           setLoading(true);
           try {
-            if (!response.razorpay_payment_id) {
-              throw new Error("Payment transaction verification failed on standard gateway.");
+            if (!response || !response.razorpay_payment_id) {
+              // Forcefully save/update booking status token in the database strictly as FAILED
+              if (finalOrderId) {
+                await updateDoc(doc(db, 'orders', finalOrderId), {
+                  status: 'FAILED',
+                  paymentStatus: 'failed',
+                  statusReason: "Payment Aborted/Not Processed by Customer"
+                });
+              }
+              if (finalBookingIds.length > 0) {
+                for (const bId of finalBookingIds) {
+                  await updateDoc(doc(db, 'bookings', bId), {
+                    status: 'FAILED',
+                    bookingStatus: 'failed',
+                    paymentStatus: 'failed',
+                    statusReason: "Payment Aborted/Not Processed by Customer",
+                    message: "Payment Aborted/Not Processed by Customer"
+                  });
+                }
+              }
+              throw new Error("Payment transaction verification failed: Missing Razorpay payment ID.");
             }
 
             // Immediately promote active Firestore documents to PAID and HELD (ESCROW) status
@@ -326,27 +345,30 @@ const CheckoutPage: React.FC = () => {
           ondismiss: async function () {
             console.log("Razorpay checkout modal closed by customer.");
             setLoading(false);
-            // Instantly transition unpaid states directly to REFUNDED/FAILED
+            // Instantly transition unpaid states directly to FAILED with meta-reason
             if (finalOrderId) {
               try {
                 await updateDoc(doc(db, 'orders', finalOrderId), {
-                  status: 'REFUNDED/FAILED',
-                  paymentStatus: 'failed'
+                  status: 'FAILED',
+                  paymentStatus: 'failed',
+                  statusReason: "Payment Aborted/Not Processed by Customer"
                 });
               } catch (e) {
-                console.warn("Failed to mark order as REFUNDED/FAILED on dismiss:", e);
+                console.warn("Failed to mark order as FAILED on dismiss:", e);
               }
             }
             if (finalBookingIds.length > 0) {
               for (const bId of finalBookingIds) {
                 try {
                   await updateDoc(doc(db, 'bookings', bId), {
-                    status: 'REFUNDED/FAILED',
+                    status: 'FAILED',
                     bookingStatus: 'failed',
-                    paymentStatus: 'failed'
+                    paymentStatus: 'failed',
+                    statusReason: "Payment Aborted/Not Processed by Customer",
+                    message: "Payment Aborted/Not Processed by Customer"
                   });
                 } catch (e) {
-                  console.warn("Failed to mark booking as REFUNDED/FAILED on dismiss:", e);
+                  console.warn("Failed to mark booking as FAILED on dismiss:", e);
                 }
               }
             }

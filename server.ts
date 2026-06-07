@@ -531,14 +531,14 @@ async function startServer() {
 
       if (bookingId) {
         await updateDoc(doc(db, 'bookings', bookingId), {
-          status: 'REFUNDED/FAILED',
-          bookingStatus: 'refunded',
+          status: 'REJECTED_TIMEOUT',
+          bookingStatus: 'failed',
           paymentStatus: 'refunded',
           statusReason: 'Partner Rejected / 5-min Expired (Auto-Refunded)',
           refundId: refundResult.id,
           refundedAt: new Date().toISOString()
         });
-        console.log(`[Backend Firestore Sync] Marked booking ${bookingId} as REFUNDED/FAILED successfully.`);
+        console.log(`[Backend Firestore Sync] Marked booking ${bookingId} as REJECTED_TIMEOUT successfully.`);
       }
 
       res.json({ success: true, refundId: refundResult.id });
@@ -549,12 +549,13 @@ async function startServer() {
       if (req.body.bookingId) {
         try {
           await updateDoc(doc(db, 'bookings', req.body.bookingId), {
-            status: 'REFUNDED/FAILED',
-            bookingStatus: 'refunded',
+            status: 'REJECTED_TIMEOUT',
+            bookingStatus: 'failed',
             paymentStatus: 'refunded',
-            statusReason: `Refund processed (Status synced on error: ${error.message || String(error)})`
+            statusReason: `Refund processed (Status synced on error: ${error.message || String(error)})`,
+            refundedAt: new Date().toISOString()
           });
-          console.log(`[Backend Firestore Sync Fallback] Gracefully marked booking ${req.body.bookingId} as REFUNDED/FAILED on error.`);
+          console.log(`[Backend Firestore Sync Fallback] Gracefully marked booking ${req.body.bookingId} as REJECTED_TIMEOUT on error.`);
         } catch (dbErr) {
           console.error("Failed to update fallback booking status:", dbErr);
         }
@@ -854,8 +855,8 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
                 console.log(`[Escrow Timer Watcher Success] Refund ID ${refundRes.id} generated for booking ${bookingId}`);
 
                 await updateDoc(doc(db, 'bookings', bookingId), {
-                  status: 'REFUNDED/FAILED',
-                  bookingStatus: 'refunded',
+                  status: 'REJECTED_TIMEOUT',
+                  bookingStatus: 'failed',
                   paymentStatus: 'refunded',
                   statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
                   refundId: refundRes.id,
@@ -864,8 +865,8 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
               } catch (gatewayErr: any) {
                 console.error(`[Escrow Timer Watcher Warning] Gateway refund failed, fallback to direct state switch:`, gatewayErr);
                 await updateDoc(doc(db, 'bookings', bookingId), {
-                  status: 'REFUNDED/FAILED',
-                  bookingStatus: 'refunded',
+                  status: 'REJECTED_TIMEOUT',
+                  bookingStatus: 'failed',
                   paymentStatus: 'refunded',
                   statusReason: `5-Minute Escrow Expiry Timeout (State synced: ${gatewayErr.message || String(gatewayErr)})`,
                   refundedAt: new Date().toISOString()
@@ -874,7 +875,7 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
             } else {
               console.warn(`[Escrow Timer Watcher Warning] Booking ${bookingId} missing transaction UID. Forcing cancel...`);
               await updateDoc(doc(db, 'bookings', bookingId), {
-                status: 'REFUNDED/FAILED',
+                status: 'REJECTED_TIMEOUT',
                 bookingStatus: 'failed',
                 paymentStatus: 'failed',
                 statusReason: '5-Minute Escrow Expiry Timeout (No payment record)'
