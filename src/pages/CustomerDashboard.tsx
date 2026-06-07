@@ -7,29 +7,226 @@ import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
 
+interface BookingDetailsModalProps {
+  booking: any;
+  onClose: () => void;
+  isEscrowVerified: (b: any) => boolean;
+  isRejectFailed: (b: any) => boolean;
+}
+
+const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
+  booking,
+  onClose,
+  isEscrowVerified,
+  isRejectFailed,
+}) => {
+  const isPendingEscrow = isEscrowVerified(booking);
+  const failedOrRejected = isRejectFailed(booking);
+
+  // Counter state for remaining seconds of 300s (5 minutes) window
+  const [secondsLeft, setSecondsLeft] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isPendingEscrow || !booking.heldAt) return;
+
+    const calculateSeconds = () => {
+      const heldTime = new Date(booking.heldAt).getTime();
+      const expirationTime = heldTime + 5 * 60 * 1000; // 5 minutes
+      const remaining = Math.max(0, Math.floor((expirationTime - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+
+    calculateSeconds();
+    const interval = setInterval(calculateSeconds, 1000);
+    return () => clearInterval(interval);
+  }, [booking, isPendingEscrow]);
+
+  const formatCountdown = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${mins}:${s < 10 ? "0" : ""}${s}s`;
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-charcoal/40 backdrop-blur-md z-50 flex items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 15 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 15 }}
+        transition={{ type: "spring", duration: 0.5 }}
+        className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col font-sans"
+      >
+        {/* Header Decoration */}
+        <div
+          className={`p-8 pb-4 text-white flex justify-between items-start relative ${
+            failedOrRejected
+              ? "bg-gradient-to-br from-red-500 to-red-600"
+              : isPendingEscrow
+                ? "bg-gradient-to-br from-bbBlue to-blue-700"
+                : "bg-gradient-to-br from-green-500 to-emerald-600"
+          }`}
+        >
+          <div>
+            <span className="text-[0.5625rem] font-bold uppercase tracking-[0.3em] bg-white/20 px-2.5 py-1 rounded-full text-white/95">
+              Secure Registry Details
+            </span>
+            <h3 className="text-[1.75rem] font-serif font-bold text-white mt-3 leading-tight">
+              {booking.shopName || "Studio Partner Network"}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all border border-white/5 shadow-inner"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Modal Content */}
+        <div className="p-8 space-y-6 flex-grow overflow-y-auto">
+          {/* Main Highlights */}
+          <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Service</p>
+              <p className="text-[0.875rem] font-bold text-charcoal">
+                {booking.serviceName || booking.service || "Premium Service"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Amount Paid</p>
+              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{booking.price || "0"}</p>
+            </div>
+          </div>
+
+          {/* Reserved Execution Time */}
+          <div className="space-y-1">
+            <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Execution Schedule</p>
+            <div className="flex items-center gap-3 bg-gray-50/50 px-4 py-3 rounded-2xl border border-gray-100">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <div>
+                <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-tighter">{booking.date}</p>
+                <p className="text-[0.6875rem] text-gray-500 font-medium">{booking.time}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Gateway Identification */}
+          <div className="space-y-1">
+            <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Authentication Gateway</p>
+            <div className="bg-gray-50/50 px-4 py-3 rounded-2xl border border-gray-100 flex items-center justify-between">
+              <div>
+                <p className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-wider">Gateway Identifier</p>
+                <p className="text-[0.75rem] font-mono font-bold text-charcoal mt-0.5 truncate max-w-[200px]">
+                  {booking.transactionId || booking.razorpayOrderId || "N/A - Direct Verification"}
+                </p>
+              </div>
+              <span className="text-[0.5625rem] font-bold text-gray-400 bg-white px-2.5 py-1 border border-gray-100 rounded-md">
+                RAZORPAY
+              </span>
+            </div>
+          </div>
+
+          {/* DYNAMIC SCENARIOS (ESCROW TIMERS & ERROR EXPLANATIONS) */}
+          {isPendingEscrow && (
+            <div className="bg-amber-50 border border-amber-100 p-5 rounded-2xl text-amber-900 flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              </div>
+              <div className="flex-grow">
+                <p className="text-[0.5625rem] font-bold text-amber-700 uppercase tracking-widest">
+                  Escrow Protection Timer
+                </p>
+                <p className="text-[0.8125rem] font-bold text-amber-900 mt-1">
+                  Releasing in{" "}
+                  <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded text-amber-800">
+                    {formatCountdown(secondsLeft)}
+                  </span>
+                </p>
+                <p className="text-[0.625rem] text-amber-700 leading-relaxed mt-1.5">
+                  After 5 minutes, money is auto-refunded to your original source of payment if the partner salon does
+                  not manually approve of your selected time slot.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {failedOrRejected && (
+            <div className="bg-red-50 border border-red-100 p-5 rounded-2xl text-red-900 flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-full bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-grow">
+                <p className="text-[0.5625rem] font-bold text-red-700 uppercase tracking-widest">
+                  Rejection / Failure Diagnostics
+                </p>
+                <p className="text-[0.8125rem] font-semibold text-red-900 mt-1 leading-normal italic">
+                  "{booking.message || booking.statusReason || "Partner Timeout Exception (Auto-Refund Triggered)"}"
+                </p>
+                <p className="text-[0.625rem] text-red-700 leading-relaxed mt-1.5">
+                  The payment transaction was either abandoned, rejected by the partner, or the automatic escrow timers
+                  timed out securely without approval.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Bar */}
+        <div className="px-8 py-5 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 bg-charcoal text-white hover:bg-charcoal/90 text-[0.6875rem] font-bold uppercase tracking-widest rounded-xl transition-all shadow-md"
+          >
+            Close Details
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState<any[]>(
-    PersistenceService.load("customer_bookings") || [],
-  );
-  const [loading, setLoading] = useState(
-    !PersistenceService.load("customer_bookings"),
-  );
-  const [activeTab, setActiveTab] = useState<"approved" | "pending" | "failed">(
-    "approved",
-  );
+  const [bookings, setBookings] = useState<any[]>(PersistenceService.load("customer_bookings") || []);
+  const [loading, setLoading] = useState(!PersistenceService.load("customer_bookings"));
+  const [activeTab, setActiveTab] = useState<"approved" | "pending" | "failed">("approved");
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
   // CRITICAL REDIRECT: Ensure partners never land on Customer Dashboard
   useEffect(() => {
     if (user && user.role === "partner") {
-      console.log(
-        "[SECURITY] Partner detected on Customer Hub. Redirecting to Terminal...",
-      );
-      navigate(user.onboardingComplete ? "/partner-dashboard" : "/onboarding", {
-        replace: true,
-      });
+      console.log("[SECURITY] Partner detected on Customer Hub. Redirecting to Terminal...");
+      navigate(user.onboardingComplete ? "/partner-dashboard" : "/onboarding", { replace: true });
     }
   }, [user, navigate]);
 
@@ -56,9 +253,7 @@ const CustomerDashboard: React.FC = () => {
         PersistenceService.save("customer_bookings", data);
 
         // Priority: Check for completed bookings that need rating
-        const needsRating = data.find(
-          (b: any) => b.status === "completed" && !b.rated,
-        );
+        const needsRating = data.find((b: any) => b.status === "completed" && !b.rated);
         if (needsRating) {
           setPendingRatingBooking(needsRating);
         }
@@ -86,19 +281,13 @@ const CustomerDashboard: React.FC = () => {
                   }),
                 });
               } catch (err) {
-                console.error(
-                  `[Auto-Refund Customer Engine Error] bookingId=${booking.id}:`,
-                  err,
-                );
+                console.error(`[Auto-Refund Customer Engine Error] bookingId=${booking.id}:`, err);
               }
             }
           }
         });
       } catch (error) {
-        console.debug(
-          "Background fetch throttled (bypass mode active):",
-          error,
-        );
+        console.debug("Background fetch throttled (bypass mode active):", error);
       }
     };
 
@@ -135,10 +324,7 @@ const CustomerDashboard: React.FC = () => {
     }
 
     // 2. Initial order/slot states that were never paid (dropped/unpaid/pending, or pending_payment)
-    if (
-      b.status === "PENDING_PAYMENT" ||
-      b.bookingStatus === "pending_payment"
-    ) {
+    if (b.status === "PENDING_PAYMENT" || b.bookingStatus === "pending_payment") {
       return true;
     }
 
@@ -173,9 +359,7 @@ const CustomerDashboard: React.FC = () => {
   };
 
   const stats = {
-    approved: bookings.filter(
-      (b) => b.status === "approved" || b.status === "confirmed",
-    ).length,
+    approved: bookings.filter((b) => b.status === "approved" || b.status === "confirmed").length,
     pending: bookings.filter(isEscrowVerified).length,
     failed: bookings.filter(isRejectFailed).length,
   };
@@ -192,11 +376,7 @@ const CustomerDashboard: React.FC = () => {
           <div className="relative">
             <div className="w-[8rem] h-[8rem] rounded-full overflow-hidden border-4 border-white shadow-xl bg-white">
               {photoURL ? (
-                <img
-                  src={photoURL}
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
+                <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-bbBlue flex items-center justify-center text-white text-[2.5rem] font-serif font-bold">
                   {displayName?.[0] || "U"}
@@ -204,11 +384,7 @@ const CustomerDashboard: React.FC = () => {
               )}
             </div>
             <div className="absolute bottom-[0.25rem] right-[0.25rem] w-[2rem] h-[2rem] bg-bbBlue text-white rounded-full flex items-center justify-center shadow-lg border border-white">
-              <svg
-                className="w-[1rem] h-[1rem]"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="w-[1rem] h-[1rem]" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
               </svg>
             </div>
@@ -239,9 +415,7 @@ const CustomerDashboard: React.FC = () => {
               <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-[0.25rem]">
                 Total Bookings
               </p>
-              <p className="text-[1.875rem] font-serif font-bold text-bbBlue">
-                {bookings.length}
-              </p>
+              <p className="text-[1.875rem] font-serif font-bold text-bbBlue">{bookings.length}</p>
             </div>
           </div>
         </header>
@@ -275,9 +449,7 @@ const CustomerDashboard: React.FC = () => {
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
               className={`relative px-[3rem] py-[1.5rem] text-[0.6875rem] font-bold uppercase tracking-[0.25em] transition-all whitespace-nowrap flex items-center gap-[1rem] ${
-                activeTab === tab.key
-                  ? tab.color
-                  : "text-gray-300 hover:text-charcoal"
+                activeTab === tab.key ? tab.color : "text-gray-300 hover:text-charcoal"
               }`}
             >
               {tab.label}
@@ -296,151 +468,117 @@ const CustomerDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* 3. LISTING AREA */}
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[2.5rem]">
+        {/* 3. LISTING AREA (LINEAR SINGLE-ROW ARCHITECTURE) */}
+        <div className="w-full bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
+          {/* Table Header Row (Desktop Only) */}
+          <div className="hidden md:grid grid-cols-[1.2fr_2fr_1fr_2fr_1.2fr] gap-4 p-6 bg-gray-50/50 border-b border-gray-100 text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+            <div>ID Token</div>
+            <div>Service / Studio Partner</div>
+            <div>Amount Paid</div>
+            <div>Target Timestamp</div>
+            <div className="text-right">Execution Status</div>
+          </div>
+
           <AnimatePresence mode="wait">
             {loading ? (
-              <div className="col-span-full py-[10rem] flex flex-col items-center justify-center gap-[1.5rem]">
+              <div className="py-[10rem] flex flex-col items-center justify-center gap-[1.5rem]">
                 <div className="w-[3rem] h-[3rem] border-4 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
                 <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.4em]">
                   Connecting to Registry...
                 </p>
               </div>
             ) : filteredBookings.length > 0 ? (
-              filteredBookings.map((booking) => {
-                const failedOrRejected = isRejectFailed(booking);
-                const isPendingEscrow = isEscrowVerified(booking);
+              <div className="divide-y divide-gray-100/70">
+                {filteredBookings.map((booking) => {
+                  const failedOrRejected = isRejectFailed(booking);
+                  const isPendingEscrow = isEscrowVerified(booking);
 
-                return (
-                  <motion.div
-                    key={booking.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="bg-white border border-gray-100 p-[2.5rem] rounded-[3rem] shadow-sm hover:shadow-2xl transition-all duration-700 group relative overflow-hidden flex flex-col"
-                  >
-                    {/* Status Indicator Bar */}
-                    <div
-                      className={`absolute top-0 left-0 w-full h-[0.375rem] ${
-                        failedOrRejected
-                          ? "bg-red-500"
-                          : isPendingEscrow
-                            ? "bg-bbBlue animate-pulse"
-                            : "bg-green-500"
-                      }`}
-                    ></div>
-
-                    <div className="flex justify-between items-start mb-[2.5rem]">
-                      <div
-                        className={`w-[4rem] h-[4rem] rounded-2xl flex items-center justify-center border shadow-sm transition-all ${
-                          failedOrRejected
-                            ? "bg-red-50 border-red-100 text-red-500"
-                            : isPendingEscrow
-                              ? "bg-blue-50 border-blue-100 text-bbBlue"
-                              : "bg-green-50 border-green-100 text-green-500"
-                        }`}
-                      >
-                        <svg
-                          className="w-[2rem] h-[2rem]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          {isPendingEscrow ? (
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="1.5"
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          ) : (
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="1.5"
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          )}
-                        </svg>
-                      </div>
-                      <p className="text-[0.5625rem] font-bold text-gray-300 uppercase tracking-widest">
-                        {failedOrRejected ? "ABND-" : "TRX-"}
-                        {(booking.transactionId || booking.id || "").slice(-6)}
-                      </p>
-                    </div>
-
-                    <div className="flex-grow">
-                      <h3 className="text-[1.5rem] font-serif font-bold text-charcoal mb-[0.5rem] tracking-tight">
-                        {booking.shopName || "Studio Partner"}
-                      </h3>
-                      <p
-                        className={`text-[0.625rem] font-bold uppercase tracking-[0.25em] mb-[2.5rem] ${failedOrRejected ? "text-red-500" : "text-bbBlue"}`}
-                      >
-                        {isPendingEscrow
-                          ? "Pending Partner Approval"
-                          : booking.serviceName}
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-[2rem] pt-[2rem] border-t border-gray-50 mb-[2rem]">
-                        <div>
-                          <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-[0.5rem]">
-                            Reserved Time
-                          </p>
-                          <p className="text-[0.6875rem] font-bold text-charcoal uppercase tracking-tighter">
-                            {booking.date}
-                          </p>
-                          <p className="text-[0.625rem] text-gray-400 font-medium">
-                            {booking.time}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-[0.5rem]">
-                            Payment Status
-                          </p>
-                          <p
-                            className={`text-[0.6875rem] font-bold uppercase tracking-widest ${
-                              failedOrRejected ? "text-red-500" : "text-bbBlue"
+                  return (
+                    <motion.div
+                      key={booking.id}
+                      layout
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      onClick={() => setSelectedBooking(booking)}
+                      className="flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.2fr] gap-3 md:gap-4 p-5 md:p-6 hover:bg-gray-50/40 cursor-pointer transition-all duration-300 items-start md:items-center text-charcoal font-sans"
+                    >
+                      {/* COL 1: ID Token & Shop */}
+                      <div className="flex items-center justify-between w-full md:w-auto md:block">
+                        <span className="text-[0.6875rem] font-mono font-bold tracking-wider text-charcoal bg-gray-50 md:bg-transparent px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5">
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              failedOrRejected ? "bg-red-500" : isPendingEscrow ? "bg-amber-500 animate-pulse" : "bg-green-500"
                             }`}
-                          >
-                            {failedOrRejected
-                              ? booking.paymentStatus?.toUpperCase() || "FAILED"
-                              : isPendingEscrow
-                                ? "HELD IN ESCROW"
-                                : booking.paymentStatus?.toUpperCase() ||
-                                  "VOID"}
-                          </p>
+                          />
+                          {failedOrRejected ? "ABND-" : "TRX-"}
+                          {(booking.transactionId || booking.id || "").slice(-6).toUpperCase()}
+                        </span>
+                        <span className="text-[0.5625rem] text-gray-400 font-bold uppercase tracking-wider md:hidden">
+                          {booking.shopName || "Partner"}
+                        </span>
+                      </div>
+
+                      {/* COL 2: Service & Shop */}
+                      <div className="w-full md:w-auto">
+                        <p className="text-[0.8125rem] font-bold text-charcoal leading-tight">
+                          {booking.serviceName || booking.service || "Grooming Service"}
+                        </p>
+                        <p className="hidden md:block text-[0.5625rem] text-gray-400 uppercase tracking-wider font-semibold mt-0.5">
+                          {booking.shopName || "Studio Partner"}
+                        </p>
+                      </div>
+
+                      {/* COL 3: Amount Paid */}
+                      <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0 border-t border-dashed border-gray-100 md:border-none">
+                        <span className="md:hidden text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+                          Amount
+                        </span>
+                        <span className="text-[0.8125rem] font-mono font-bold text-charcoal">
+                          ₹{booking.price || "0"}
+                        </span>
+                      </div>
+
+                      {/* COL 4: Target Execution Timestamp */}
+                      <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0">
+                        <span className="md:hidden text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+                          Execution Time
+                        </span>
+                        <div className="text-right md:text-left">
+                          <p className="text-[0.75rem] font-bold text-charcoal">{booking.date}</p>
+                          <p className="text-[0.625rem] text-gray-400 font-medium md:mt-0.5">{booking.time}</p>
                         </div>
                       </div>
-                    </div>
 
-                    {(booking.message || booking.statusReason) && (
-                      <div className="mt-auto p-[1.5rem] bg-gray-50 rounded-2xl border border-gray-100">
-                        <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-[0.5rem] flex items-center gap-[0.5rem]">
-                          <span className="w-[0.375rem] h-[0.375rem] rounded-full bg-bbBlue"></span>
-                          Platform Note
-                        </p>
-                        <p className="text-[0.6875rem] text-gray-600 italic font-medium leading-relaxed">
-                          "{booking.message || booking.statusReason}"
-                        </p>
+                      {/* COL 5: Stylized Badge */}
+                      <div className="flex items-center justify-between w-full md:w-auto md:justify-end pt-2 md:pt-0">
+                        <span className="md:hidden text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+                          Status
+                        </span>
+                        <span
+                          className={`text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border ${
+                            failedOrRejected
+                              ? "bg-red-50 border-red-100 text-red-600"
+                              : isPendingEscrow
+                                ? "bg-amber-50 border-amber-100 text-amber-600 animate-pulse"
+                                : "bg-green-50 border-green-100 text-green-600"
+                          }`}
+                        >
+                          {failedOrRejected ? "REJECTED" : isPendingEscrow ? "HELD (ESCROW)" : "CONFIRMED"}
+                        </span>
                       </div>
-                    )}
-                  </motion.div>
-                );
-              })
+                    </motion.div>
+                  );
+                })}
+              </div>
             ) : (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="col-span-full py-[12rem] flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-[4rem] bg-gray-50/20"
+                className="py-[12rem] flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-[2rem] m-6 bg-gray-50/20"
               >
                 <div className="w-[6rem] h-[6rem] bg-white rounded-full flex items-center justify-center mb-[2rem] shadow-xl border border-gray-100">
-                  <svg
-                    className="w-[2.5rem] h-[2.5rem] text-gray-200"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-[2.5rem] h-[2.5rem] text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                       strokeWidth="1.5"
@@ -460,6 +598,18 @@ const CustomerDashboard: React.FC = () => {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Details Interactive Pop-Up Modal Overlay */}
+      <AnimatePresence>
+        {selectedBooking && (
+          <BookingDetailsModal
+            booking={selectedBooking}
+            onClose={() => setSelectedBooking(null)}
+            isEscrowVerified={isEscrowVerified}
+            isRejectFailed={isRejectFailed}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {pendingRatingBooking && (
