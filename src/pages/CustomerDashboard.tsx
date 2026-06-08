@@ -127,7 +127,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             </div>
             <div>
               <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Amount Paid</p>
-              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{booking.price || "0"}</p>
+              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{booking.amount || booking.price || "0"}</p>
             </div>
           </div>
 
@@ -145,7 +145,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
               </svg>
               <div>
                 <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-tighter">{booking.date}</p>
-                <p className="text-[0.6875rem] text-gray-500 font-medium">{booking.time}</p>
+                <p className="text-[0.6875rem] text-gray-500 font-medium">{booking.slotTime || booking.time || "N/A"}</p>
               </div>
             </div>
           </div>
@@ -349,21 +349,26 @@ const CustomerDashboard: React.FC = () => {
   }, [user]);
 
   const isEscrowVerified = (b: any) => {
-    const s = String(b.status || "").toLowerCase();
-    const paymentStatusStr = String(b.paymentStatus || "").toUpperCase();
-    const hasValidTxId = b.transactionId && b.transactionId.trim() !== "";
+    if (!b) return false;
+    const s = String(b.status || "").toUpperCase();
+    const ps = String(b.paymentStatus || b.payment_status || "").toUpperCase();
+    const hasEscrowToken = !!(b.escrowToken || b.escrow_token);
+    
     return (
-      s === "payment_held" &&
-      hasValidTxId &&
-      paymentStatusStr !== "UNPAID" &&
-      paymentStatusStr !== "PENDING" &&
-      paymentStatusStr !== "FAILED"
+      s === "PAYMENT_HELD" ||
+      s === "HELD" ||
+      ps === "SUCCESS" ||
+      ps === "PAID" ||
+      hasEscrowToken
     );
   };
 
   const isRejectFailed = (b: any) => {
+    if (!b) return false;
+    if (isEscrowVerified(b)) return false;
+
     const s = String(b.status || "").toLowerCase();
-    const ps = String(b.paymentStatus || "").toLowerCase();
+    const ps = String(b.paymentStatus || b.payment_status || "").toLowerCase();
     
     // 1. Explicit failed/rejected/cancelled statuses
     if (
@@ -378,14 +383,9 @@ const CustomerDashboard: React.FC = () => {
       return true;
     }
 
-    // 2. Initial order/slot states that were never paid (dropped/unpaid/pending, or pending_payment)
-    if (s === "pending_payment" || b.bookingStatus === "pending_payment" || s === "pending_payment") {
+    // 2. Initial order/slot states that were never paid
+    if (s === "pending_payment" || b.bookingStatus === "pending_payment") {
       return true;
-    }
-
-    // 3. Or if status says payment_held but the actual payment was unpaid, pending, failed, or has no valid transaction ID
-    if (s === "payment_held") {
-      return !isEscrowVerified(b);
     }
 
     return false;
@@ -630,7 +630,7 @@ const CustomerDashboard: React.FC = () => {
                             }`}
                           />
                           {failedOrRejected ? "ABND-" : "TRX-"}
-                          {(booking.transactionId || booking.id || "").slice(-6).toUpperCase()}
+                          {String(booking.id || booking._id || "").slice(-8).toUpperCase()}
                         </span>
                         <span className="text-[0.5625rem] text-gray-400 font-bold uppercase tracking-wider md:hidden">
                           {booking.shopName || "Partner"}
@@ -653,7 +653,7 @@ const CustomerDashboard: React.FC = () => {
                           Amount
                         </span>
                         <span className="text-[0.8125rem] font-mono font-bold text-charcoal">
-                          ₹{booking.price || "0"}
+                          ₹{booking.amount || booking.price || "0"}
                         </span>
                       </div>
 
@@ -664,7 +664,9 @@ const CustomerDashboard: React.FC = () => {
                         </span>
                         <div className="text-right md:text-left">
                           <p className="text-[0.75rem] font-bold text-charcoal">{booking.date}</p>
-                          <p className="text-[0.625rem] text-gray-400 font-medium md:mt-0.5">{booking.time}</p>
+                          <p className="text-[0.625rem] text-gray-400 font-medium md:mt-0.5">
+                            {booking.slotTime || booking.time || "N/A"}
+                          </p>
                         </div>
                       </div>
 
@@ -682,7 +684,7 @@ const CustomerDashboard: React.FC = () => {
                                 : "bg-green-50 border-green-100 text-green-600"
                           }`}
                         >
-                          {failedOrRejected ? "REJECTED" : isPendingEscrow ? "HELD (ESCROW)" : "CONFIRMED"}
+                          {failedOrRejected ? "REJECTED" : isPendingEscrow ? "HELD IN ESCROW" : "CONFIRMED"}
                         </span>
                       </div>
                     </motion.div>
