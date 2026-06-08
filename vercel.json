@@ -7,6 +7,7 @@
     }
   },
   "rewrites": [
+    { "source": "/api/razorpay/create-order", "destination": "/api/razorpay/create-order.js" },
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

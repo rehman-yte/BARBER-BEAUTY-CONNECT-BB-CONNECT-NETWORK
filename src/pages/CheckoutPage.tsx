@@ -168,8 +168,8 @@ const CheckoutPage: React.FC = () => {
         }
         
         const orderResult = await orderResponse.json();
-        if (orderResult.success && orderResult.orderId) {
-          backendOrderId = orderResult.orderId;
+        if (orderResult.success && (orderResult.orderId || orderResult.id)) {
+          backendOrderId = orderResult.orderId || orderResult.id;
           if (orderResult.keyId) {
             usedKeyId = orderResult.keyId;
           }
