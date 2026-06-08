@@ -7,7 +7,7 @@ import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
 import { db } from "../lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 
 interface BookingDetailsModalProps {
   booking: any;
@@ -102,7 +102,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
               Secure Registry Details
             </span>
             <h3 className="text-[1.75rem] font-serif font-bold text-white mt-3 leading-tight">
-              {booking.shopName || "Studio Partner Network"}
+              {booking.partnerBrandName || booking.shopName || "Studio Partner Network"}
             </h3>
           </div>
           <button
@@ -127,7 +127,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             </div>
             <div>
               <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Amount Paid</p>
-              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{booking.amount || booking.price || "0"}</p>
+              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{booking.amountPaid || booking.amount || booking.price || "0"}</p>
             </div>
           </div>
 
@@ -144,8 +144,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                 />
               </svg>
               <div>
-                <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-tighter">{booking.date}</p>
-                <p className="text-[0.6875rem] text-gray-500 font-medium">{booking.slotTime || booking.time || "N/A"}</p>
+                <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-tighter">{booking.selectedDate || booking.date || "N/A"}</p>
+                <p className="text-[0.6875rem] text-gray-500 font-medium">{booking.selectedSlot || booking.slotTime || booking.time || "N/A"}</p>
               </div>
             </div>
           </div>
@@ -271,12 +271,40 @@ const CustomerDashboard: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    const fetchBookings = async () => {
-      try {
-        const data = await getBookings(user.uid);
+    setLoading(true);
+
+    const q = query(
+      collection(db, "bookings"),
+      where("customerId", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data: any[] = [];
+        snapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Sort data by createdAt (descending)
+        data.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+
         setBookings(data);
         setLoading(false);
         PersistenceService.save("customer_bookings", data);
+
+        // Keep selected booking reference fresh so the pop-up modal persists updating states
+        setSelectedBooking((prev: any) => {
+          if (prev) {
+            const updated = data.find((b) => b.id === prev.id);
+            return updated || prev;
+          }
+          return prev;
+        });
 
         // Priority: Check for completed bookings that need rating
         const needsRating = data.find((b: any) => b.status === "completed" && !b.rated);
@@ -295,21 +323,23 @@ const CustomerDashboard: React.FC = () => {
               console.log(
                 `[Auto-Refund Customer Engine] Booking ${booking.id} has expired. Auto-refunding payment...`,
               );
-              
+
               // Move out of escrow tab instantly
-              setBookings(prev => prev.map(b => {
-                if (b.id === booking.id) {
-                  return {
-                    ...b,
-                    status: 'REJECTED_TIMEOUT',
-                    bookingStatus: 'failed',
-                    paymentStatus: 'failed',
-                    statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
-                    message: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
-                  };
-                }
-                return b;
-              }));
+              setBookings((prev) =>
+                prev.map((b) => {
+                  if (b.id === booking.id) {
+                    return {
+                      ...b,
+                      status: "REJECTED_TIMEOUT",
+                      bookingStatus: "failed",
+                      paymentStatus: "failed",
+                      statusReason: "5-Minute Escrow Expiry Timeout (Auto-Refunded)",
+                      message: "5-Minute Escrow Expiry Timeout (Auto-Refunded)",
+                    };
+                  }
+                  return b;
+                })
+              );
 
               try {
                 await fetch("/api/razorpay/refund", {
@@ -325,11 +355,11 @@ const CustomerDashboard: React.FC = () => {
                 });
 
                 // Mutate database status
-                await updateDoc(doc(db, 'bookings', booking.id), {
-                  status: 'REJECTED_TIMEOUT',
-                  bookingStatus: 'failed',
-                  paymentStatus: 'failed',
-                  statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+                await updateDoc(doc(db, "bookings", booking.id), {
+                  status: "REJECTED_TIMEOUT",
+                  bookingStatus: "failed",
+                  paymentStatus: "failed",
+                  statusReason: "5-Minute Escrow Expiry Timeout (Auto-Refunded)",
                 });
               } catch (err) {
                 console.error(`[Auto-Refund Customer Engine Error] bookingId=${booking.id}:`, err);
@@ -337,15 +367,14 @@ const CustomerDashboard: React.FC = () => {
             }
           }
         });
-      } catch (error) {
-        console.debug("Background fetch throttled (bypass mode active):", error);
+      },
+      (error) => {
+        console.warn("[Firestore Customer Dashboard error]:", error);
+        setLoading(false);
       }
-    };
+    );
 
-    fetchBookings();
-    const interval = setInterval(fetchBookings, 5000);
-
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [user]);
 
   const isEscrowVerified = (b: any) => {
@@ -633,7 +662,7 @@ const CustomerDashboard: React.FC = () => {
                           {String(booking.id || booking._id || "").slice(-8).toUpperCase()}
                         </span>
                         <span className="text-[0.5625rem] text-gray-400 font-bold uppercase tracking-wider md:hidden">
-                          {booking.shopName || "Partner"}
+                          {booking.partnerBrandName || booking.shopName || "Partner"}
                         </span>
                       </div>
 
@@ -643,7 +672,7 @@ const CustomerDashboard: React.FC = () => {
                           {booking.serviceName || booking.service || "Grooming Service"}
                         </p>
                         <p className="hidden md:block text-[0.5625rem] text-gray-400 uppercase tracking-wider font-semibold mt-0.5">
-                          {booking.shopName || "Studio Partner"}
+                          {booking.partnerBrandName || booking.shopName || "Studio Partner"}
                         </p>
                       </div>
 
@@ -653,7 +682,7 @@ const CustomerDashboard: React.FC = () => {
                           Amount
                         </span>
                         <span className="text-[0.8125rem] font-mono font-bold text-charcoal">
-                          ₹{booking.amount || booking.price || "0"}
+                          ₹{booking.amountPaid || booking.amount || booking.price || "0"}
                         </span>
                       </div>
 
@@ -663,9 +692,11 @@ const CustomerDashboard: React.FC = () => {
                           Execution Time
                         </span>
                         <div className="text-right md:text-left">
-                          <p className="text-[0.75rem] font-bold text-charcoal">{booking.date}</p>
+                          <p className="text-[0.75rem] font-bold text-charcoal">
+                            {booking.selectedDate || booking.date || "N/A"}
+                          </p>
                           <p className="text-[0.625rem] text-gray-400 font-medium md:mt-0.5">
-                            {booking.slotTime || booking.time || "N/A"}
+                            {booking.selectedSlot || booking.slotTime || booking.time || "N/A"}
                           </p>
                         </div>
                       </div>
@@ -684,7 +715,7 @@ const CustomerDashboard: React.FC = () => {
                                 : "bg-green-50 border-green-100 text-green-600"
                           }`}
                         >
-                          {failedOrRejected ? "REJECTED" : isPendingEscrow ? "HELD IN ESCROW" : "CONFIRMED"}
+                          {failedOrRejected ? "REJECT/FAILED" : isPendingEscrow ? "HELD (ESCROW)" : "CONFIRMED"}
                         </span>
                       </div>
                     </motion.div>
