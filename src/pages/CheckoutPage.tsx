@@ -247,6 +247,7 @@ const CheckoutPage: React.FC = () => {
               item.type === 'booking'
             ) {
               const bookingDocData = {
+                customer_id: user?.uid,
                 customerId: user?.uid,
                 customerName: formData.fullName || user?.name || 'Customer Booking',
                 partnerId: item.shopId || item.partnerId || '',
@@ -468,9 +469,17 @@ const CheckoutPage: React.FC = () => {
       if (createdBookingDocIds && createdBookingDocIds.length > 0) {
         for (const bId of createdBookingDocIds) {
           await updateDoc(doc(db, 'bookings', bId), {
-            paymentStatus: 'paid',
-            bookingStatus: 'confirmed',
-            status: 'confirmed',
+            customer_id: user?.uid,
+            customerId: user?.uid,
+            paymentStatus: 'SUCCESS',
+            payment_status: 'paid',
+            bookingStatus: 'paid',
+            status: 'paid',
+            heldAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            timestamp: serverTimestamp(),
+            partner_accepted: false,
+            partner_rejected: false,
             transactionId: utrNumber.trim()
           });
         }
@@ -481,6 +490,9 @@ const CheckoutPage: React.FC = () => {
       setTimerActive(false);
       setStep('success');
       clearCart();
+
+      // EXECUTE IMMEDIATE ROUTER REDIRECT
+      navigate('/customer/dashboard');
     } catch (err: any) {
       console.error("Failed to commit verification data:", err);
       setPaymentError("Network error: Verification record submission failed. Please try again.");
