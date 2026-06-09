@@ -275,12 +275,22 @@ const CustomerDashboard: React.FC = () => {
 
     setLoading(true);
 
+    // Force query filtering precisely using all possibilities of user identify tokens
+    const uId = user.uid || "";
+    const regId = (user as any).registryId || "";
+    const usrId = (user as any).userId || "";
+    const tokens = Array.from(new Set([uId, regId, usrId].filter(Boolean)));
+    const conditions: any[] = [];
+    tokens.forEach((t) => {
+      conditions.push(where("customerId", "==", t));
+      conditions.push(where("customer_id", "==", t));
+      conditions.push(where("userId", "==", t));
+      conditions.push(where("registryId", "==", t));
+    });
+
     const q = query(
       collection(db, "bookings"),
-      or(
-        where("customerId", "==", user.uid),
-        where("customer_id", "==", user.uid)
-      )
+      or(...conditions)
     );
 
     const unsubscribe = onSnapshot(
@@ -288,7 +298,35 @@ const CustomerDashboard: React.FC = () => {
       (snapshot) => {
         const data: any[] = [];
         snapshot.forEach((doc) => {
-          data.push({ id: doc.id, ...doc.data() });
+          const docData = doc.data();
+          
+          // Normalize to preserve data array mappings precisely under any field variants
+          const serviceName = docData.serviceName || docData.service || "Grooming Service";
+          const amountPaid = docData.amountPaid || docData.amount || docData.price || "0";
+          const selectedDate = docData.selectedDate || docData.date || "N/A";
+          const selectedSlot = docData.selectedSlot || docData.slotTime || docData.time || "N/A";
+
+          let status = docData.status || "";
+          let paymentStatus = docData.paymentStatus || docData.payment_status || "";
+
+          // Ensure whenever a state transition occurs with status/payment, it maps correctly
+          if (String(paymentStatus).toUpperCase() === "SUCCESS" || String(paymentStatus).toUpperCase() === "PAID") {
+            paymentStatus = "SUCCESS";
+          }
+          if (String(status).toUpperCase() === "HELD" || String(status).toUpperCase() === "PAYMENT_HELD") {
+            status = "HELD";
+          }
+
+          data.push({
+            id: doc.id,
+            ...docData,
+            serviceName,
+            amountPaid,
+            selectedDate,
+            selectedSlot,
+            status,
+            paymentStatus
+          });
         });
 
         // Sort data by createdAt (descending)
@@ -419,7 +457,19 @@ const CustomerDashboard: React.FC = () => {
     const bs = String(b.bookingStatus || "").toUpperCase();
 
     // Check if customer matches active user to be extremely secure and precise
-    const isCustomerMatch = b.customerId === user?.uid || b.customer_id === user?.uid;
+    const uId = user?.uid || "";
+    const regId = (user as any)?.registryId || "";
+    const usrId = (user as any)?.userId || "";
+    const bookingCustId = b.customerId || b.customer_id || b.userId || b.registryId || "";
+    const isCustomerMatch = 
+      bookingCustId === uId || 
+      bookingCustId === regId || 
+      bookingCustId === usrId ||
+      b.customerId === uId ||
+      b.customer_id === uId ||
+      b.userId === uId ||
+      b.registryId === uId;
+
     if (!isCustomerMatch) return false;
 
     return (
@@ -734,8 +784,7 @@ const CustomerDashboard: React.FC = () => {
                               failedOrRejected ? "bg-red-500" : isPending ? "bg-red-500 animate-pulse" : "bg-green-500"
                             }`}
                           />
-                          {failedOrRejected ? "ABND-" : "TRX-"}
-                          {String(booking.id || booking._id || "").slice(-8).toUpperCase()}
+                          {String(booking.id || "").slice(-8).toUpperCase()}
                         </span>
                         <span className={`text-[0.5625rem] font-bold uppercase tracking-wider md:hidden ${
                           failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
@@ -749,7 +798,7 @@ const CustomerDashboard: React.FC = () => {
                         <p className={`text-[0.8125rem] font-bold leading-tight ${
                           failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
                         }`}>
-                          {booking.serviceName || booking.service || "Grooming Service"}
+                          {booking.serviceName}
                         </p>
                         <p className={`hidden md:block text-[0.5625rem] uppercase tracking-wider font-semibold mt-0.5 ${
                           failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
@@ -768,7 +817,7 @@ const CustomerDashboard: React.FC = () => {
                         <span className={`text-[0.8125rem] font-mono font-bold ${
                           failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
                         }`}>
-                          ₹{booking.amountPaid || booking.amount || booking.price || "0"}
+                          ₹{booking.amountPaid}
                         </span>
                       </div>
 
@@ -783,12 +832,12 @@ const CustomerDashboard: React.FC = () => {
                           <p className={`text-[0.75rem] font-bold ${
                             failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
                           }`}>
-                            {booking.selectedDate || booking.date || "N/A"}
+                            {booking.selectedDate}
                           </p>
                           <p className={`text-[0.625rem] font-medium md:mt-0.5 ${
                             failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
                           }`}>
-                            {booking.selectedSlot || booking.slotTime || booking.time || "N/A"}
+                            {booking.selectedSlot}
                           </p>
                         </div>
                       </div>
@@ -810,10 +859,10 @@ const CustomerDashboard: React.FC = () => {
                           }`}
                         >
                           {failedOrRejected
-                            ? "REJECT/FAILED"
+                            ? "Failed"
                             : isPending
-                              ? `PENDING APPROVAL (${formatCountdown(secsLeft)})`
-                              : "CONFIRMED"}
+                              ? "Held in Escrow"
+                              : "Confirmed"}
                         </span>
                       </div>
                     </motion.div>
