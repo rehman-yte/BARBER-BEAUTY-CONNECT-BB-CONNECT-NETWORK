@@ -189,9 +189,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     {formatCountdown(secondsLeft)}
                   </span>
                 </p>
-                <p className="text-[0.625rem] text-amber-700 leading-relaxed mt-1.5">
-                  After 5 minutes, money is auto-refunded to your original source of payment if the partner salon does
-                  not manually approve of your selected time slot.
+                <p className="text-[0.625rem] text-amber-700 leading-relaxed mt-1.5 font-bold">
+                  Please wait 5 minutes for partner verification.
                 </p>
               </div>
             </div>
@@ -216,9 +215,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                 <p className="text-[0.8125rem] font-semibold text-red-900 mt-1 leading-normal italic">
                   "{booking.message || booking.statusReason || "Partner Timeout Exception (Auto-Refund Triggered)"}"
                 </p>
-                <p className="text-[0.625rem] text-red-700 leading-relaxed mt-1.5">
-                  The payment transaction was either abandoned, rejected by the partner, or the automatic escrow timers
-                  timed out securely without approval.
+                <p className="text-[0.625rem] text-red-700 leading-relaxed mt-1.5 font-bold">
+                  Your payment will be refunded within 10-20 minutes.
                 </p>
               </div>
             </div>
@@ -244,7 +242,7 @@ const CustomerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<any[]>(PersistenceService.load("customer_bookings") || []);
   const [loading, setLoading] = useState(!PersistenceService.load("customer_bookings"));
-  const [activeTab, setActiveTab] = useState<"approved" | "failed">("approved");
+  const [activeTab, setActiveTab] = useState<"waiting" | "confirmed" | "failed">("waiting");
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
@@ -317,16 +315,18 @@ const CustomerDashboard: React.FC = () => {
             status = "HELD";
           }
 
-          data.push({
-            id: doc.id,
-            ...docData,
-            serviceName,
-            amountPaid,
-            selectedDate,
-            selectedSlot,
-            status,
-            paymentStatus
-          });
+          if (paymentStatus === "SUCCESS") {
+            data.push({
+              id: doc.id,
+              ...docData,
+              serviceName,
+              amountPaid,
+              selectedDate,
+              selectedSlot,
+              status,
+              paymentStatus
+            });
+          }
         });
 
         // Sort data by createdAt (descending)
@@ -367,29 +367,38 @@ const CustomerDashboard: React.FC = () => {
   const isBookingApproved = (b: any) => {
     if (!b) return false;
     const s = String(b.status || "").toLowerCase();
+    const bs = String(b.bookingStatus || "").toLowerCase();
     return (
       s === "confirmed" ||
       s === "approved" ||
       s === "completed" ||
+      bs === "confirmed" ||
+      bs === "approved" ||
+      bs === "completed" ||
+      b.partner_accepted === true ||
       b.partner_approval === true ||
       b.partnerApproved === true ||
       b.partner_approved === true
     );
   };
 
-  const isEscrowVerified = (b: any) => {
+  const isBookingRejected = (b: any) => {
     if (!b) return false;
-    const s = String(b.status || "").toUpperCase();
-    const ps = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-    const hasEscrowToken = !!(b.escrowToken || b.escrow_token);
-    
+    const s = String(b.status || "").toLowerCase();
+    const bs = String(b.bookingStatus || "").toLowerCase();
+    const ps = String(b.paymentStatus || b.payment_status || "").toLowerCase();
     return (
-      s === "PAYMENT_HELD" ||
-      s === "HELD" ||
-      s === "PENDING_APPROVAL" ||
-      ps === "SUCCESS" ||
-      ps === "PAID" ||
-      hasEscrowToken
+      s === "rejected" ||
+      s === "failed" ||
+      s === "cancelled" ||
+      s === "refunded/failed" ||
+      s === "rejected_timeout" ||
+      s === "failed_timeout" ||
+      bs === "failed" ||
+      bs === "rejected" ||
+      b.partner_rejected === true ||
+      b.partnerRejected === true ||
+      ps === "failed"
     );
   };
 
@@ -401,118 +410,31 @@ const CustomerDashboard: React.FC = () => {
     return Math.max(0, 300 - Math.floor(elapsed / 1000));
   };
 
-  const isBookingTimedOut = (b: any) => {
-    const isApproved = isBookingApproved(b);
-    if (isApproved) return false;
-    
-    if (!isEscrowVerified(b)) {
-      const s = String(b.status || "").toUpperCase();
-      const ps = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-      if (!(ps === "SUCCESS" || ps === "PAID" || s === "CONFIRMED" || s === "PENDING_APPROVAL" || b.partner_approved === false)) {
-        return false;
-      }
-    }
-    
-    const secs = getBookingSecondsLeft(b);
-    return secs <= 0;
-  };
-
-  const isRejectFailed = (b: any) => {
+  const isWaitingBooking = (b: any) => {
     if (!b) return false;
+    if (b.paymentStatus !== "SUCCESS") return false;
     if (isBookingApproved(b)) return false;
-    if (isConfirmedTabWithoutFailureCheck(b)) return false;
-
-    const s = String(b.status || "").toLowerCase();
-    const ps = String(b.paymentStatus || b.payment_status || "").toLowerCase();
-    
-    // 1. Explicit failed/rejected/cancelled statuses
-    if (
-      s === "rejected" ||
-      s === "failed" ||
-      s === "cancelled" ||
-      s === "refunded/failed" ||
-      s === "rejected_timeout" ||
-      s === "failed_timeout" ||
-      ps === "failed" ||
-      ps === "abandoned"
-    ) {
-      return true;
-    }
-
-    // 2. Initial order/slot states that were never paid
-    if (s === "pending_payment" || b.bookingStatus === "pending_payment") {
-      return true;
-    }
-
-    return false;
-  };
-
-  const isConfirmedTabWithoutFailureCheck = (b: any) => {
+    if (isBookingRejected(b)) return false;
     const secsLeft = getBookingSecondsLeft(b);
-    const isApproved = isBookingApproved(b);
-    if (secsLeft <= 0 && !isApproved) return false;
-
-    const s = String(b.status || "").toUpperCase();
-    const ps = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-    const bs = String(b.bookingStatus || "").toUpperCase();
-
-    // Check if customer matches active user to be extremely secure and precise
-    const uId = user?.uid || "";
-    const regId = (user as any)?.registryId || "";
-    const usrId = (user as any)?.userId || "";
-    const bookingCustId = b.customerId || b.customer_id || b.userId || b.registryId || "";
-    const isCustomerMatch = 
-      bookingCustId === uId || 
-      bookingCustId === regId || 
-      bookingCustId === usrId ||
-      b.customerId === uId ||
-      b.customer_id === uId ||
-      b.userId === uId ||
-      b.registryId === uId;
-
-    if (!isCustomerMatch) return false;
-
-    return (
-      ps === "SUCCESS" ||
-      ps === "PAID" ||
-      s === "CONFIRMED" ||
-      s === "PAYMENT_HELD" ||
-      s === "PENDING_APPROVAL" ||
-      s === "PENDING_PARTNER_APPROVAL" ||
-      bs === "PENDING_APPROVAL" ||
-      bs === "PENDING_PARTNER_APPROVAL" ||
-      bs === "PAYMENT_HELD" ||
-      b.partner_approved === false ||
-      b.partnerApproved === false ||
-      isApproved ||
-      isEscrowVerified(b)
-    );
+    return secsLeft > 0;
   };
 
-  const isConfirmedTab = (b: any) => {
-    const s = String(b.status || "").toUpperCase();
-    const ps = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-
-    if (
-      s === "REJECTED" ||
-      s === "FAILED" ||
-      s === "CANCELLED" ||
-      s === "REFUNDED/FAILED" ||
-      s === "REJECTED_TIMEOUT" ||
-      s === "FAILED_TIMEOUT" ||
-      ps === "FAILED" ||
-      ps === "ABANDONED"
-    ) {
-      return false;
-    }
-
-    return isConfirmedTabWithoutFailureCheck(b);
+  const isConfirmedBooking = (b: any) => {
+    if (!b) return false;
+    if (b.paymentStatus !== "SUCCESS") return false;
+    return isBookingApproved(b);
   };
 
-  const isFailedTab = (b: any) => {
-    if (isConfirmedTab(b)) return false;
-    return true;
+  const isFailedBooking = (b: any) => {
+    if (!b) return false;
+    if (b.paymentStatus !== "SUCCESS") return false;
+    if (isBookingApproved(b)) return false;
+    const secsLeft = getBookingSecondsLeft(b);
+    return isBookingRejected(b) || secsLeft <= 0;
   };
+
+  const isEscrowVerified = (b: any) => isWaitingBooking(b);
+  const isRejectFailed = (b: any) => isFailedBooking(b);
 
   const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
     console.log(`[Auto-Refund Modal Trigger] Booking ${bookingId} has expired. Direct database and view update...`);
@@ -570,8 +492,8 @@ const CustomerDashboard: React.FC = () => {
         status: "failed_timeout",
         bookingStatus: 'failed',
         paymentStatus: 'failed',
-        statusReason: 'Partner Response Timeout',
-        message: 'Partner Response Timeout'
+        statusReason: 'Partner Response Timeout (Auto-Refund Triggered)',
+        message: 'Partner Response Timeout (Auto-Refund Triggered)'
       });
     } catch (dbErr) {
       console.error("[Silent DB Mutate Error]:", dbErr);
@@ -584,9 +506,7 @@ const CustomerDashboard: React.FC = () => {
 
       // Check for timeout events in real-time
       bookings.forEach(async (booking) => {
-        const isApproved = isBookingApproved(booking);
-        const isPending = isConfirmedTab(booking) && !isApproved;
-        if (isPending) {
+        if (isWaitingBooking(booking)) {
           const secs = getBookingSecondsLeft(booking);
           if (secs <= 0) {
             console.log(`[Real-time escalation] Booking ${booking.id} timed out. Auto-escalating.`);
@@ -604,8 +524,9 @@ const CustomerDashboard: React.FC = () => {
   }, [bookings]);
 
   const filteredBookings = bookings.filter((b) => {
-    if (activeTab === "failed") return isFailedTab(b);
-    return isConfirmedTab(b);
+    if (activeTab === "waiting") return isWaitingBooking(b);
+    if (activeTab === "confirmed") return isConfirmedBooking(b);
+    return isFailedBooking(b);
   });
 
   const handleRatingSubmit = async (rating: number, comment: string) => {
@@ -624,8 +545,9 @@ const CustomerDashboard: React.FC = () => {
   };
 
   const stats = {
-    approved: bookings.filter(isConfirmedTab).length,
-    failed: bookings.filter(isFailedTab).length,
+    waiting: bookings.filter(isWaitingBooking).length,
+    confirmed: bookings.filter(isConfirmedBooking).length,
+    failed: bookings.filter(isFailedBooking).length,
   };
 
   // Sync with actual details
@@ -688,9 +610,16 @@ const CustomerDashboard: React.FC = () => {
         <div className="flex border-b border-gray-100 mb-[3rem] overflow-x-auto scrollbar-hide bg-white sticky top-[5rem] z-20 py-[0.5rem]">
           {[
             {
-              key: "approved",
-              label: "Confirmed",
-              count: stats.approved,
+              key: "waiting",
+              label: "WAITING",
+              count: stats.waiting,
+              color: "text-amber-500",
+              activeBg: "bg-amber-500",
+            },
+            {
+              key: "confirmed",
+              label: "CONFIRMED",
+              count: stats.confirmed,
               color: "text-green-600",
               activeBg: "bg-green-600",
             },
@@ -703,32 +632,32 @@ const CustomerDashboard: React.FC = () => {
             },
           ].map((tab) => (
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
-              className={`relative px-[3rem] py-[1.5rem] text-[0.6875rem] font-bold uppercase tracking-[0.25em] transition-all whitespace-nowrap flex items-center gap-[1rem] ${
-                activeTab === tab.key ? tab.color : "text-gray-300 hover:text-charcoal"
-              }`}
-            >
-              {tab.label}
-              <span
-                className={`text-[0.5625rem] px-[0.625rem] py-[0.125rem] rounded-md font-sans ${activeTab === tab.key ? tab.activeBg + " text-white" : "bg-gray-100 text-gray-400"}`}
-              >
-                {tab.count}
-              </span>
-              {activeTab === tab.key && (
-                <motion.div
-                  layoutId="activeTabLine"
-                  className={`absolute bottom-0 left-0 right-0 h-[0.375rem] ${tab.activeBg} rounded-t-full`}
-                />
-              )}
-            </button>
+               key={tab.key}
+               onClick={() => setActiveTab(tab.key as any)}
+               className={`relative px-[3rem] py-[1.5rem] text-[0.6875rem] font-bold uppercase tracking-[0.25em] transition-all whitespace-nowrap flex items-center gap-[1rem] ${
+                 activeTab === tab.key ? tab.color : "text-gray-300 hover:text-charcoal"
+               }`}
+             >
+               {tab.label}
+               <span
+                 className={`text-[0.5625rem] px-[0.625rem] py-[0.125rem] rounded-md font-sans ${activeTab === tab.key ? tab.activeBg + " text-white" : "bg-gray-100 text-gray-400"}`}
+               >
+                 {tab.count}
+               </span>
+               {activeTab === tab.key && (
+                 <motion.div
+                   layoutId="activeTabLine"
+                   className={`absolute bottom-0 left-0 right-0 h-[0.375rem] ${tab.activeBg} rounded-t-full`}
+                 />
+               )}
+             </button>
           ))}
         </div>
 
         {/* 3. LISTING AREA (LINEAR SINGLE-ROW ARCHITECTURE) */}
         <div className="w-full bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
           {/* Table Header Row (Desktop Only) */}
-          <div className="hidden md:grid grid-cols-[1.2fr_2fr_1fr_2fr_1.2fr] gap-4 p-6 bg-gray-50/50 border-b border-gray-100 text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+          <div className="hidden md:grid grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-4 p-6 bg-gray-50/50 border-b border-gray-100 text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
             <div>ID Token</div>
             <div>Service / Studio Partner</div>
             <div>Amount Paid</div>
@@ -747,10 +676,10 @@ const CustomerDashboard: React.FC = () => {
             ) : filteredBookings.length > 0 ? (
               <div className="divide-y divide-gray-100/70">
                 {filteredBookings.map((booking) => {
-                  const failedOrRejected = isFailedTab(booking);
+                  const failedOrRejected = isFailedBooking(booking);
                   const isApproved = isBookingApproved(booking) || booking.partner_approved === true || booking.partnerApproved === true;
                   const secsLeft = getBookingSecondsLeft(booking);
-                  const isPending = isConfirmedTab(booking) && !isApproved;
+                  const isWaiting = isWaitingBooking(booking);
 
                   const formatCountdown = (secs: number) => {
                     const mins = Math.floor(secs / 60);
@@ -766,28 +695,28 @@ const CustomerDashboard: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
                       onClick={() => setSelectedBooking(booking)}
-                      className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.2fr] gap-3 md:gap-4 p-5 md:p-6 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
+                      className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-3 md:gap-4 p-5 md:p-6 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
                         failedOrRejected
                           ? "text-charcoal border-b border-gray-100 hover:bg-gray-50/40"
-                          : isPending
-                            ? "text-red-600 bg-red-50 hover:bg-red-100/50 border border-red-300"
-                            : "text-green-600 bg-green-50 hover:bg-green-100/50 border border-green-200"
+                          : isWaiting
+                            ? "bg-amber-50/60 hover:bg-amber-100/40 border border-amber-200 text-amber-900"
+                            : "bg-green-50/60 hover:bg-green-100/40 border border-green-200 text-green-900"
                       }`}
                     >
                       {/* COL 1: ID Token & Shop */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block">
                         <span className={`text-[0.6875rem] font-mono font-bold tracking-wider px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5 ${
-                          failedOrRejected ? "text-charcoal bg-gray-50 md:bg-transparent" : isPending ? "text-red-600" : "text-green-600"
+                          failedOrRejected ? "text-gray-500" : isWaiting ? "text-amber-700" : "text-green-700"
                         }`}>
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              failedOrRejected ? "bg-red-500" : isPending ? "bg-red-500 animate-pulse" : "bg-green-500"
+                              failedOrRejected ? "bg-red-500" : isWaiting ? "bg-amber-500 animate-pulse" : "bg-green-500"
                             }`}
                           />
                           {String(booking.id || "").slice(-8).toUpperCase()}
                         </span>
                         <span className={`text-[0.5625rem] font-bold uppercase tracking-wider md:hidden ${
-                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
+                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-500" : "text-green-600"
                         }`}>
                           {booking.partnerBrandName || booking.shopName || "Partner"}
                         </span>
@@ -796,12 +725,12 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 2: Service & Shop */}
                       <div className="w-full md:w-auto">
                         <p className={`text-[0.8125rem] font-bold leading-tight ${
-                          failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
+                          failedOrRejected ? "text-gray-700" : isWaiting ? "text-amber-900" : "text-green-905"
                         }`}>
                           {booking.serviceName}
                         </p>
                         <p className={`hidden md:block text-[0.5625rem] uppercase tracking-wider font-semibold mt-0.5 ${
-                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
+                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-600" : "text-green-600"
                         }`}>
                           {booking.partnerBrandName || booking.shopName || "Studio Partner"}
                         </p>
@@ -810,12 +739,12 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 3: Amount Paid */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0 border-t border-dashed border-gray-100 md:border-none">
                         <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
-                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-400" : "text-green-500"
+                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-650" : "text-green-500"
                         }`}>
                           Amount
                         </span>
                         <span className={`text-[0.8125rem] font-mono font-bold ${
-                          failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
+                          failedOrRejected ? "text-gray-700" : isWaiting ? "text-amber-700" : "text-green-700"
                         }`}>
                           ₹{booking.amountPaid}
                         </span>
@@ -824,46 +753,49 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 4: Target Execution Timestamp */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0">
                         <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
-                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-400" : "text-green-500"
+                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-650" : "text-green-500"
                         }`}>
                           Execution Time
                         </span>
                         <div className="text-right md:text-left">
                           <p className={`text-[0.75rem] font-bold ${
-                            failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
+                            failedOrRejected ? "text-gray-700" : isWaiting ? "text-amber-900" : "text-green-909"
                           }`}>
                             {booking.selectedDate}
                           </p>
                           <p className={`text-[0.625rem] font-medium md:mt-0.5 ${
-                            failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
+                            failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-600" : "text-green-600"
                           }`}>
                             {booking.selectedSlot}
                           </p>
                         </div>
                       </div>
 
-                      {/* COL 5: Stylized Badge */}
+                      {/* COL 5: Stylized Badge / Execution Status */}
                       <div className="flex items-center justify-between w-full md:w-auto md:justify-end pt-2 md:pt-0">
                         <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
-                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-400" : "text-green-500"
+                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-650" : "text-green-500"
                         }`}>
                           Status
                         </span>
-                        <span
-                          className={`text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border ${
-                            failedOrRejected
-                              ? "bg-red-50 border-red-100 text-red-600"
-                              : isPending
-                                ? "bg-red-50 border-red-300 text-red-600 animate-pulse"
-                                : "bg-green-50 border-green-200 text-green-600"
-                          }`}
-                        >
-                          {failedOrRejected
-                            ? "Failed"
-                            : isPending
-                              ? "Held in Escrow"
-                              : "Confirmed"}
-                        </span>
+                        {isWaiting ? (
+                          <div className="flex flex-col md:items-end items-start gap-1 pb-1">
+                            <span className="text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border bg-amber-50 border-amber-300 text-amber-700 animate-pulse">
+                              Held in Escrow ({formatCountdown(secsLeft)})
+                            </span>
+                            <span className="text-[0.5rem] font-medium text-amber-605 uppercase tracking-tight text-right whitespace-normal md:max-w-[180px]">
+                              Please wait 5 minutes for partner verification
+                            </span>
+                          </div>
+                        ) : failedOrRejected ? (
+                          <span className="text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border bg-red-50 border-red-200 text-red-600">
+                            Failed / Refunded
+                          </span>
+                        ) : (
+                          <span className="text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border bg-green-50 border-green-200 text-green-600">
+                            Confirmed
+                          </span>
+                        )}
                       </div>
                     </motion.div>
                   );
