@@ -10,9 +10,9 @@ import { db } from "../lib/firebase";
 import { doc, updateDoc, collection, query, where, onSnapshot, or, and } from "firebase/firestore";
 
 const parseDateToMillis = (val: any): number => {
-  if (!val) return 0;
+  if (!val) return Date.now(); // Graceful fallback for local serverTimestamp synchronization latency
   const targetTime = val?.seconds ? val.seconds * 1000 : (typeof val.toDate === "function" ? val.toDate().getTime() : new Date(val).getTime());
-  return isNaN(targetTime) ? 0 : targetTime;
+  return isNaN(targetTime) ? Date.now() : targetTime;
 };
 
 interface BookingDetailsModalProps {
@@ -282,9 +282,7 @@ const CustomerDashboard: React.FC = () => {
   // Time Countdown Helper with full Timestamp checks
   const getBookingSecondsLeft = (b: any) => {
     const timeStr = b.heldAt || b.createdAt;
-    if (!timeStr) return 0;
-    const start = timeStr?.seconds ? timeStr.seconds * 1000 : new Date(timeStr).getTime();
-    if (isNaN(start) || !start) return 0;
+    const start = parseDateToMillis(timeStr);
     const elapsed = Date.now() - start;
     return Math.max(0, 300 - Math.floor(elapsed / 1000));
   };

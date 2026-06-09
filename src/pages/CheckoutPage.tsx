@@ -324,20 +324,54 @@ const CheckoutPage: React.FC = () => {
             if (finalBookingIds.length > 0) {
               for (const bId of finalBookingIds) {
                 await updateDoc(doc(db, 'bookings', bId), {
-                  paymentStatus: 'paid',
-                  bookingStatus: 'payment_held',
-                  status: 'payment_held',
-                  heldAt: new Date().toISOString(), // 5-minute escrow timer begins now
-                  createdAt: new Date().toISOString(), // 5-minute escrow timer begins now (recorded high-res ISO string)
+                  customer_id: user?.uid,
+                  customerId: user?.uid,
+                  paymentStatus: 'SUCCESS',
+                  bookingStatus: 'paid',
+                  status: 'paid',
+                  heldAt: serverTimestamp(),
+                  createdAt: serverTimestamp(),
+                  timestamp: serverTimestamp(),
+                  partner_accepted: false,
+                  partner_rejected: false,
                   transactionId: response.razorpay_payment_id
                 });
               }
             }
 
+            // GUARANTEE AND FORCE FIRESTORE DATA ENTRY ON SUCCESS FOR THE LOGGED-IN CUSTOMER SYSTEM-WIDE
+            const immediateVerifiedBookingData = {
+              customer_id: user?.uid,
+              customerId: user?.uid,
+              customerName: formData.fullName || user?.name || 'Customer Booking',
+              partnerId: cart[0]?.shopId || cart[0]?.partnerId || 'fallback_partner_id',
+              shopId: cart[0]?.shopId || cart[0]?.partnerId || 'fallback_partner_id',
+              shopName: cart[0]?.shopName || 'Partner Salon',
+              service: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
+              serviceName: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
+              price: cart[0]?.price || finalTotal,
+              date: cart[0]?.date || new Date().toDateString(),
+              time: cart[0]?.time || '10:00',
+              status: 'paid',
+              bookingStatus: 'paid',
+              paymentStatus: 'SUCCESS',
+              payment_status: 'paid',
+              partner_accepted: false,
+              partner_rejected: false,
+              timestamp: serverTimestamp(),
+              createdAt: serverTimestamp(),
+              heldAt: serverTimestamp(),
+              transactionId: response.razorpay_payment_id || 'manual'
+            };
+            await addDoc(collection(db, "bookings"), immediateVerifiedBookingData);
+
             // Clean up and proceed to success
             setTimerActive(false);
             setStep('success');
             clearCart();
+            
+            // EXECUTE IMMEDIATE ROUTER REDIRECT
+            navigate('/customer/dashboard');
           } catch (verificationErr: any) {
             console.error("Payment status verification error:", verificationErr);
             setPaymentError(verificationErr.message || "Payment status updating failed. Please contact support.");
