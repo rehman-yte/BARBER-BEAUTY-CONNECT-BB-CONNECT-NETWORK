@@ -11,17 +11,8 @@ import { doc, updateDoc, collection, query, where, onSnapshot, or, and } from "f
 
 const parseDateToMillis = (val: any): number => {
   if (!val) return 0;
-  if (typeof val.toDate === "function") {
-    return val.toDate().getTime();
-  }
-  if (typeof val === "object" && typeof val.seconds === "number") {
-    return val.seconds * 1000;
-  }
-  if (val instanceof Date) {
-    return val.getTime();
-  }
-  const parsed = new Date(val).getTime();
-  return isNaN(parsed) ? 0 : parsed;
+  const targetTime = val?.seconds ? val.seconds * 1000 : (typeof val.toDate === "function" ? val.toDate().getTime() : new Date(val).getTime());
+  return isNaN(targetTime) ? 0 : targetTime;
 };
 
 interface BookingDetailsModalProps {
@@ -255,8 +246,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState<any[]>(PersistenceService.load("customer_bookings") || []);
-  const [loading, setLoading] = useState(!PersistenceService.load("customer_bookings"));
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"waiting" | "confirmed" | "failed">("waiting");
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
@@ -288,14 +279,24 @@ const CustomerDashboard: React.FC = () => {
 
   const [tick, setTick] = useState(0);
 
-  // Time Countdown Helper
+  // Time Countdown Helper with full Timestamp checks
   const getBookingSecondsLeft = (b: any) => {
     const timeStr = b.heldAt || b.createdAt;
     if (!timeStr) return 0;
-    const start = parseDateToMillis(timeStr);
-    if (!start) return 0;
+    const start = timeStr?.seconds ? timeStr.seconds * 1000 : new Date(timeStr).getTime();
+    if (isNaN(start) || !start) return 0;
     const elapsed = Date.now() - start;
     return Math.max(0, 300 - Math.floor(elapsed / 1000));
+  };
+
+  // Convert/Normalize string statuses
+  const getNormalizedPaymentStatus = (b: any): string => {
+    if (!b) return "";
+    const pStatus = String(b.paymentStatus || b.payment_status || "").trim().toUpperCase();
+    if (pStatus === "SUCCESS" || pStatus === "PAID" || pStatus === "TRUE") {
+      return "SUCCESS";
+    }
+    return pStatus;
   };
 
   const isBookingApproved = (b: any) => {
@@ -338,8 +339,7 @@ const CustomerDashboard: React.FC = () => {
 
   const isWaitingBooking = (b: any) => {
     if (!b) return false;
-    const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-    const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+    const isPaid = getNormalizedPaymentStatus(b) === "SUCCESS";
     if (!isPaid) return false;
     if (isBookingApproved(b)) return false;
     if (isBookingRejected(b)) return false;
@@ -349,16 +349,14 @@ const CustomerDashboard: React.FC = () => {
 
   const isConfirmedBooking = (b: any) => {
     if (!b) return false;
-    const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-    const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+    const isPaid = getNormalizedPaymentStatus(b) === "SUCCESS";
     if (!isPaid) return false;
     return isBookingApproved(b);
   };
 
   const isFailedBooking = (b: any) => {
     if (!b) return false;
-    const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-    const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+    const isPaid = getNormalizedPaymentStatus(b) === "SUCCESS";
     if (!isPaid) return false;
     if (isBookingApproved(b)) return false;
     const secsLeft = getBookingSecondsLeft(b);
@@ -375,11 +373,8 @@ const CustomerDashboard: React.FC = () => {
     const failed: any[] = [];
 
     rawList.forEach((b) => {
-      // paymentStatus raw mapping
-      const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
-      const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
-      
-      if (!isPaid) return; // Drop unpaid, fraudulent or incomplete immediately!
+      const isPaid = getNormalizedPaymentStatus(b) === "SUCCESS";
+      if (!isPaid) return; // Drop list item if unpaid, incomplete, or invalid
 
       const isApproved = isBookingApproved(b);
       const isRejected = isBookingRejected(b);
@@ -388,7 +383,16 @@ const CustomerDashboard: React.FC = () => {
       if (isApproved) {
         confirmed.push(b);
       } else if (isRejected || secsLeft <= 0) {
-        failed.push(b);
+        const baseMsg = b.message || b.statusReason || "Partner Response Timeout";
+        const cleanMsg = baseMsg.includes("Your payment will be refunded") 
+          ? baseMsg 
+          : `${baseMsg}. Your payment will be refunded within 10-20 minutes.`;
+
+        failed.push({
+          ...b,
+          message: cleanMsg,
+          statusReason: cleanMsg
+        });
       } else {
         waiting.push(b);
       }
@@ -403,7 +407,7 @@ const CustomerDashboard: React.FC = () => {
 
     setLoading(true);
 
-    // Filter using query to isolate authenticated customer ID explicitly
+    // Completely isolate query inside Firestore based strictly on the active user session token
     const q = query(
       collection(db, "bookings"),
       or(
@@ -431,8 +435,7 @@ const CustomerDashboard: React.FC = () => {
           const selectedDate = docData.selectedDate || docData.date || "N/A";
           const selectedSlot = docData.selectedSlot || docData.slotTime || docData.time || "N/A";
 
-          const paymentStatusRaw = String(docData.paymentStatus || docData.payment_status || "").toUpperCase();
-          const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || docData.paymentStatus === "paid" || docData.payment_status === "paid";
+          const isPaid = getNormalizedPaymentStatus(docData) === "SUCCESS";
 
           if (isPaid) {
             rawList.push({
@@ -455,7 +458,7 @@ const CustomerDashboard: React.FC = () => {
         });
 
         setBookings(rawList);
-        PersistenceService.save("customer_bookings", rawList);
+        PersistenceService.save(`customer_bookings_${user.uid}`, rawList);
 
         // Distribute to distinct state arrays
         const split = splitBookingsIntoTabs(rawList);
@@ -491,14 +494,20 @@ const CustomerDashboard: React.FC = () => {
 
   // Sync state arrays with storage on initial load
   useEffect(() => {
-    const cached = PersistenceService.load("customer_bookings") || [];
+    if (!user) return;
+    const cachedKey = `customer_bookings_${user.uid}`;
+    const cached = PersistenceService.load(cachedKey) || [];
     if (cached.length > 0) {
+      setBookings(cached);
       const split = splitBookingsIntoTabs(cached);
       setWaitingBookings(split.waiting);
       setConfirmedBookings(split.confirmed);
       setFailedBookings(split.failed);
+      setLoading(false);
+    } else {
+      setLoading(true);
     }
-  }, []);
+  }, [user]);
 
   const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
     console.log(`[Auto-Refund Trigger] Booking ${bookingId} has expired. evicting from waiting list...`);
