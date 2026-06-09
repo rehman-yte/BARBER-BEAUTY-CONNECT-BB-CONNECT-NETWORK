@@ -261,6 +261,11 @@ const CustomerDashboard: React.FC = () => {
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
+  // ID-ISOLATED 3-TAB PIPELINE STATE ARRAYS
+  const [waitingBookings, setWaitingBookings] = useState<any[]>([]);
+  const [confirmedBookings, setConfirmedBookings] = useState<any[]>([]);
+  const [failedBookings, setFailedBookings] = useState<any[]>([]);
+
   // CRITICAL REDIRECT: Ensure partners never land on Customer Dashboard
   useEffect(() => {
     if (user && user.role === "partner") {
@@ -283,101 +288,15 @@ const CustomerDashboard: React.FC = () => {
 
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    if (!user) return;
-
-    setLoading(true);
-
-    // Force query filtering precisely using all possibilities of user identify tokens
-    const uId = user.uid || "";
-    const regId = (user as any).registryId || "";
-    const usrId = (user as any).userId || "";
-    const tokens = Array.from(new Set([uId, regId, usrId].filter(Boolean)));
-    const conditions: any[] = [];
-    tokens.forEach((t) => {
-      conditions.push(where("customerId", "==", t));
-      conditions.push(where("customer_id", "==", t));
-      conditions.push(where("userId", "==", t));
-      conditions.push(where("registryId", "==", t));
-    });
-
-    const q = query(
-      collection(db, "bookings"),
-      or(...conditions)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data: any[] = [];
-        snapshot.forEach((doc) => {
-          const docData = doc.data();
-          
-          // Normalize to preserve data array mappings precisely under any field variants
-          const serviceName = docData.serviceName || docData.service || "Grooming Service";
-          const amountPaid = docData.amountPaid || docData.amount || docData.price || "0";
-          const selectedDate = docData.selectedDate || docData.date || "N/A";
-          const selectedSlot = docData.selectedSlot || docData.slotTime || docData.time || "N/A";
-
-          let status = docData.status || "";
-          let paymentStatus = docData.paymentStatus || docData.payment_status || "";
-
-          // Ensure whenever a state transition occurs with status/payment, it maps correctly
-          if (String(paymentStatus).toUpperCase() === "SUCCESS" || String(paymentStatus).toUpperCase() === "PAID") {
-            paymentStatus = "SUCCESS";
-          }
-          if (String(status).toUpperCase() === "HELD" || String(status).toUpperCase() === "PAYMENT_HELD") {
-            status = "HELD";
-          }
-
-          if (paymentStatus === "SUCCESS") {
-            data.push({
-              id: doc.id,
-              ...docData,
-              serviceName,
-              amountPaid,
-              selectedDate,
-              selectedSlot,
-              status,
-              paymentStatus
-            });
-          }
-        });
-
-        // Sort data by createdAt (descending)
-        data.sort((a, b) => {
-          const dateA = a.createdAt ? parseDateToMillis(a.createdAt) : 0;
-          const dateB = b.createdAt ? parseDateToMillis(b.createdAt) : 0;
-          return dateB - dateA;
-        });
-
-        setBookings(data);
-        setLoading(false);
-        PersistenceService.save("customer_bookings", data);
-
-        // Keep selected booking reference fresh so the pop-up modal persists updating states
-        setSelectedBooking((prev: any) => {
-          if (prev) {
-            const updated = data.find((b) => b.id === prev.id);
-            return updated || prev;
-          }
-          return prev;
-        });
-
-        // Priority: Check for completed bookings that need rating
-        const needsRating = data.find((b: any) => b.status === "completed" && !b.rated);
-        if (needsRating) {
-          setPendingRatingBooking(needsRating);
-        }
-      },
-      (error) => {
-        console.warn("[Firestore Customer Dashboard error]:", error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
+  // Time Countdown Helper
+  const getBookingSecondsLeft = (b: any) => {
+    const timeStr = b.heldAt || b.createdAt;
+    if (!timeStr) return 0;
+    const start = parseDateToMillis(timeStr);
+    if (!start) return 0;
+    const elapsed = Date.now() - start;
+    return Math.max(0, 300 - Math.floor(elapsed / 1000));
+  };
 
   const isBookingApproved = (b: any) => {
     if (!b) return false;
@@ -417,18 +336,11 @@ const CustomerDashboard: React.FC = () => {
     );
   };
 
-  const getBookingSecondsLeft = (b: any) => {
-    const timeStr = b.heldAt || b.createdAt;
-    if (!timeStr) return 0;
-    const start = parseDateToMillis(timeStr);
-    if (!start) return 0;
-    const elapsed = Date.now() - start;
-    return Math.max(0, 300 - Math.floor(elapsed / 1000));
-  };
-
   const isWaitingBooking = (b: any) => {
     if (!b) return false;
-    if (b.paymentStatus !== "SUCCESS") return false;
+    const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
+    const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+    if (!isPaid) return false;
     if (isBookingApproved(b)) return false;
     if (isBookingRejected(b)) return false;
     const secsLeft = getBookingSecondsLeft(b);
@@ -437,13 +349,17 @@ const CustomerDashboard: React.FC = () => {
 
   const isConfirmedBooking = (b: any) => {
     if (!b) return false;
-    if (b.paymentStatus !== "SUCCESS") return false;
+    const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
+    const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+    if (!isPaid) return false;
     return isBookingApproved(b);
   };
 
   const isFailedBooking = (b: any) => {
     if (!b) return false;
-    if (b.paymentStatus !== "SUCCESS") return false;
+    const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
+    const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+    if (!isPaid) return false;
     if (isBookingApproved(b)) return false;
     const secsLeft = getBookingSecondsLeft(b);
     return isBookingRejected(b) || secsLeft <= 0;
@@ -452,40 +368,169 @@ const CustomerDashboard: React.FC = () => {
   const isEscrowVerified = (b: any) => isWaitingBooking(b);
   const isRejectFailed = (b: any) => isFailedBooking(b);
 
-  const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
-    console.log(`[Auto-Refund Modal Trigger] Booking ${bookingId} has expired. Direct database and view update...`);
-    
-    // 1. Mutate local representation instantly to avoid timing lag
-    setBookings(prev => prev.map(b => {
-      if (b.id === bookingId) {
-        return {
-          ...b,
-          status: "failed_timeout",
-          bookingStatus: 'failed',
-          paymentStatus: 'failed',
-          statusReason: 'Partner Response Timeout',
-          message: 'Partner Response Timeout'
-        };
+  // Tab Separator Helper
+  const splitBookingsIntoTabs = (rawList: any[]) => {
+    const waiting: any[] = [];
+    const confirmed: any[] = [];
+    const failed: any[] = [];
+
+    rawList.forEach((b) => {
+      // paymentStatus raw mapping
+      const paymentStatusRaw = String(b.paymentStatus || b.payment_status || "").toUpperCase();
+      const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || b.paymentStatus === "paid" || b.payment_status === "paid";
+      
+      if (!isPaid) return; // Drop unpaid, fraudulent or incomplete immediately!
+
+      const isApproved = isBookingApproved(b);
+      const isRejected = isBookingRejected(b);
+      const secsLeft = getBookingSecondsLeft(b);
+
+      if (isApproved) {
+        confirmed.push(b);
+      } else if (isRejected || secsLeft <= 0) {
+        failed.push(b);
+      } else {
+        waiting.push(b);
       }
-      return b;
-    }));
+    });
+
+    return { waiting, confirmed, failed };
+  };
+
+  // 1. FORCE USER-IDENTITY RELATIONAL FIREBASE QUERY
+  useEffect(() => {
+    if (!user) return;
+
+    setLoading(true);
+
+    // Filter using query to isolate authenticated customer ID explicitly
+    const q = query(
+      collection(db, "bookings"),
+      or(
+        where("customerId", "==", user.uid),
+        where("customer_id", "==", user.uid)
+      )
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const rawList: any[] = [];
+        snapshot.forEach((doc) => {
+          const docData = doc.data();
+          
+          // Normalize service fields
+          const serviceName = docData.serviceName || docData.service || "Grooming Service";
+          const amountPaid = docData.amountPaid || docData.amount || docData.price || "0";
+          const selectedDate = docData.selectedDate || docData.date || "N/A";
+          const selectedSlot = docData.selectedSlot || docData.slotTime || docData.time || "N/A";
+
+          const paymentStatusRaw = String(docData.paymentStatus || docData.payment_status || "").toUpperCase();
+          const isPaid = paymentStatusRaw === "SUCCESS" || paymentStatusRaw === "PAID" || docData.paymentStatus === "paid" || docData.payment_status === "paid";
+
+          if (isPaid) {
+            rawList.push({
+              id: doc.id,
+              ...docData,
+              serviceName,
+              amountPaid,
+              selectedDate,
+              selectedSlot,
+              paymentStatus: "SUCCESS"
+            });
+          }
+        });
+
+        // Sort overall list by newest first
+        rawList.sort((a, b) => {
+          const dateA = a.createdAt ? parseDateToMillis(a.createdAt) : 0;
+          const dateB = b.createdAt ? parseDateToMillis(b.createdAt) : 0;
+          return dateB - dateA;
+        });
+
+        setBookings(rawList);
+        PersistenceService.save("customer_bookings", rawList);
+
+        // Distribute to distinct state arrays
+        const split = splitBookingsIntoTabs(rawList);
+        setWaitingBookings(split.waiting);
+        setConfirmedBookings(split.confirmed);
+        setFailedBookings(split.failed);
+
+        setLoading(false);
+
+        // Keep selected booking reference fresh so modals update live
+        setSelectedBooking((prev: any) => {
+          if (prev) {
+            const updated = rawList.find((b) => b.id === prev.id);
+            return updated || prev;
+          }
+          return prev;
+        });
+
+        // Priority rating reminder
+        const needsRating = rawList.find((b: any) => b.status === "completed" && !b.rated);
+        if (needsRating) {
+          setPendingRatingBooking(needsRating);
+        }
+      },
+      (error) => {
+        console.warn("[Firestore Customer Dashboard error]:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Sync state arrays with storage on initial load
+  useEffect(() => {
+    const cached = PersistenceService.load("customer_bookings") || [];
+    if (cached.length > 0) {
+      const split = splitBookingsIntoTabs(cached);
+      setWaitingBookings(split.waiting);
+      setConfirmedBookings(split.confirmed);
+      setFailedBookings(split.failed);
+    }
+  }, []);
+
+  const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
+    console.log(`[Auto-Refund Trigger] Booking ${bookingId} has expired. evicting from waiting list...`);
     
-    // If the selected booking is currently open, sync description immediately
+    // Direct local eviction & reassignment to failed list to skip Firestore delay
+    setWaitingBookings((prev) => prev.filter((item) => item.id !== bookingId));
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          return {
+            ...b,
+            status: "failed_timeout",
+            bookingStatus: "failed",
+            paymentStatus: "failed",
+            statusReason: "Partner Response Timeout",
+            message: "Partner Response Timeout"
+          };
+        }
+        return b;
+      })
+    );
+
+    // If active pop-up modal is opened, sync live
     setSelectedBooking((prev: any) => {
       if (prev && prev.id === bookingId) {
         return {
           ...prev,
           status: "failed_timeout",
-          bookingStatus: 'failed',
-          paymentStatus: 'failed',
-          statusReason: 'Partner Response Timeout',
-          message: 'Partner Response Timeout'
+          bookingStatus: "failed",
+          paymentStatus: "failed",
+          statusReason: "Partner Response Timeout",
+          message: "Partner Response Timeout"
         };
       }
       return prev;
     });
 
-    // 2. Execute silent background fetch to initiate refund & update DB
+    // 1. Trigger background refund endpoint call
     try {
       await fetch("/api/razorpay/refund", {
         method: "POST",
@@ -502,48 +547,68 @@ const CustomerDashboard: React.FC = () => {
       console.error("[Silent Auto-Refund Error]:", err);
     }
 
-    // 3. Direct Firestore document backup write
+    // 2. Direct background database update
     try {
-      await updateDoc(doc(db, 'bookings', bookingId), {
+      await updateDoc(doc(db, "bookings", bookingId), {
         status: "failed_timeout",
-        bookingStatus: 'failed',
-        paymentStatus: 'failed',
-        statusReason: 'Partner Response Timeout (Auto-Refund Triggered)',
-        message: 'Partner Response Timeout (Auto-Refund Triggered)'
+        bookingStatus: "failed",
+        paymentStatus: "failed",
+        statusReason: "Partner Response Timeout (Auto-Refund Triggered)",
+        message: "Partner Response Timeout (Auto-Refund Triggered)"
       });
     } catch (dbErr) {
       console.error("[Silent DB Mutate Error]:", dbErr);
     }
   };
 
+  // 2. HIGH-PRECISION COUNTDOWN TICKING AND REAL-TIME DELETION & MOVEMENT HOOKS
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
 
-      // Check for timeout events in real-time
-      bookings.forEach(async (booking) => {
-        if (isWaitingBooking(booking)) {
-          const secs = getBookingSecondsLeft(booking);
+      setWaitingBookings((prevWaiting) => {
+        const nextWaiting: any[] = [];
+        prevWaiting.forEach((b) => {
+          const secs = getBookingSecondsLeft(b);
           if (secs <= 0) {
-            console.log(`[Real-time escalation] Booking ${booking.id} timed out. Auto-escalating.`);
-            await handleExpired(
-              booking.id,
-              booking.transactionId || booking.id,
-              booking.amountPaid || booking.amount || booking.price || 0
+            console.log(`[Timer Timeout Event] Evicting booking ${b.id}`);
+            
+            // Execute refund logic
+            handleExpired(
+              b.id,
+              b.transactionId || b.id,
+              b.amountPaid || b.amount || b.price || 0
             );
+
+            // Evict and move to failed states locally
+            const failedCopy = {
+              ...b,
+              status: "failed_timeout",
+              bookingStatus: "failed",
+              paymentStatus: "failed",
+              statusReason: "Partner Response Timeout (Auto-Refund Triggered)",
+              message: "Partner Response Timeout (Auto-Refund Triggered)"
+            };
+
+            setFailedBookings((prevFailed) => {
+              if (prevFailed.some((item) => item.id === b.id)) return prevFailed;
+              return [failedCopy, ...prevFailed];
+            });
+          } else {
+            nextWaiting.push(b);
           }
-        }
+        });
+        return nextWaiting;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [bookings]);
+  }, [waitingBookings]);
 
-  const filteredBookings = bookings.filter((b) => {
-    if (activeTab === "waiting") return isWaitingBooking(b);
-    if (activeTab === "confirmed") return isConfirmedBooking(b);
-    return isFailedBooking(b);
-  });
+  const filteredBookings = 
+    activeTab === "waiting" ? waitingBookings :
+    activeTab === "confirmed" ? confirmedBookings :
+    failedBookings;
 
   const handleRatingSubmit = async (rating: number, comment: string) => {
     if (!pendingRatingBooking) return;
@@ -561,9 +626,9 @@ const CustomerDashboard: React.FC = () => {
   };
 
   const stats = {
-    waiting: bookings.filter(isWaitingBooking).length,
-    confirmed: bookings.filter(isConfirmedBooking).length,
-    failed: bookings.filter(isFailedBooking).length,
+    waiting: waitingBookings.length,
+    confirmed: confirmedBookings.length,
+    failed: failedBookings.length,
   };
 
   // Sync with actual details
