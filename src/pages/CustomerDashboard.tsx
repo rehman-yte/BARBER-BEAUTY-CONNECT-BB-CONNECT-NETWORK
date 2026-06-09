@@ -9,6 +9,21 @@ import { PersistenceService } from "../services/PersistenceService";
 import { db } from "../lib/firebase";
 import { doc, updateDoc, collection, query, where, onSnapshot, or, and } from "firebase/firestore";
 
+const parseDateToMillis = (val: any): number => {
+  if (!val) return 0;
+  if (typeof val.toDate === "function") {
+    return val.toDate().getTime();
+  }
+  if (typeof val === "object" && typeof val.seconds === "number") {
+    return val.seconds * 1000;
+  }
+  if (val instanceof Date) {
+    return val.getTime();
+  }
+  const parsed = new Date(val).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 interface BookingDetailsModalProps {
   booking: any;
   onClose: () => void;
@@ -36,7 +51,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     let intervalId: any = null;
 
     const calculateSeconds = () => {
-      const heldTime = new Date(booking.heldAt).getTime();
+      const heldTime = parseDateToMillis(booking.heldAt);
       const expirationTime = heldTime + 5 * 60 * 1000; // 5 minutes
       const remaining = Math.max(0, Math.floor((expirationTime - Date.now()) / 1000));
       setSecondsLeft(remaining);
@@ -54,7 +69,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
     calculateSeconds();
     
-    const heldTime = new Date(booking.heldAt).getTime();
+    const heldTime = parseDateToMillis(booking.heldAt);
     const expirationTime = heldTime + 5 * 60 * 1000;
     const initialRemaining = Math.max(0, Math.floor((expirationTime - Date.now()) / 1000));
 
@@ -331,8 +346,8 @@ const CustomerDashboard: React.FC = () => {
 
         // Sort data by createdAt (descending)
         data.sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const dateA = a.createdAt ? parseDateToMillis(a.createdAt) : 0;
+          const dateB = b.createdAt ? parseDateToMillis(b.createdAt) : 0;
           return dateB - dateA;
         });
 
@@ -405,7 +420,8 @@ const CustomerDashboard: React.FC = () => {
   const getBookingSecondsLeft = (b: any) => {
     const timeStr = b.heldAt || b.createdAt;
     if (!timeStr) return 0;
-    const start = new Date(timeStr).getTime();
+    const start = parseDateToMillis(timeStr);
+    if (!start) return 0;
     const elapsed = Date.now() - start;
     return Math.max(0, 300 - Math.floor(elapsed / 1000));
   };

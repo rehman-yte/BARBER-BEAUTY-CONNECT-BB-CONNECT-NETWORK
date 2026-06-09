@@ -33,6 +33,21 @@ import {
 
 /* UI_CLEANUP_FINAL - LOCKED - SUCCESS */
 
+const parseDateToMillis = (val: any): number => {
+  if (!val) return 0;
+  if (typeof val.toDate === "function") {
+    return val.toDate().getTime();
+  }
+  if (typeof val === "object" && typeof val.seconds === "number") {
+    return val.seconds * 1000;
+  }
+  if (val instanceof Date) {
+    return val.getTime();
+  }
+  const parsed = new Date(val).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 interface EscrowTimerProps {
   heldAt?: string;
   onTimeout: () => void;
@@ -45,7 +60,8 @@ const EscrowTimer: React.FC<EscrowTimerProps> = ({ heldAt, onTimeout }) => {
     if (!heldAt) return;
     
     const calculateTime = () => {
-      const remainingMs = (new Date(heldAt).getTime() + 5 * 60 * 1000) - Date.now();
+      const heldTime = parseDateToMillis(heldAt);
+      const remainingMs = (heldTime + 5 * 60 * 1000) - Date.now();
       if (remainingMs <= 0) {
         setTimeLeft('Expired');
         onTimeout();
@@ -149,7 +165,7 @@ const PartnerDashboard: React.FC = () => {
       const FIVE_MINUTES = 5 * 60 * 1000;
       for (const b of bookings) {
         if (b.status === 'payment_held' && b.heldAt) {
-          const heldTime = new Date(b.heldAt).getTime();
+          const heldTime = parseDateToMillis(b.heldAt);
           if (now - heldTime >= FIVE_MINUTES) {
             console.log(`[Auto-Refund Hook] Booking ${b.id} expired. Auto-refunding payment...`);
             setBookings((prev) => prev.filter((item) => item.id !== b.id));
