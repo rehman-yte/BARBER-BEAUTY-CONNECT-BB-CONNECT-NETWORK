@@ -7,7 +7,7 @@ import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
 import { db } from "../lib/firebase";
-import { doc, updateDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc, collection, query, where, onSnapshot, or, and } from "firebase/firestore";
 
 interface BookingDetailsModalProps {
   booking: any;
@@ -277,7 +277,10 @@ const CustomerDashboard: React.FC = () => {
 
     const q = query(
       collection(db, "bookings"),
-      where("customerId", "==", user.uid)
+      or(
+        where("customerId", "==", user.uid),
+        where("customer_id", "==", user.uid)
+      )
     );
 
     const unsubscribe = onSnapshot(
@@ -413,6 +416,11 @@ const CustomerDashboard: React.FC = () => {
 
     const s = String(b.status || "").toUpperCase();
     const ps = String(b.paymentStatus || b.payment_status || "").toUpperCase();
+    const bs = String(b.bookingStatus || "").toUpperCase();
+
+    // Check if customer matches active user to be extremely secure and precise
+    const isCustomerMatch = b.customerId === user?.uid || b.customer_id === user?.uid;
+    if (!isCustomerMatch) return false;
 
     return (
       ps === "SUCCESS" ||
@@ -420,6 +428,10 @@ const CustomerDashboard: React.FC = () => {
       s === "CONFIRMED" ||
       s === "PAYMENT_HELD" ||
       s === "PENDING_APPROVAL" ||
+      s === "PENDING_PARTNER_APPROVAL" ||
+      bs === "PENDING_APPROVAL" ||
+      bs === "PENDING_PARTNER_APPROVAL" ||
+      bs === "PAYMENT_HELD" ||
       b.partner_approved === false ||
       b.partnerApproved === false ||
       isApproved ||
@@ -686,9 +698,9 @@ const CustomerDashboard: React.FC = () => {
               <div className="divide-y divide-gray-100/70">
                 {filteredBookings.map((booking) => {
                   const failedOrRejected = isFailedTab(booking);
-                  const isApproved = isBookingApproved(booking);
-                  const isPending = isConfirmedTab(booking) && !isApproved;
+                  const isApproved = isBookingApproved(booking) || booking.partner_approved === true || booking.partnerApproved === true;
                   const secsLeft = getBookingSecondsLeft(booking);
+                  const isPending = isConfirmedTab(booking) && !isApproved;
 
                   const formatCountdown = (secs: number) => {
                     const mins = Math.floor(secs / 60);
@@ -708,14 +720,14 @@ const CustomerDashboard: React.FC = () => {
                         failedOrRejected
                           ? "text-charcoal border-b border-gray-100 hover:bg-gray-50/40"
                           : isPending
-                            ? "text-red-600 bg-red-50 hover:bg-red-100/50 border border-red-200"
-                            : "text-green-700 bg-green-50 hover:bg-green-100/50 border border-green-200"
+                            ? "text-red-600 bg-red-50 hover:bg-red-100/50 border border-red-300"
+                            : "text-green-600 bg-green-50 hover:bg-green-100/50 border border-green-200"
                       }`}
                     >
                       {/* COL 1: ID Token & Shop */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block">
                         <span className={`text-[0.6875rem] font-mono font-bold tracking-wider px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5 ${
-                          failedOrRejected ? "text-charcoal bg-gray-50 md:bg-transparent" : isPending ? "text-red-700" : "text-green-800"
+                          failedOrRejected ? "text-charcoal bg-gray-50 md:bg-transparent" : isPending ? "text-red-600" : "text-green-600"
                         }`}>
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
@@ -726,7 +738,7 @@ const CustomerDashboard: React.FC = () => {
                           {String(booking.id || booking._id || "").slice(-8).toUpperCase()}
                         </span>
                         <span className={`text-[0.5625rem] font-bold uppercase tracking-wider md:hidden ${
-                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-400" : "text-green-600"
+                          failedOrRejected ? "text-gray-400" : isPending ? "text-red-500" : "text-green-600"
                         }`}>
                           {booking.partnerBrandName || booking.shopName || "Partner"}
                         </span>
@@ -735,7 +747,7 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 2: Service & Shop */}
                       <div className="w-full md:w-auto">
                         <p className={`text-[0.8125rem] font-bold leading-tight ${
-                          failedOrRejected ? "text-charcoal" : isPending ? "text-red-900" : "text-green-900"
+                          failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
                         }`}>
                           {booking.serviceName || booking.service || "Grooming Service"}
                         </p>
@@ -754,7 +766,7 @@ const CustomerDashboard: React.FC = () => {
                           Amount
                         </span>
                         <span className={`text-[0.8125rem] font-mono font-bold ${
-                          failedOrRejected ? "text-charcoal" : isPending ? "text-red-800" : "text-green-800"
+                          failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
                         }`}>
                           ₹{booking.amountPaid || booking.amount || booking.price || "0"}
                         </span>
@@ -769,7 +781,7 @@ const CustomerDashboard: React.FC = () => {
                         </span>
                         <div className="text-right md:text-left">
                           <p className={`text-[0.75rem] font-bold ${
-                            failedOrRejected ? "text-charcoal" : isPending ? "text-red-900" : "text-green-900"
+                            failedOrRejected ? "text-charcoal" : isPending ? "text-red-600" : "text-green-600"
                           }`}>
                             {booking.selectedDate || booking.date || "N/A"}
                           </p>
@@ -793,14 +805,14 @@ const CustomerDashboard: React.FC = () => {
                             failedOrRejected
                               ? "bg-red-50 border-red-100 text-red-600"
                               : isPending
-                                ? "bg-red-100 border-red-300 text-red-700 animate-pulse"
-                                : "bg-green-100 border-green-300 text-green-800"
+                                ? "bg-red-50 border-red-300 text-red-600 animate-pulse"
+                                : "bg-green-50 border-green-200 text-green-600"
                           }`}
                         >
                           {failedOrRejected
                             ? "REJECT/FAILED"
                             : isPending
-                              ? `PENDING (${formatCountdown(secsLeft)})`
+                              ? `PENDING APPROVAL (${formatCountdown(secsLeft)})`
                               : "CONFIRMED"}
                         </span>
                       </div>
