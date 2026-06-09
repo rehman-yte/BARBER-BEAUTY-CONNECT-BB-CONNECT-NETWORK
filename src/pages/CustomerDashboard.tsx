@@ -407,8 +407,8 @@ const CustomerDashboard: React.FC = () => {
     const q = query(
       collection(db, "bookings"),
       or(
-        where("customerId", "==", user.uid),
-        where("customer_id", "==", user.uid)
+        where("customer_id", "==", user.uid),
+        where("customerId", "==", user.uid)
       )
     );
 
@@ -419,6 +419,12 @@ const CustomerDashboard: React.FC = () => {
         snapshot.forEach((doc) => {
           const docData = doc.data();
           
+          // ABSOLUTE CUSTOMER IDENTITY LOCK: strictly block and ignore matches outside this unique user session
+          const bookingCustId = docData.customer_id || docData.customerId;
+          if (bookingCustId !== user.uid) {
+            return;
+          }
+
           // Normalize service fields
           const serviceName = docData.serviceName || docData.service || "Grooming Service";
           const amountPaid = docData.amountPaid || docData.amount || docData.price || "0";
