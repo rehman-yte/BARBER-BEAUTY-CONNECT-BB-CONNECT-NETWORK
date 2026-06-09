@@ -244,7 +244,7 @@ const CustomerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<any[]>(PersistenceService.load("customer_bookings") || []);
   const [loading, setLoading] = useState(!PersistenceService.load("customer_bookings"));
-  const [activeTab, setActiveTab] = useState<"approved" | "pending" | "failed">("approved");
+  const [activeTab, setActiveTab] = useState<"approved" | "failed">("approved");
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
@@ -267,6 +267,8 @@ const CustomerDashboard: React.FC = () => {
       </div>
     );
   }
+
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -311,62 +313,6 @@ const CustomerDashboard: React.FC = () => {
         if (needsRating) {
           setPendingRatingBooking(needsRating);
         }
-
-        // AUTO-REFUND LOGIC: Check for expired held payments
-        const now = Date.now();
-        const FIVE_MINUTES = 5 * 60 * 1000;
-        data.forEach(async (booking: any) => {
-          const s = String(booking.status || "").toLowerCase();
-          if (s === "payment_held" && booking.heldAt) {
-            const heldTime = new Date(booking.heldAt).getTime();
-            if (now - heldTime >= FIVE_MINUTES) {
-              console.log(
-                `[Auto-Refund Customer Engine] Booking ${booking.id} has expired. Auto-refunding payment...`,
-              );
-
-              // Move out of escrow tab instantly
-              setBookings((prev) =>
-                prev.map((b) => {
-                  if (b.id === booking.id) {
-                    return {
-                      ...b,
-                      status: "REJECTED_TIMEOUT",
-                      bookingStatus: "failed",
-                      paymentStatus: "failed",
-                      statusReason: "5-Minute Escrow Expiry Timeout (Auto-Refunded)",
-                      message: "5-Minute Escrow Expiry Timeout (Auto-Refunded)",
-                    };
-                  }
-                  return b;
-                })
-              );
-
-              try {
-                await fetch("/api/razorpay/refund", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    paymentId: booking.transactionId,
-                    amount: booking.price,
-                    bookingId: booking.id,
-                  }),
-                });
-
-                // Mutate database status
-                await updateDoc(doc(db, "bookings", booking.id), {
-                  status: "REJECTED_TIMEOUT",
-                  bookingStatus: "failed",
-                  paymentStatus: "failed",
-                  statusReason: "5-Minute Escrow Expiry Timeout (Auto-Refunded)",
-                });
-              } catch (err) {
-                console.error(`[Auto-Refund Customer Engine Error] bookingId=${booking.id}:`, err);
-              }
-            }
-          }
-        });
       },
       (error) => {
         console.warn("[Firestore Customer Dashboard error]:", error);
@@ -376,6 +322,18 @@ const CustomerDashboard: React.FC = () => {
 
     return () => unsubscribe();
   }, [user]);
+
+  const isBookingApproved = (b: any) => {
+    if (!b) return false;
+    const s = String(b.status || "").toLowerCase();
+    return (
+      s === "confirmed" ||
+      s === "approved" ||
+      s === "completed" ||
+      b.partner_approval === true ||
+      b.partnerApproved === true
+    );
+  };
 
   const isEscrowVerified = (b: any) => {
     if (!b) return false;
@@ -392,9 +350,28 @@ const CustomerDashboard: React.FC = () => {
     );
   };
 
+  const getBookingSecondsLeft = (b: any) => {
+    const timeStr = b.heldAt || b.createdAt;
+    if (!timeStr) return 0;
+    const start = new Date(timeStr).getTime();
+    const elapsed = Date.now() - start;
+    return Math.max(0, 300 - Math.floor(elapsed / 1000));
+  };
+
+  const isBookingTimedOut = (b: any) => {
+    const isApproved = isBookingApproved(b);
+    if (isApproved) return false;
+    
+    if (!isEscrowVerified(b)) return false;
+    
+    const secs = getBookingSecondsLeft(b);
+    return secs <= 0;
+  };
+
   const isRejectFailed = (b: any) => {
     if (!b) return false;
-    if (isEscrowVerified(b)) return false;
+    if (isBookingApproved(b)) return false;
+    if (isEscrowVerified(b) && !isBookingTimedOut(b)) return false;
 
     const s = String(b.status || "").toLowerCase();
     const ps = String(b.paymentStatus || b.payment_status || "").toLowerCase();
@@ -420,6 +397,17 @@ const CustomerDashboard: React.FC = () => {
     return false;
   };
 
+  const isConfirmedTab = (b: any) => {
+    if (isRejectFailed(b) || isBookingTimedOut(b)) return false;
+    return isEscrowVerified(b) || isBookingApproved(b);
+  };
+
+  const isFailedTab = (b: any) => {
+    if (isRejectFailed(b) || isBookingTimedOut(b)) return true;
+    const s = String(b.status || "").toLowerCase();
+    return s === "rejected" || s === "failed" || s === "rejected_timeout";
+  };
+
   const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
     console.log(`[Auto-Refund Modal Trigger] Booking ${bookingId} has expired. Direct database and view update...`);
     
@@ -428,11 +416,11 @@ const CustomerDashboard: React.FC = () => {
       if (b.id === bookingId) {
         return {
           ...b,
-          status: 'REJECTED_TIMEOUT',
+          status: 'rejected_timeout',
           bookingStatus: 'failed',
           paymentStatus: 'failed',
-          statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
-          message: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+          statusReason: 'Partner Response Timeout',
+          message: 'Partner Response Timeout'
         };
       }
       return b;
@@ -443,11 +431,11 @@ const CustomerDashboard: React.FC = () => {
       if (prev && prev.id === bookingId) {
         return {
           ...prev,
-          status: 'REJECTED_TIMEOUT',
+          status: 'rejected_timeout',
           bookingStatus: 'failed',
           paymentStatus: 'failed',
-          statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)',
-          message: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+          statusReason: 'Partner Response Timeout',
+          message: 'Partner Response Timeout'
         };
       }
       return prev;
@@ -473,20 +461,45 @@ const CustomerDashboard: React.FC = () => {
     // 3. Direct Firestore document backup write
     try {
       await updateDoc(doc(db, 'bookings', bookingId), {
-        status: 'REJECTED_TIMEOUT',
+        status: 'rejected_timeout',
         bookingStatus: 'failed',
         paymentStatus: 'failed',
-        statusReason: '5-Minute Escrow Expiry Timeout (Auto-Refunded)'
+        statusReason: 'Partner Response Timeout',
+        message: 'Partner Response Timeout'
       });
     } catch (dbErr) {
       console.error("[Silent DB Mutate Error]:", dbErr);
     }
   };
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+
+      // Check for timeout events in real-time
+      bookings.forEach(async (booking) => {
+        const isApproved = isBookingApproved(booking);
+        const isPending = isConfirmedTab(booking) && !isApproved;
+        if (isPending) {
+          const secs = getBookingSecondsLeft(booking);
+          if (secs <= 0) {
+            console.log(`[Real-time escalation] Booking ${booking.id} timed out. Auto-escalating.`);
+            await handleExpired(
+              booking.id,
+              booking.transactionId || booking.id,
+              booking.amountPaid || booking.amount || booking.price || 0
+            );
+          }
+        }
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [bookings]);
+
   const filteredBookings = bookings.filter((b) => {
-    if (activeTab === "pending") return isEscrowVerified(b);
-    if (activeTab === "failed") return isRejectFailed(b);
-    return b.status === "approved" || b.status === "confirmed";
+    if (activeTab === "failed") return isFailedTab(b);
+    return isConfirmedTab(b);
   });
 
   const handleRatingSubmit = async (rating: number, comment: string) => {
@@ -499,16 +512,14 @@ const CustomerDashboard: React.FC = () => {
         comment,
       );
       setPendingRatingBooking(null);
-      // Data will refresh on next interval
     } catch (error) {
       console.error("Failed to submit rating:", error);
     }
   };
 
   const stats = {
-    approved: bookings.filter((b) => b.status === "approved" || b.status === "confirmed").length,
-    pending: bookings.filter(isEscrowVerified).length,
-    failed: bookings.filter(isRejectFailed).length,
+    approved: bookings.filter(isConfirmedTab).length,
+    failed: bookings.filter(isFailedTab).length,
   };
 
   // Sync with actual details
@@ -578,13 +589,6 @@ const CustomerDashboard: React.FC = () => {
               activeBg: "bg-green-600",
             },
             {
-              key: "pending",
-              label: "Held (Escrow)",
-              count: stats.pending,
-              color: "text-bbBlue",
-              activeBg: "bg-bbBlue",
-            },
-            {
               key: "failed",
               label: "REJECT/FAILED",
               count: stats.failed,
@@ -637,8 +641,16 @@ const CustomerDashboard: React.FC = () => {
             ) : filteredBookings.length > 0 ? (
               <div className="divide-y divide-gray-100/70">
                 {filteredBookings.map((booking) => {
-                  const failedOrRejected = isRejectFailed(booking);
-                  const isPendingEscrow = isEscrowVerified(booking);
+                  const failedOrRejected = isFailedTab(booking);
+                  const isApproved = isBookingApproved(booking);
+                  const isPending = isConfirmedTab(booking) && !isApproved;
+                  const secsLeft = getBookingSecondsLeft(booking);
+
+                  const formatCountdown = (secs: number) => {
+                    const mins = Math.floor(secs / 60);
+                    const s = secs % 60;
+                    return `${mins}:${s < 10 ? "0" : ""}${s}s`;
+                  };
 
                   return (
                     <motion.div
@@ -648,54 +660,72 @@ const CustomerDashboard: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
                       onClick={() => setSelectedBooking(booking)}
-                      className="flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.2fr] gap-3 md:gap-4 p-5 md:p-6 hover:bg-gray-50/40 cursor-pointer transition-all duration-300 items-start md:items-center text-charcoal font-sans"
+                      className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.2fr] gap-3 md:gap-4 p-5 md:p-6 hover:bg-gray-50/40 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
+                        isPending
+                          ? "text-red-700 bg-red-50/5 hover:bg-red-50/10 border-l-4 border-l-red-500"
+                          : "text-charcoal"
+                      }`}
                     >
                       {/* COL 1: ID Token & Shop */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block">
-                        <span className="text-[0.6875rem] font-mono font-bold tracking-wider text-charcoal bg-gray-50 md:bg-transparent px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5">
+                        <span className={`text-[0.6875rem] font-mono font-bold tracking-wider bg-gray-50 md:bg-transparent px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5 ${
+                          isPending ? "text-red-700" : "text-charcoal"
+                        }`}>
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              failedOrRejected ? "bg-red-500" : isPendingEscrow ? "bg-amber-500 animate-pulse" : "bg-green-500"
+                              failedOrRejected ? "bg-red-500" : isPending ? "bg-red-500 animate-pulse" : "bg-green-500"
                             }`}
                           />
                           {failedOrRejected ? "ABND-" : "TRX-"}
                           {String(booking.id || booking._id || "").slice(-8).toUpperCase()}
                         </span>
-                        <span className="text-[0.5625rem] text-gray-400 font-bold uppercase tracking-wider md:hidden">
+                        <span className={`text-[0.5625rem] font-bold uppercase tracking-wider md:hidden ${
+                          isPending ? "text-red-400" : "text-gray-400"
+                        }`}>
                           {booking.partnerBrandName || booking.shopName || "Partner"}
                         </span>
                       </div>
 
                       {/* COL 2: Service & Shop */}
                       <div className="w-full md:w-auto">
-                        <p className="text-[0.8125rem] font-bold text-charcoal leading-tight">
+                        <p className={`text-[0.8125rem] font-bold leading-tight ${
+                          isPending ? "text-red-900" : "text-charcoal"
+                        }`}>
                           {booking.serviceName || booking.service || "Grooming Service"}
                         </p>
-                        <p className="hidden md:block text-[0.5625rem] text-gray-400 uppercase tracking-wider font-semibold mt-0.5">
+                        <p className={`hidden md:block text-[0.5625rem] uppercase tracking-wider font-semibold mt-0.5 ${
+                          isPending ? "text-red-500" : "text-gray-400"
+                        }`}>
                           {booking.partnerBrandName || booking.shopName || "Studio Partner"}
                         </p>
                       </div>
 
                       {/* COL 3: Amount Paid */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0 border-t border-dashed border-gray-100 md:border-none">
-                        <span className="md:hidden text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+                        <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
+                          isPending ? "text-red-400" : "text-gray-400"
+                        }`}>
                           Amount
                         </span>
-                        <span className="text-[0.8125rem] font-mono font-bold text-charcoal">
+                        <span className={`text-[0.8125rem] font-mono font-bold ${
+                          isPending ? "text-red-800" : "text-charcoal"
+                        }`}>
                           ₹{booking.amountPaid || booking.amount || booking.price || "0"}
                         </span>
                       </div>
 
                       {/* COL 4: Target Execution Timestamp */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0">
-                        <span className="md:hidden text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+                        <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
+                          isPending ? "text-red-400" : "text-gray-400"
+                        }`}>
                           Execution Time
                         </span>
                         <div className="text-right md:text-left">
-                          <p className="text-[0.75rem] font-bold text-charcoal">
+                          <p className={`text-[0.75rem] font-bold ${isPending ? "text-red-900" : "text-charcoal"}`}>
                             {booking.selectedDate || booking.date || "N/A"}
                           </p>
-                          <p className="text-[0.625rem] text-gray-400 font-medium md:mt-0.5">
+                          <p className={`text-[0.625rem] font-medium md:mt-0.5 ${isPending ? "text-red-500" : "text-gray-400"}`}>
                             {booking.selectedSlot || booking.slotTime || booking.time || "N/A"}
                           </p>
                         </div>
@@ -703,19 +733,25 @@ const CustomerDashboard: React.FC = () => {
 
                       {/* COL 5: Stylized Badge */}
                       <div className="flex items-center justify-between w-full md:w-auto md:justify-end pt-2 md:pt-0">
-                        <span className="md:hidden text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+                        <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
+                          isPending ? "text-red-400" : "text-gray-400"
+                        }`}>
                           Status
                         </span>
                         <span
                           className={`text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border ${
                             failedOrRejected
                               ? "bg-red-50 border-red-100 text-red-600"
-                              : isPendingEscrow
-                                ? "bg-amber-50 border-amber-100 text-amber-600 animate-pulse"
+                              : isPending
+                                ? "bg-red-50 border-red-200 text-red-600 animate-pulse"
                                 : "bg-green-50 border-green-100 text-green-600"
                           }`}
                         >
-                          {failedOrRejected ? "REJECT/FAILED" : isPendingEscrow ? "HELD (ESCROW)" : "CONFIRMED"}
+                          {failedOrRejected
+                            ? "REJECT/FAILED"
+                            : isPending
+                              ? `PENDING (${formatCountdown(secsLeft)})`
+                              : "CONFIRMED"}
                         </span>
                       </div>
                     </motion.div>
