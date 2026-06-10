@@ -34,18 +34,9 @@ import {
 /* UI_CLEANUP_FINAL - LOCKED - SUCCESS */
 
 const parseDateToMillis = (val: any): number => {
-  if (!val) return 0;
-  if (typeof val.toDate === "function") {
-    return val.toDate().getTime();
-  }
-  if (typeof val === "object" && typeof val.seconds === "number") {
-    return val.seconds * 1000;
-  }
-  if (val instanceof Date) {
-    return val.getTime();
-  }
-  const parsed = new Date(val).getTime();
-  return isNaN(parsed) ? 0 : parsed;
+  if (!val) return Date.now(); // Graceful fallback for local serverTimestamp synchronization latency
+  const targetTime = val?.seconds ? val.seconds * 1000 : (typeof val.toDate === "function" ? val.toDate().getTime() : new Date(val).getTime());
+  return isNaN(targetTime) ? Date.now() : targetTime;
 };
 
 interface EscrowTimerProps {
@@ -227,12 +218,21 @@ const PartnerDashboard: React.FC = () => {
     const unsubscribeBookings = onSnapshot(qPartner, (snapshot) => {
       const registry = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      if (registry.length > bookings.length && bookings.length > 0) {
-        setHasNewBooking(true);
-        audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
-        setTimeout(() => setHasNewBooking(false), 5000);
-      }
-      setBookings(registry);
+      // Sort registry by `createdAt` timestamp parameter in descending order natively
+      registry.sort((a: any, b: any) => {
+        const tA = parseDateToMillis(a.createdAt || a.heldAt || a.timestamp);
+        const tB = parseDateToMillis(b.createdAt || b.heldAt || b.timestamp);
+        return tB - tA;
+      });
+
+      setBookings((prevBookings) => {
+        if (registry.length > prevBookings.length && prevBookings.length > 0) {
+          setHasNewBooking(true);
+          audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
+          setTimeout(() => setHasNewBooking(false), 5500);
+        }
+        return registry;
+      });
     }, (err) => {
       console.error("Bookings snapshot error:", err);
     });
@@ -272,18 +272,29 @@ const PartnerDashboard: React.FC = () => {
   const todayISO = new Date().toISOString().split('T')[0];
   const todayLocale = new Date().toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
   
+  // Normalized helper to identify paid / valid booking payments (PAID, SUCCESS, payment_held)
+  const isBookingPaid = (b: any): boolean => {
+    if (!b) return false;
+    const pSt = String(b.paymentStatus || b.payment_status || "").trim().toUpperCase();
+    const st = String(b.status || "").trim().toUpperCase();
+    return pSt === "SUCCESS" || pSt === "PAID" || pSt === "TRUE" ||
+           st === "SUCCESS" || st === "PAID" || st === "CONFIRMED" || st === "PAYMENT_HELD";
+  };
+
   const todayBookings = bookings.filter(b => {
+    if (!isBookingPaid(b)) return false;
     const bDate = b.date || b.appointmentDate?.split('T')[0];
     return bDate === todayISO || bDate === todayLocale;
   });
 
   const futureBookingsList = bookings.filter(b => {
+    if (!isBookingPaid(b)) return false;
     const bDate = b.date || b.appointmentDate?.split('T')[0];
     return bDate > todayISO;
   });
 
   const todayEarnings = todayBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
-  const totalSlotsBooked = bookings.length;
+  const totalSlotsBooked = bookings.filter(b => isBookingPaid(b)).length;
   
   const avgRating = ratings.length > 0 
     ? (ratings.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / ratings.length).toFixed(1) 
@@ -292,7 +303,7 @@ const PartnerDashboard: React.FC = () => {
   
   // Accountant AI Engine Logic: Use field from Firestore or calculate if missing
   const walletBalance = shopData?.partner_wallet !== undefined 
-    ? shopData.partner_wallet 
+    ? (Number(shopData.partner_wallet) || 0) 
     : (todayEarnings * 0.95);
 
   const handleToggleLive = async () => {
