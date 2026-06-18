@@ -11,6 +11,16 @@ import { getSettings } from '../services/logic_engine';
 
 // Purged Razorpay Script Integrations. Using Direct UPI Intent Interface.
 
+const sanitizePayload = (obj: any): any => {
+  const cleaned: any = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined && obj[key] !== null) {
+      cleaned[key] = obj[key];
+    }
+  });
+  return cleaned;
+};
+
 const CheckoutPage: React.FC = () => {
   const { cart, totalPrice, totalItems, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
@@ -246,25 +256,25 @@ const CheckoutPage: React.FC = () => {
               (item.name && String(item.name).includes('(Booking)')) || 
               item.type === 'booking'
             ) {
-              const bookingDocData = {
-                customer_id: user?.uid,
-                customerId: user?.uid,
+              const bookingDocData = sanitizePayload({
+                customer_id: user?.uid || '',
+                customerId: user?.uid || '',
                 customerName: formData.fullName || user?.name || 'Customer Booking',
                 partnerId: item.shopId || item.partnerId || '',
                 shopId: item.shopId || item.partnerId || '',
                 shopName: item.shopName || 'Partner Salon',
                 service: item.serviceName || item.name || 'Grooming Service',
                 serviceName: item.serviceName || item.name || 'Grooming Service',
-                price: item.price,
+                price: Number(item.price) || 0,
                 date: item.date || new Date().toDateString(),
                 time: item.time || '10:00',
-                status: 'PENDING_PAYMENT', // Initial state, not shown in HELD (ESCROW) tab
-                bookingStatus: 'pending_payment',
+                status: 'pending', // lowercase pending status
+                bookingStatus: 'pending',
                 paymentStatus: 'unpaid',
                 paymentMethod: 'RAZORPAY_GATEWAY',
                 razorpayOrderId: clientGeneratedOrderId,
                 createdAt: new Date().toISOString()
-              };
+              });
               const bookingRef = await addDoc(collection(db, 'bookings'), bookingDocData);
               finalBookingIds.push(bookingRef.id);
             }
@@ -324,37 +334,38 @@ const CheckoutPage: React.FC = () => {
 
             if (finalBookingIds.length > 0) {
               for (const bId of finalBookingIds) {
-                await updateDoc(doc(db, 'bookings', bId), {
-                  customer_id: user?.uid,
-                  customerId: user?.uid,
+                const updateBookingPayload = sanitizePayload({
+                  customer_id: user?.uid || '',
+                  customerId: user?.uid || '',
                   paymentStatus: 'SUCCESS',
-                  bookingStatus: 'paid',
-                  status: 'paid',
+                  bookingStatus: 'pending',
+                  status: 'pending',
                   heldAt: serverTimestamp(),
                   createdAt: serverTimestamp(),
                   timestamp: serverTimestamp(),
                   partner_accepted: false,
                   partner_rejected: false,
-                  transactionId: response.razorpay_payment_id
+                  transactionId: response.razorpay_payment_id || ''
                 });
+                await updateDoc(doc(db, 'bookings', bId), updateBookingPayload);
               }
             }
 
             // GUARANTEE AND FORCE FIRESTORE DATA ENTRY ON SUCCESS FOR THE LOGGED-IN CUSTOMER SYSTEM-WIDE
-            const immediateVerifiedBookingData = {
-              customer_id: user?.uid,
-              customerId: user?.uid,
+            const immediateVerifiedBookingData = sanitizePayload({
+              customer_id: user?.uid || '',
+              customerId: user?.uid || '',
               customerName: formData.fullName || user?.name || 'Customer Booking',
-              partnerId: cart[0]?.shopId || cart[0]?.partnerId || 'fallback_partner_id',
-              shopId: cart[0]?.shopId || cart[0]?.partnerId || 'fallback_partner_id',
+              partnerId: cart[0]?.shopId || cart[0]?.partnerId || '',
+              shopId: cart[0]?.shopId || cart[0]?.partnerId || '',
               shopName: cart[0]?.shopName || 'Partner Salon',
               service: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
               serviceName: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
-              price: cart[0]?.price || finalTotal,
+              price: Number(cart[0]?.price) || finalTotal || 0,
               date: cart[0]?.date || new Date().toDateString(),
               time: cart[0]?.time || '10:00',
-              status: 'paid',
-              bookingStatus: 'paid',
+              status: 'pending',
+              bookingStatus: 'pending',
               paymentStatus: 'SUCCESS',
               payment_status: 'paid',
               partner_accepted: false,
@@ -363,7 +374,7 @@ const CheckoutPage: React.FC = () => {
               createdAt: serverTimestamp(),
               heldAt: serverTimestamp(),
               transactionId: response.razorpay_payment_id || 'manual'
-            };
+            });
             await addDoc(collection(db, "bookings"), immediateVerifiedBookingData);
 
             // Clean up and proceed to success
@@ -468,13 +479,13 @@ const CheckoutPage: React.FC = () => {
 
       if (createdBookingDocIds && createdBookingDocIds.length > 0) {
         for (const bId of createdBookingDocIds) {
-          await updateDoc(doc(db, 'bookings', bId), {
-            customer_id: user?.uid,
-            customerId: user?.uid,
+          const updateBookingPayload = sanitizePayload({
+            customer_id: user?.uid || '',
+            customerId: user?.uid || '',
             paymentStatus: 'SUCCESS',
             payment_status: 'paid',
-            bookingStatus: 'paid',
-            status: 'paid',
+            bookingStatus: 'pending',
+            status: 'pending',
             heldAt: serverTimestamp(),
             createdAt: serverTimestamp(),
             timestamp: serverTimestamp(),
@@ -482,6 +493,7 @@ const CheckoutPage: React.FC = () => {
             partner_rejected: false,
             transactionId: utrNumber.trim()
           });
+          await updateDoc(doc(db, 'bookings', bId), updateBookingPayload);
         }
       }
 
