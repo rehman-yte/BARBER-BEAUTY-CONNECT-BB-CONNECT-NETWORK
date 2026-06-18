@@ -565,14 +565,14 @@ const CustomerDashboard: React.FC = () => {
       const isPaid = getNormalizedPaymentStatus(b) === "SUCCESS";
       if (!isPaid) return; // Drop list item if unpaid, incomplete, or invalid
 
-      const isApproved = isBookingApproved(b);
-      const isRejected = isBookingRejected(b);
-      const secsLeft = getBookingSecondsLeft(b);
+      const statusVal = String(b.status || b.bookingStatus || "").toLowerCase();
 
-      if (isApproved) {
+      if (statusVal === "pending" || statusVal === "payment_held") {
+        waiting.push(b);
+      } else if (statusVal === "confirmed" || statusVal === "approved") {
         confirmed.push(b);
-      } else if (isRejected || secsLeft <= 0) {
-        const baseMsg = b.message || b.statusReason || "Partner Response Timeout";
+      } else if (statusVal === "failed" || statusVal === "rejected" || statusVal === "failed_timeout" || statusVal === "rejected_timeout" || statusVal === "refunded/failed") {
+        const baseMsg = b.message || b.statusReason || b.failure_reason || "Timeout: Partner did not accept within 5 minutes";
         const cleanMsg = baseMsg.includes("Your payment will be refunded") 
           ? baseMsg 
           : `${baseMsg}. Your payment will be refunded within 10-20 minutes.`;
@@ -583,7 +583,26 @@ const CustomerDashboard: React.FC = () => {
           statusReason: cleanMsg
         });
       } else {
-        waiting.push(b);
+        const isApproved = isBookingApproved(b);
+        const isRejected = isBookingRejected(b);
+        const secsLeft = getBookingSecondsLeft(b);
+
+        if (isApproved) {
+          confirmed.push(b);
+        } else if (isRejected || secsLeft <= 0) {
+          const baseMsg = b.message || b.statusReason || b.failure_reason || "Partner Response Timeout";
+          const cleanMsg = baseMsg.includes("Your payment will be refunded") 
+            ? baseMsg 
+            : `${baseMsg}. Your payment will be refunded within 10-20 minutes.`;
+
+          failed.push({
+            ...b,
+            message: cleanMsg,
+            statusReason: cleanMsg
+          });
+        } else {
+          waiting.push(b);
+        }
       }
     });
 
@@ -649,11 +668,35 @@ const CustomerDashboard: React.FC = () => {
         setBookings(rawList);
         PersistenceService.save(`customer_bookings_${user.uid}`, rawList);
 
-        // Distribute to distinct state arrays
-        const split = splitBookingsIntoTabs(rawList);
-        setWaitingBookings(split.waiting);
-        setConfirmedBookings(split.confirmed);
-        setFailedBookings(split.failed);
+        // Clear previous state matrices & cleanly sort every document into its respective state array in real-time strictly on status
+        const waitingBookings: any[] = [];
+        const confirmedBookings: any[] = [];
+        const rejectFailedBookings: any[] = [];
+
+        rawList.forEach((b) => {
+          const statusVal = String(b.status || b.bookingStatus || "").toLowerCase();
+          
+          if (statusVal === "pending" || statusVal === "payment_held") {
+            waitingBookings.push(b);
+          } else if (statusVal === "confirmed" || statusVal === "approved") {
+            confirmedBookings.push(b);
+          } else if (statusVal === "failed" || statusVal === "rejected" || statusVal === "failed_timeout" || statusVal === "rejected_timeout" || statusVal === "refunded/failed") {
+            rejectFailedBookings.push(b);
+          } else {
+            // Fallback status assessment checks
+            if (isBookingApproved(b)) {
+              confirmedBookings.push(b);
+            } else if (isBookingRejected(b)) {
+              rejectFailedBookings.push(b);
+            } else {
+              waitingBookings.push(b);
+            }
+          }
+        });
+
+        setWaitingBookings(waitingBookings);
+        setConfirmedBookings(confirmedBookings);
+        setFailedBookings(rejectFailedBookings);
 
         setLoading(false);
 
@@ -708,7 +751,7 @@ const CustomerDashboard: React.FC = () => {
         if (b.id === bookingId) {
           return {
             ...b,
-            status: "failed_timeout",
+            status: "failed",
             bookingStatus: "failed",
             paymentStatus: "failed",
             statusReason: "Timeout: Partner did not accept within 5 minutes",
@@ -727,7 +770,7 @@ const CustomerDashboard: React.FC = () => {
       if (prev && prev.id === bookingId) {
         return {
           ...prev,
-          status: "failed_timeout",
+          status: "failed",
           bookingStatus: "failed",
           paymentStatus: "failed",
           statusReason: "Timeout: Partner did not accept within 5 minutes",
@@ -760,7 +803,7 @@ const CustomerDashboard: React.FC = () => {
     // 2. Direct background database update
     try {
       await updateDoc(doc(db, "bookings", bookingId), {
-        status: "failed_timeout",
+        status: "failed",
         bookingStatus: "failed",
         paymentStatus: "failed",
         statusReason: "Timeout: Partner did not accept within 5 minutes",
@@ -796,7 +839,7 @@ const CustomerDashboard: React.FC = () => {
             // Evict and move to failed states locally
             const failedCopy = {
               ...b,
-              status: "failed_timeout",
+              status: "failed",
               bookingStatus: "failed",
               paymentStatus: "failed",
               statusReason: "Timeout: Partner did not accept within 5 minutes",
