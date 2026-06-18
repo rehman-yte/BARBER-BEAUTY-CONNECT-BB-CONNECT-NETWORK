@@ -408,7 +408,10 @@ const CustomerDashboard: React.FC = () => {
     // Completely isolate query inside Firestore based strictly on the active user session token
     const q = query(
       collection(db, "bookings"),
-      where("customer_id", "==", user.uid)
+      or(
+        where("customer_id", "==", user.uid),
+        where("customerId", "==", user.uid)
+      )
     );
 
     const unsubscribe = onSnapshot(

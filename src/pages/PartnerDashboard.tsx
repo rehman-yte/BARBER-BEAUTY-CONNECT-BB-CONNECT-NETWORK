@@ -91,6 +91,7 @@ const PartnerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings'>('overview');
   const [bookingView, setBookingView] = useState<'today' | 'upcoming'>('today');
   const [hasNewBooking, setHasNewBooking] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [isLive, setIsLive] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +149,11 @@ const PartnerDashboard: React.FC = () => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioRef.current.volume = 0.8;
   }, []);
+
+  // Synchronous change check
+  useEffect(() => {
+    console.log("Real-time notifications array sync completed:", notifications.length);
+  }, [notifications]);
 
   // Periodic background scanner for auto-refunds (5-min escrow countdown)
   useEffect(() => {
@@ -214,6 +220,7 @@ const PartnerDashboard: React.FC = () => {
     });
 
     // 2. Bookings Listener (Dual Path: Partner or Auditor)
+    let isInitialLoad = true;
     const qPartner = query(collection(db, 'bookings'), where('partnerId', '==', user.uid));
     const unsubscribeBookings = onSnapshot(qPartner, (snapshot) => {
       const registry = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -225,14 +232,23 @@ const PartnerDashboard: React.FC = () => {
         return tB - tA;
       });
 
-      setBookings((prevBookings) => {
-        if (registry.length > prevBookings.length && prevBookings.length > 0) {
-          setHasNewBooking(true);
-          audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
-          setTimeout(() => setHasNewBooking(false), 5500);
+      setBookings(registry);
+
+      // Collect real-time document change type actions for added rows
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const docData = change.doc.data();
+          if (!isInitialLoad) {
+            // Trigger the notification state stack array
+            setNotifications((prev) => [...prev, { id: change.doc.id, ...docData }]);
+            setHasNewBooking(true);
+            audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
+            setTimeout(() => setHasNewBooking(false), 5550);
+          }
         }
-        return registry;
       });
+
+      isInitialLoad = false;
     }, (err) => {
       console.error("Bookings snapshot error:", err);
     });
