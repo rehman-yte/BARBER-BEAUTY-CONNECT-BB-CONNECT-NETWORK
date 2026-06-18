@@ -243,6 +243,132 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   );
 };
 
+interface FailedBookingDetailsModalProps {
+  booking: any;
+  onClose: () => void;
+}
+
+const FailedBookingDetailsModal: React.FC<FailedBookingDetailsModalProps> = ({ booking, onClose }) => {
+  const failureReason = booking.failure_reason || booking.reject_reason || booking.statusReason || booking.message || "Timeout: Partner did not accept within 5 minutes";
+  const refundStatus = booking.refund_status || "Payment Refund Initiated";
+  const timeframe = booking.refund_timeframe || "12 Hours (Amount will be credited back to your original payment method safely)";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-charcoal/40 backdrop-blur-md z-50 flex items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 15 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 15 }}
+        transition={{ type: "spring", duration: 0.5 }}
+        className="bg-white rounded-[2.5rem] border border-red-100 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col font-sans"
+      >
+        {/* Header */}
+        <div className="p-8 pb-4 text-white bg-gradient-to-br from-red-500 to-red-600 flex justify-between items-start relative">
+          <div>
+            <span className="text-[0.5625rem] font-bold uppercase tracking-[0.3em] bg-white/20 px-2.5 py-1 rounded-full text-white/95">
+              Refund & Failure Registry
+            </span>
+            <h3 className="text-[1.75rem] font-serif font-bold text-white mt-3 leading-tight">
+              {booking.partnerBrandName || booking.shopName || "Partner Studio"}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all border border-white/5 shadow-inner"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 space-y-6 flex-grow overflow-y-auto">
+          <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Service</p>
+              <p className="text-[0.875rem] font-bold text-charcoal">
+                {booking.serviceName || booking.service || "Premium Service"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Amount Paid</p>
+              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{booking.amountPaid || booking.amount || booking.price || "0"}</p>
+            </div>
+          </div>
+
+          {/* Reserved Execution Time */}
+          <div className="space-y-1">
+            <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Original Schedule</p>
+            <div className="flex items-center gap-3 bg-gray-50/50 px-4 py-3 rounded-2xl border border-gray-100">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <div>
+                <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-tighter">{booking.selectedDate || booking.date || "N/A"}</p>
+                <p className="text-[0.6875rem] text-gray-500 font-medium">{booking.selectedSlot || booking.slotTime || booking.time || "N/A"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Failure Details */}
+          <div className="bg-red-50 border border-red-100 p-5 rounded-2xl text-red-900 space-y-4">
+            <div>
+              <p className="text-[0.5625rem] font-bold text-red-700 uppercase tracking-widest">
+                Reason for Failure
+              </p>
+              <p className="text-[0.8125rem] font-semibold text-red-900 mt-1 leading-normal italic">
+                "{failureReason}"
+              </p>
+            </div>
+
+            <div className="border-t border-red-200/50 pt-3">
+              <p className="text-[0.5625rem] font-bold text-red-700 uppercase tracking-widest">
+                Refund Status
+              </p>
+              <div className="flex items-center gap-2 mt-1.5 font-bold text-green-700">
+                <svg className="w-4 h-4 shrink-0 animate-pulse text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-[0.8125rem] uppercase tracking-wider">{refundStatus}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-red-200/50 pt-3">
+              <p className="text-[0.5625rem] font-bold text-red-700 uppercase tracking-widest">
+                Estimated Timeframe
+              </p>
+              <p className="text-[0.75rem] font-medium text-red-800 leading-relaxed mt-1">
+                {timeframe}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Button */}
+        <div className="px-8 py-5 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 bg-charcoal text-white hover:bg-charcoal/90 text-[0.6875rem] font-bold uppercase tracking-widest rounded-xl transition-all shadow-md"
+          >
+            Close Diagnostics
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -251,6 +377,7 @@ const CustomerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"waiting" | "confirmed" | "failed">("waiting");
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [selectedFailedBooking, setSelectedFailedBooking] = useState<any>(null);
 
   // ID-ISOLATED 3-TAB PIPELINE STATE ARRAYS
   const [waitingBookings, setWaitingBookings] = useState<any[]>([]);
@@ -584,8 +711,11 @@ const CustomerDashboard: React.FC = () => {
             status: "failed_timeout",
             bookingStatus: "failed",
             paymentStatus: "failed",
-            statusReason: "Partner Response Timeout",
-            message: "Partner Response Timeout"
+            statusReason: "Timeout: Partner did not accept within 5 minutes",
+            message: "Timeout: Partner did not accept within 5 minutes",
+            refund_status: "initiated",
+            refund_timeframe: "12 hours",
+            failure_reason: "Timeout: Partner did not accept within 5 minutes"
           };
         }
         return b;
@@ -600,8 +730,11 @@ const CustomerDashboard: React.FC = () => {
           status: "failed_timeout",
           bookingStatus: "failed",
           paymentStatus: "failed",
-          statusReason: "Partner Response Timeout",
-          message: "Partner Response Timeout"
+          statusReason: "Timeout: Partner did not accept within 5 minutes",
+          message: "Timeout: Partner did not accept within 5 minutes",
+          refund_status: "initiated",
+          refund_timeframe: "12 hours",
+          failure_reason: "Timeout: Partner did not accept within 5 minutes"
         };
       }
       return prev;
@@ -630,8 +763,11 @@ const CustomerDashboard: React.FC = () => {
         status: "failed_timeout",
         bookingStatus: "failed",
         paymentStatus: "failed",
-        statusReason: "Partner Response Timeout (Auto-Refund Triggered)",
-        message: "Partner Response Timeout (Auto-Refund Triggered)"
+        statusReason: "Timeout: Partner did not accept within 5 minutes",
+        message: "Timeout: Partner did not accept within 5 minutes",
+        refund_status: "initiated",
+        refund_timeframe: "12 hours",
+        failure_reason: "Timeout: Partner did not accept within 5 minutes"
       });
     } catch (dbErr) {
       console.error("[Silent DB Mutate Error]:", dbErr);
@@ -663,8 +799,11 @@ const CustomerDashboard: React.FC = () => {
               status: "failed_timeout",
               bookingStatus: "failed",
               paymentStatus: "failed",
-              statusReason: "Partner Response Timeout (Auto-Refund Triggered)",
-              message: "Partner Response Timeout (Auto-Refund Triggered)"
+              statusReason: "Timeout: Partner did not accept within 5 minutes",
+              message: "Timeout: Partner did not accept within 5 minutes",
+              refund_status: "initiated",
+              refund_timeframe: "12 hours",
+              failure_reason: "Timeout: Partner did not accept within 5 minutes"
             };
 
             setFailedBookings((prevFailed) => {
@@ -852,7 +991,13 @@ const CustomerDashboard: React.FC = () => {
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      onClick={() => setSelectedBooking(booking)}
+                      onClick={() => {
+                        if (failedOrRejected) {
+                          setSelectedFailedBooking(booking);
+                        } else {
+                          setSelectedBooking(booking);
+                        }
+                      }}
                       className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-3 md:gap-4 p-5 md:p-6 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
                         failedOrRejected
                           ? "text-charcoal border-b border-gray-100 hover:bg-gray-50/40"
@@ -996,6 +1141,16 @@ const CustomerDashboard: React.FC = () => {
             isEscrowVerified={isEscrowVerified}
             isRejectFailed={isRejectFailed}
             onExpired={handleExpired}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Failure/Rejected Detailed Refund Modal Overlay */}
+      <AnimatePresence>
+        {selectedFailedBooking && (
+          <FailedBookingDetailsModal
+            booking={selectedFailedBooking}
+            onClose={() => setSelectedFailedBooking(null)}
           />
         )}
       </AnimatePresence>
