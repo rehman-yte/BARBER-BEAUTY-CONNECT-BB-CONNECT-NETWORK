@@ -7,7 +7,7 @@ import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
 import { db } from "../lib/firebase";
-import { doc, updateDoc, collection, query, where, onSnapshot, or, and } from "firebase/firestore";
+import { doc, updateDoc, collection, query, where, onSnapshot, or, and, getDoc } from "firebase/firestore";
 
 const parseDateToMillis = (val: any): number => {
   if (!val) return Date.now(); // Graceful fallback for local serverTimestamp synchronization latency
@@ -256,6 +256,70 @@ const CustomerDashboard: React.FC = () => {
   const [waitingBookings, setWaitingBookings] = useState<any[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<any[]>([]);
   const [failedBookings, setFailedBookings] = useState<any[]>([]);
+
+  // Success Popup control states
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [popupData, setPopupData] = useState<any>(null);
+
+  // Post-payment interception and success popup controller
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const paymentParam = searchParams.get("payment");
+    const bookingIdParam = searchParams.get("bookingId");
+
+    if (paymentParam === "success" && bookingIdParam) {
+      const fetchDirectDoc = async () => {
+        try {
+          const docRef = doc(db, "bookings", bookingIdParam);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const serviceName = data.serviceName || data.service || "Grooming Service";
+            const amountPaid = data.amountPaid || data.amount || data.price || "0";
+            const selectedDate = data.selectedDate || data.date || "N/A";
+            const selectedSlot = data.selectedSlot || data.slotTime || data.time || "N/A";
+
+            const normalizedBooking = {
+              id: docSnap.id,
+              ...data,
+              serviceName,
+              amountPaid,
+              selectedDate,
+              selectedSlot
+            };
+
+            setPopupData(normalizedBooking);
+            setShowSuccessPopup(true);
+
+            // Once the popup closes, cleanly map the fetched booking row into local component states backing the respective live tabs
+            setBookings((prev) => {
+              if (prev.some((b) => b.id === normalizedBooking.id)) {
+                return prev.map((b) => b.id === normalizedBooking.id ? normalizedBooking : b);
+              }
+              const next = [normalizedBooking, ...prev];
+              const split = splitBookingsIntoTabs(next);
+              setWaitingBookings(split.waiting);
+              setConfirmedBookings(split.confirmed);
+              setFailedBookings(split.failed);
+              return next;
+            });
+
+            setTimeout(() => {
+              setShowSuccessPopup(false);
+            }, 4000);
+          }
+        } catch (error) {
+          console.error("Direct fetch error for status popup:", error);
+        }
+      };
+
+      fetchDirectDoc();
+
+      // Clean query parameters so refresh doesn't trigger the modal again
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [navigate]);
 
   // CRITICAL REDIRECT: Ensure partners never land on Customer Dashboard
   useEffect(() => {
@@ -933,6 +997,107 @@ const CustomerDashboard: React.FC = () => {
             isRejectFailed={isRejectFailed}
             onExpired={handleExpired}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Success Auto-dismiss Pop-Up Modal Overlay */}
+      <AnimatePresence>
+        {showSuccessPopup && popupData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-charcoal/40 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              transition={{ type: "spring", duration: 0.45 }}
+              className="bg-white rounded-[2.5rem] border border-green-100 shadow-2xl max-w-md w-full overflow-hidden flex flex-col font-sans"
+            >
+              {/* Header Banner - Emerald Theme Accent */}
+              <div className="p-8 pb-5 text-white bg-gradient-to-br from-green-500 to-emerald-600 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-12 -translate-y-12" />
+                <div className="relative z-10 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/10 shadow-inner">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-[0.5625rem] font-bold uppercase tracking-[0.3em] bg-white/25 px-2.5 py-1 rounded-full text-white/95">
+                      Transaction Confirmed
+                    </span>
+                    <h3 className="text-xl font-serif font-black text-white mt-1.5 leading-tight">
+                      Booking Initialized Successfully!
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Customer & Booking Details */}
+              <div className="p-8 space-y-5 flex-grow">
+                <div className="bg-gray-50/50 p-5 rounded-2xl border border-gray-100 space-y-3.5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Customer</span>
+                      <p className="text-[0.875rem] font-bold text-charcoal truncate mt-0.5">
+                        {popupData.customerName || popupData.customer_name || displayName}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Partner</span>
+                      <p className="text-[0.875rem] font-bold text-bbBlue truncate mt-0.5">
+                        {popupData.partnerBrandName || popupData.shopName || "Partner Studio"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-gray-100 pt-3.5">
+                    <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Selected Service</span>
+                    <p className="text-[0.875rem] font-bold text-charcoal mt-0.5">
+                      {popupData.serviceName}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-t border-dashed border-gray-100 pt-3.5">
+                    <div>
+                      <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Date</span>
+                      <p className="text-[0.8125rem] font-bold text-charcoal mt-0.5">
+                        {popupData.selectedDate}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Time Slot</span>
+                      <p className="text-[0.8125rem] font-mono font-bold text-charcoal mt-0.5">
+                        {popupData.selectedSlot}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-green-600 bg-green-50/60 p-4 rounded-xl border border-green-150">
+                  <svg className="w-5 h-5 shrink-0 animate-pulse text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider">
+                    Redirecting to dynamic waiting tab...
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress dismiss bar */}
+              <div className="h-1.5 w-full bg-gray-100">
+                <motion.div
+                  initial={{ width: "100%" }}
+                  animate={{ width: "0%" }}
+                  transition={{ duration: 4, ease: "linear" }}
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
