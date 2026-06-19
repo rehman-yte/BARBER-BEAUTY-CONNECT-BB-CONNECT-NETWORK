@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, query, collection, where, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, orderBy, updateDoc } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -89,7 +89,7 @@ const PartnerDashboard: React.FC = () => {
   const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings'>('overview');
-  const [bookingView, setBookingView] = useState<'today' | 'upcoming'>('today');
+  const [bookingView, setBookingView] = useState<'today' | 'upcoming' | 'completed' | 'rejected'>('today');
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLive, setIsLive] = useState(false);
@@ -242,8 +242,24 @@ const PartnerDashboard: React.FC = () => {
             // Trigger the notification state stack array
             setNotifications((prev) => [...prev, { id: change.doc.id, ...docData }]);
             setHasNewBooking(true);
-            audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
             setTimeout(() => setHasNewBooking(false), 5550);
+
+            const st = docData.status ? String(docData.status).toLowerCase() : '';
+            if (st === 'pending' || st === 'confirmed' || st === 'payment_held') {
+              const alertSound = new Audio('/assets/heavy_notification.mp3');
+              let playbackCount = 0;
+              const fireAlarm = () => {
+                if (playbackCount < 3) {
+                  alertSound.play().then(() => {
+                    playbackCount++;
+                    alertSound.onended = fireAlarm;
+                  }).catch(err => console.log("Audio waiting for pointer interaction context:", err));
+                }
+              };
+              fireAlarm();
+            } else {
+              audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
+            }
           }
         }
       });
@@ -831,64 +847,81 @@ const PartnerDashboard: React.FC = () => {
               </motion.div>
             )}
             {activeTab === 'bookings' && (() => {
-              const systemDateObj = new Date();
-              // Generate exact pattern variations to safeguard against platform inconsistencies
-              const formatVariantA = systemDateObj.toLocaleDateString('en-CA'); // YYYY-MM-DD
-              const formatVariantB = systemDateObj.toDateString(); // e.g., "Fri Jun 19 2026"
+              const localClock = new Date();
+              const formatStringA = localClock.toDateString(); // "Fri Jun 19 2026"
+              const formatStringB = localClock.toLocaleDateString('en-CA'); // "2026-06-19"
 
               const isTodayDate = (dateVal: any) => {
                 if (!dateVal) return false;
                 const str = String(dateVal).trim();
-                const isA = str === formatVariantA;
-                const isB = str === formatVariantB;
-                const isSubB = str.toLowerCase().includes(formatVariantB.toLowerCase());
-                const isSubA = str.toLowerCase().includes(formatVariantA.toLowerCase());
+                const isA = str === formatStringA;
+                const isB = str === formatStringB;
+                const isSubB = str.toLowerCase().includes(formatStringB.toLowerCase());
+                const isSubA = str.toLowerCase().includes(formatStringA.toLowerCase());
                 
                 // Timestamp or Date object matching today
                 let isTimestampMatch = false;
                 try {
                   const d = new Date(str);
                   if (!isNaN(d.getTime())) {
-                    isTimestampMatch = d.toLocaleDateString('en-CA') === formatVariantA;
+                    isTimestampMatch = d.toLocaleDateString('en-CA') === formatStringB;
                   }
                 } catch (e) {}
 
                 return isA || isB || isSubB || isSubA || isTimestampMatch;
               };
 
-              const registryTodayQueue = bookings.filter((b: any) => {
-                const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
-                const isToday = isTodayDate(bDate);
-                const status = b.status ? String(b.status).toLowerCase() : '';
-                const isTerminal = status === 'completed' || status === 'cancelled' || status === 'rejected' || status === 'failed';
-                return isToday && !isTerminal;
+              const registryTodayQueue = bookings.filter((item: any) => {
+                const itemDate = item.date || item.selectedDate || item.appointmentDate?.split('T')[0];
+                const isToday = isTodayDate(itemDate);
+                const status = item.status ? String(item.status).toLowerCase() : '';
+                const isActiveStatus = status === 'confirmed' || status === 'accepted' || status === 'payment_held' || status === 'pending';
+                return isActiveStatus && isToday;
               });
 
-              const registryUpcomingQueue = bookings.filter((b: any) => {
-                const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
-                if (!bDate) return false;
-                const isToday = isTodayDate(bDate);
+              const registryUpcomingQueue = bookings.filter((item: any) => {
+                const itemDate = item.date || item.selectedDate || item.appointmentDate?.split('T')[0];
+                if (!itemDate) return false;
+                const isToday = isTodayDate(itemDate);
                 if (isToday) return false;
+
+                const status = item.status ? String(item.status).toLowerCase() : '';
+                const isActiveStatus = status === 'confirmed' || status === 'accepted' || status === 'payment_held' || status === 'pending';
+                if (!isActiveStatus) return false;
 
                 // Chronological future check
                 let isFuture = false;
                 try {
-                  const d = new Date(bDate);
+                  const d = new Date(itemDate);
                   if (!isNaN(d.getTime())) {
-                    const todayNoTime = new Date(formatVariantA);
-                    const bNoTime = new Date(d.toLocaleDateString('en-CA'));
-                    isFuture = bNoTime > todayNoTime;
+                    const todayNoTime = new Date(formatStringB);
+                    const itemNoTime = new Date(d.toLocaleDateString('en-CA'));
+                    isFuture = itemNoTime > todayNoTime;
                   }
                 } catch (e) {}
 
                 // Fallback direct string comparison
                 if (!isFuture) {
-                  isFuture = bDate > formatVariantA;
+                  isFuture = itemDate > formatStringB;
                 }
                 return isFuture;
               });
 
-              const displayedBookings = bookingView === 'today' ? registryTodayQueue : registryUpcomingQueue;
+              const registryCompletedQueue = bookings.filter((item: any) => {
+                const status = item.status ? String(item.status).toLowerCase() : '';
+                return status === 'completed';
+              });
+
+              const registryRejectedQueue = bookings.filter((item: any) => {
+                const status = item.status ? String(item.status).toLowerCase() : '';
+                return status === 'rejected' || status === 'failed' || status === 'failed_timeout' || status === 'cancelled';
+              });
+
+              const displayedBookings = 
+                bookingView === 'today' ? registryTodayQueue : 
+                bookingView === 'upcoming' ? registryUpcomingQueue : 
+                bookingView === 'completed' ? registryCompletedQueue : 
+                registryRejectedQueue;
 
               return (
                 <motion.div 
@@ -903,7 +936,7 @@ const PartnerDashboard: React.FC = () => {
                       <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Live queue and scheduling archive</p>
                     </div>
                     
-                    <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+                    <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
                       <button 
                         onClick={() => setBookingView('today')}
                         className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'today' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
@@ -915,6 +948,18 @@ const PartnerDashboard: React.FC = () => {
                         className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'upcoming' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
                       >
                         Upcoming Slots
+                      </button>
+                      <button 
+                        onClick={() => setBookingView('completed')}
+                        className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'completed' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
+                      >
+                        Completed / Cleared
+                      </button>
+                      <button 
+                        onClick={() => setBookingView('rejected')}
+                        className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'rejected' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
+                      >
+                        Rejected / Timeout
                       </button>
                     </div>
                   </div>
@@ -955,8 +1000,10 @@ const PartnerDashboard: React.FC = () => {
                               <td className="px-8 py-6 text-center">
                                 <div className="flex flex-col items-center gap-1">
                                   <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                                    b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                    b.status === 'confirmed' || b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                    b.status === 'accepted' ? 'bg-emerald-100 text-emerald-600' :
                                     b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
+                                    b.status === 'rejected' || b.status === 'failed' || b.status === 'failed_timeout' || b.status === 'cancelled' ? 'bg-red-100 text-red-600' :
                                     'bg-bbBlue/10 text-bbBlue'
                                   }`}>
                                     {b.status === 'payment_held' ? 'HELD (ESCROW)' : b.status}
@@ -988,11 +1035,14 @@ const PartnerDashboard: React.FC = () => {
                                         e.stopPropagation();
                                         const confirmAccept = window.confirm("Are you sure you want to ACCEPT this booking? This will confirm the slot permanently.");
                                         if (confirmAccept) {
-                                          setBookings(prev => prev.filter(item => item.id !== b.id));
-                                          await updateBooking(b.id, { 
-                                            status: 'confirmed', 
-                                            acceptedAt: new Date().toISOString() 
-                                          });
+                                          try {
+                                            await updateDoc(doc(db, 'bookings', b.id), { 
+                                              status: 'accepted', 
+                                              acceptedAt: new Date().toISOString() 
+                                            });
+                                          } catch (err) {
+                                            console.error("Failed to accept booking:", err);
+                                          }
                                         }
                                       }}
                                       className="px-4 py-2 bg-green-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95"
@@ -1004,8 +1054,11 @@ const PartnerDashboard: React.FC = () => {
                                         e.stopPropagation();
                                         const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
                                         if (confirmReject) {
-                                          setBookings(prev => prev.filter(item => item.id !== b.id));
                                           try {
+                                            await updateDoc(doc(db, 'bookings', b.id), { 
+                                              status: 'rejected', 
+                                              rejectedAt: new Date().toISOString() 
+                                            });
                                             await fetch('/api/razorpay/refund', {
                                               method: 'POST',
                                               headers: { 'Content-Type': 'application/json' },
@@ -1022,13 +1075,20 @@ const PartnerDashboard: React.FC = () => {
                                     </button>
                                   </div>
                                 ) : (
-                                  b.status !== 'completed' && b.status !== 'rejected' && b.status !== 'failed' && b.status !== 'cancelled' && b.status !== 'Cancelled' && (
+                                  (b.status === 'confirmed' || b.status === 'accepted') && (
                                     <button 
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         const confirm = window.confirm("Clear this service? This will request feedback from customer.");
-                                        if(confirm) {
-                                          await updateBooking(b.id, { status: 'completed', completedAt: new Date().toISOString() });
+                                        if (confirm) {
+                                          try {
+                                            await updateDoc(doc(db, 'bookings', b.id), { 
+                                              status: 'completed', 
+                                              completedAt: new Date().toISOString() 
+                                            });
+                                          } catch (err) {
+                                            console.error("Failed to complete booking:", err);
+                                          }
                                         }
                                       }}
                                       className="px-4 py-2 bg-black text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg active:scale-95"
@@ -1050,7 +1110,10 @@ const PartnerDashboard: React.FC = () => {
                       <div className="py-[10rem] flex flex-col items-center justify-center opacity-30 grayscale">
                          <Clock size={40} className="text-gray-200 mb-4" />
                          <p className="text-[0.625rem] font-bold uppercase tracking-[0.5em]">
-                           {bookingView === 'today' ? 'NO BOOKINGS FOR TODAY' : 'NO UPCOMING APPOINTMENTS'}
+                           {bookingView === 'today' ? 'NO BOOKINGS FOR TODAY' : 
+                            bookingView === 'upcoming' ? 'NO UPCOMING APPOINTMENTS' :
+                            bookingView === 'completed' ? 'NO COMPLETED BOOKINGS' :
+                            'NO REJECTED OR TIMEOUT LOGS'}
                          </p>
                       </div>
                     )}
