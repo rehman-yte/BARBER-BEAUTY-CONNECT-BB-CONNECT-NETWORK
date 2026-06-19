@@ -831,10 +831,34 @@ const PartnerDashboard: React.FC = () => {
               </motion.div>
             )}
             {activeTab === 'bookings' && (() => {
-              const todayStr = new Date().toLocaleDateString('en-CA');
+              const systemDateObj = new Date();
+              // Generate exact pattern variations to safeguard against platform inconsistencies
+              const formatVariantA = systemDateObj.toLocaleDateString('en-CA'); // YYYY-MM-DD
+              const formatVariantB = systemDateObj.toDateString(); // e.g., "Fri Jun 19 2026"
+
+              const isTodayDate = (dateVal: any) => {
+                if (!dateVal) return false;
+                const str = String(dateVal).trim();
+                const isA = str === formatVariantA;
+                const isB = str === formatVariantB;
+                const isSubB = str.toLowerCase().includes(formatVariantB.toLowerCase());
+                const isSubA = str.toLowerCase().includes(formatVariantA.toLowerCase());
+                
+                // Timestamp or Date object matching today
+                let isTimestampMatch = false;
+                try {
+                  const d = new Date(str);
+                  if (!isNaN(d.getTime())) {
+                    isTimestampMatch = d.toLocaleDateString('en-CA') === formatVariantA;
+                  }
+                } catch (e) {}
+
+                return isA || isB || isSubB || isSubA || isTimestampMatch;
+              };
+
               const registryTodayQueue = bookings.filter((b: any) => {
                 const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
-                const isToday = bDate === todayStr;
+                const isToday = isTodayDate(bDate);
                 const status = b.status ? String(b.status).toLowerCase() : '';
                 const isTerminal = status === 'completed' || status === 'cancelled' || status === 'rejected' || status === 'failed';
                 return isToday && !isTerminal;
@@ -842,7 +866,26 @@ const PartnerDashboard: React.FC = () => {
 
               const registryUpcomingQueue = bookings.filter((b: any) => {
                 const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
-                return bDate && bDate > todayStr;
+                if (!bDate) return false;
+                const isToday = isTodayDate(bDate);
+                if (isToday) return false;
+
+                // Chronological future check
+                let isFuture = false;
+                try {
+                  const d = new Date(bDate);
+                  if (!isNaN(d.getTime())) {
+                    const todayNoTime = new Date(formatVariantA);
+                    const bNoTime = new Date(d.toLocaleDateString('en-CA'));
+                    isFuture = bNoTime > todayNoTime;
+                  }
+                } catch (e) {}
+
+                // Fallback direct string comparison
+                if (!isFuture) {
+                  isFuture = bDate > formatVariantA;
+                }
+                return isFuture;
               });
 
               const displayedBookings = bookingView === 'today' ? registryTodayQueue : registryUpcomingQueue;
