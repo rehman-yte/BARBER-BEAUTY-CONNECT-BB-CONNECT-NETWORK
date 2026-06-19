@@ -369,6 +369,139 @@ const FailedBookingDetailsModal: React.FC<FailedBookingDetailsModalProps> = ({ b
   );
 };
 
+interface SelectedSlotDetailsModalProps {
+  item: any;
+  onClose: () => void;
+}
+
+const SelectedSlotDetailsModal: React.FC<SelectedSlotDetailsModalProps> = ({ item, onClose }) => {
+  if (!item) return null;
+
+  const shopName = item.shopName || item.partnerBrand || item.partnerBrandName || "Partner Studio";
+  const serviceName = item.serviceName || item.service || "Premium Service";
+  const pricePaid = item.price || item.amountPaid || item.amount || "0";
+  const timeWindow = item.selectedSlot || item.timeSlot || item.slotTime || item.time || "N/A";
+  const bookingDate = item.selectedDate || item.date || "";
+
+  // Chronological Status Check: If matches same-day print "Today's Slot", else print "Upcoming Day's Slot"
+  let dateStatusText = "Upcoming Day's Slot";
+  if (bookingDate) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const parsedBookingDate = String(bookingDate).trim();
+    if (parsedBookingDate === todayStr) {
+      dateStatusText = "Today's Slot";
+    } else {
+      try {
+        const d1 = new Date(parsedBookingDate);
+        const d2 = new Date();
+        if (
+          d1.getFullYear() === d2.getFullYear() &&
+          d1.getMonth() === d2.getMonth() &&
+          d1.getDate() === d2.getDate()
+        ) {
+          dateStatusText = "Today's Slot";
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-charcoal/40 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans text-charcoal"
+      id="selected-slot-modal-backdrop"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 15 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 15 }}
+        transition={{ type: "spring", duration: 0.5 }}
+        className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col"
+        id="selected-slot-modal"
+      >
+        {/* Header */}
+        <div className="p-8 pb-4 text-white bg-gradient-to-br from-bbBlue to-blue-700 flex justify-between items-start relative">
+          <div>
+            <span className="text-[0.5625rem] font-bold uppercase tracking-[0.3em] bg-white/20 px-2.5 py-1 rounded-full text-white/95">
+              Slot Execution Details
+            </span>
+            <h3 className="text-[1.75rem] font-serif font-bold text-white mt-3 leading-tight">
+              {shopName}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all border border-white/5 shadow-inner"
+            id="close-slot-modal-btn-top"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 space-y-6 flex-grow overflow-y-auto">
+          {/* Service & Price */}
+          <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Service</p>
+              <p className="text-[0.875rem] font-bold text-charcoal">
+                {serviceName}
+              </p>
+            </div>
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Amount Paid</p>
+              <p className="text-[0.875rem] font-mono font-bold text-charcoal">₹{pricePaid}</p>
+            </div>
+          </div>
+
+          {/* Time & Chronology */}
+          <div className="space-y-4">
+            <div>
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Timeline Category</p>
+              <p className="text-[0.875rem] font-bold text-bbBlue uppercase tracking-tighter">{dateStatusText}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Reserved Schedule</p>
+              <div className="flex items-center gap-3 bg-gray-50/50 px-4 py-3 rounded-2xl border border-gray-100">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.5"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                <div>
+                  <p className="text-[0.75rem] font-bold text-charcoal uppercase tracking-tighter">{bookingDate}</p>
+                  <p className="text-[0.6875rem] text-gray-500 font-medium">{timeWindow}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Button */}
+        <div className="px-8 py-5 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 bg-charcoal text-white hover:bg-charcoal/90 text-[0.6875rem] font-bold uppercase tracking-widest rounded-xl transition-all shadow-md"
+            id="close-slot-modal-btn-bottom"
+          >
+            Close Details
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -378,6 +511,7 @@ const CustomerDashboard: React.FC = () => {
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [selectedFailedBooking, setSelectedFailedBooking] = useState<any>(null);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
 
   // ID-ISOLATED 3-TAB PIPELINE STATE ARRAYS
   const [waitingBookings, setWaitingBookings] = useState<any[]>([]);
@@ -628,8 +762,16 @@ const CustomerDashboard: React.FC = () => {
       q,
       (snapshot) => {
         const rawList: any[] = [];
+        const seenIds = new Set<string>();
+        
         snapshot.forEach((doc) => {
           const docData = doc.data();
+          const bookingId = doc.id;
+          
+          if (seenIds.has(bookingId)) {
+            return;
+          }
+          seenIds.add(bookingId);
           
           // ABSOLUTE CUSTOMER IDENTITY LOCK: strictly block and ignore matches outside this unique user session
           const bookingCustId = docData.customer_id || docData.customerId;
@@ -647,7 +789,7 @@ const CustomerDashboard: React.FC = () => {
 
           if (isPaid) {
             rawList.push({
-              id: doc.id,
+              id: bookingId,
               ...docData,
               serviceName,
               amountPaid,
@@ -672,12 +814,22 @@ const CustomerDashboard: React.FC = () => {
         const waitingBookings: any[] = [];
         const confirmedBookings: any[] = [];
         const rejectFailedBookings: any[] = [];
+        const seenIdsInTabs = new Set<string>();
 
         rawList.forEach((b) => {
+          if (seenIdsInTabs.has(b.id)) return;
+          seenIdsInTabs.add(b.id);
+
           const statusVal = String(b.status || b.bookingStatus || "").toLowerCase();
           
           if (statusVal === "pending" || statusVal === "payment_held") {
-            waitingBookings.push(b);
+            // Check countdown timer
+            const secsLeft = getBookingSecondsLeft(b);
+            if (secsLeft <= 0) {
+              rejectFailedBookings.push(b);
+            } else {
+              waitingBookings.push(b);
+            }
           } else if (statusVal === "confirmed" || statusVal === "approved") {
             confirmedBookings.push(b);
           } else if (statusVal === "failed" || statusVal === "rejected" || statusVal === "failed_timeout" || statusVal === "rejected_timeout" || statusVal === "refunded/failed") {
@@ -689,7 +841,12 @@ const CustomerDashboard: React.FC = () => {
             } else if (isBookingRejected(b)) {
               rejectFailedBookings.push(b);
             } else {
-              waitingBookings.push(b);
+              const secsLeft = getBookingSecondsLeft(b);
+              if (secsLeft <= 0) {
+                rejectFailedBookings.push(b);
+              } else {
+                waitingBookings.push(b);
+              }
             }
           }
         });
@@ -1035,15 +1192,11 @@ const CustomerDashboard: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
                       onClick={() => {
-                        if (failedOrRejected) {
-                          setSelectedFailedBooking(booking);
-                        } else {
-                          setSelectedBooking(booking);
-                        }
+                        setSelectedSlot(booking);
                       }}
                       className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-3 md:gap-4 p-5 md:p-6 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
                         failedOrRejected
-                          ? "text-charcoal border-b border-gray-100 hover:bg-gray-50/40"
+                          ? "bg-red-50/80 hover:bg-red-100/60 border border-red-200 text-red-900 shadow-sm shadow-red-100/50"
                           : isWaiting
                             ? "bg-amber-50/60 hover:bg-amber-100/40 border border-amber-200 text-amber-900"
                             : "bg-green-50/60 hover:bg-green-100/40 border border-green-200 text-green-900"
@@ -1052,17 +1205,17 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 1: ID Token & Shop */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block">
                         <span className={`text-[0.6875rem] font-mono font-bold tracking-wider px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5 ${
-                          failedOrRejected ? "text-gray-500" : isWaiting ? "text-amber-700" : "text-green-700"
+                          failedOrRejected ? "text-red-700" : isWaiting ? "text-amber-700" : "text-green-700"
                         }`}>
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              failedOrRejected ? "bg-red-500" : isWaiting ? "bg-amber-500 animate-pulse" : "bg-green-500"
+                              failedOrRejected ? "bg-red-500 animate-pulse" : isWaiting ? "bg-amber-500 animate-pulse" : "bg-green-500"
                             }`}
                           />
                           {String(booking.id || "").slice(-8).toUpperCase()}
                         </span>
                         <span className={`text-[0.5625rem] font-bold uppercase tracking-wider md:hidden ${
-                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-500" : "text-green-600"
+                          failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-500" : "text-green-600"
                         }`}>
                           {booking.partnerBrandName || booking.shopName || "Partner"}
                         </span>
@@ -1071,12 +1224,12 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 2: Service & Shop */}
                       <div className="w-full md:w-auto">
                         <p className={`text-[0.8125rem] font-bold leading-tight ${
-                          failedOrRejected ? "text-gray-700" : isWaiting ? "text-amber-900" : "text-green-905"
+                          failedOrRejected ? "text-red-900 font-extrabold" : isWaiting ? "text-amber-900" : "text-green-905"
                         }`}>
                           {booking.serviceName}
                         </p>
                         <p className={`hidden md:block text-[0.5625rem] uppercase tracking-wider font-semibold mt-0.5 ${
-                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-600" : "text-green-600"
+                          failedOrRejected ? "text-red-600/80" : isWaiting ? "text-amber-600" : "text-green-600"
                         }`}>
                           {booking.partnerBrandName || booking.shopName || "Studio Partner"}
                         </p>
@@ -1085,12 +1238,12 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 3: Amount Paid */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0 border-t border-dashed border-gray-100 md:border-none">
                         <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
-                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-650" : "text-green-500"
+                          failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-650" : "text-green-500"
                         }`}>
                           Amount
                         </span>
                         <span className={`text-[0.8125rem] font-mono font-bold ${
-                          failedOrRejected ? "text-gray-700" : isWaiting ? "text-amber-700" : "text-green-700"
+                          failedOrRejected ? "text-red-700" : isWaiting ? "text-amber-700" : "text-green-700"
                         }`}>
                           ₹{booking.amountPaid}
                         </span>
@@ -1099,18 +1252,18 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 4: Target Execution Timestamp */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block pt-1 md:pt-0">
                         <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
-                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-650" : "text-green-500"
+                          failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-650" : "text-green-500"
                         }`}>
                           Execution Time
                         </span>
                         <div className="text-right md:text-left">
                           <p className={`text-[0.75rem] font-bold ${
-                            failedOrRejected ? "text-gray-700" : isWaiting ? "text-amber-900" : "text-green-909"
+                            failedOrRejected ? "text-red-900" : isWaiting ? "text-amber-900" : "text-green-909"
                           }`}>
                             {booking.selectedDate}
                           </p>
                           <p className={`text-[0.625rem] font-medium md:mt-0.5 ${
-                            failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-600" : "text-green-600"
+                            failedOrRejected ? "text-red-600" : isWaiting ? "text-amber-600" : "text-green-600"
                           }`}>
                             {booking.selectedSlot}
                           </p>
@@ -1120,7 +1273,7 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 5: Stylized Badge / Execution Status */}
                       <div className="flex items-center justify-between w-full md:w-auto md:justify-end pt-2 md:pt-0">
                         <span className={`md:hidden text-[0.5625rem] font-bold uppercase tracking-widest ${
-                          failedOrRejected ? "text-gray-400" : isWaiting ? "text-amber-650" : "text-green-500"
+                          failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-650" : "text-green-500"
                         }`}>
                           Status
                         </span>
@@ -1134,9 +1287,11 @@ const CustomerDashboard: React.FC = () => {
                             </span>
                           </div>
                         ) : failedOrRejected ? (
-                          <span className="text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border bg-red-50 border-red-200 text-red-600">
-                            Failed / Refunded
-                          </span>
+                          <div className="flex flex-col md:items-end items-start gap-1">
+                            <span className="text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border bg-red-100/80 border-red-300 text-red-700 font-sans shadow-inner">
+                              Failed / Refunded
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-[0.5625rem] font-bold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border bg-green-50 border-green-200 text-green-600">
                             Confirmed
@@ -1188,7 +1343,17 @@ const CustomerDashboard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Failure/Rejected Detailed Refund Modal Overlay */}
+      {/* Single Comprehensive Slot Details Modal Overlay */}
+      <AnimatePresence>
+        {selectedSlot && (
+          <SelectedSlotDetailsModal
+            item={selectedSlot}
+            onClose={() => setSelectedSlot(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Failure/Rejected Detailed Refund Refund Modal Overlay */}
       <AnimatePresence>
         {selectedFailedBooking && (
           <FailedBookingDetailsModal
