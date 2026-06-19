@@ -377,11 +377,11 @@ interface SelectedSlotDetailsModalProps {
 const SelectedSlotDetailsModal: React.FC<SelectedSlotDetailsModalProps> = ({ item, onClose }) => {
   if (!item) return null;
 
-  const shopName = item.shopName || item.partnerBrand || "Partner Studio";
-  const serviceName = item.serviceName || "Premium Service";
-  const pricePaid = item.price || item.amountPaid || "0";
-  const timeWindow = item.timeSlot || item.selectedSlot || "N/A";
-  const bookingDate = item.date || item.selectedDate || "";
+  const shopName = item.partnerBrandName || item.shopName || item.partnerBrand || item.studioName || "Partner Studio";
+  const serviceName = item.serviceName || item.service || "Premium Service";
+  const pricePaid = item.amountPaid || item.price || item.amount || "0";
+  const timeWindow = item.selectedSlot || item.timeSlot || item.slotTime || item.time || "N/A";
+  const bookingDate = item.selectedDate || item.date || "";
 
   // Chronological Status Check: Compare item.date (bookingDate) with today's calendar date
   let dateStatusText = "Upcoming Day's Slot";
@@ -427,13 +427,16 @@ const SelectedSlotDetailsModal: React.FC<SelectedSlotDetailsModalProps> = ({ ite
         className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col"
         id="selected-slot-modal"
       >
-        {/* Header */}
-        <div className="p-8 pb-4 text-white bg-gradient-to-br from-bbBlue to-blue-700 flex justify-between items-start relative">
+        {/* Header with resilient inline gradient definition */}
+        <div 
+          className="p-8 pb-4 text-white flex justify-between items-start relative bg-gradient-to-br from-blue-600 to-indigo-900"
+          style={{ background: "linear-gradient(135deg, #2a7de1 0%, #1d4ed8 100%)" }}
+        >
           <div>
             <span className="text-[0.5625rem] font-bold uppercase tracking-[0.3em] bg-white/20 px-2.5 py-1 rounded-full text-white/95">
               Slot Execution Details
             </span>
-            <h3 className="text-[1.75rem] font-serif font-bold text-white mt-3 leading-tight">
+            <h3 className="text-[1.75rem] font-serif font-bold text-white mt-3 leading-tight" id="modal-shop-name">
               {shopName}
             </h3>
           </div>
@@ -1204,7 +1207,7 @@ const CustomerDashboard: React.FC = () => {
                       }}
                       className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-3 md:gap-4 p-5 md:p-6 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
                         failedOrRejected
-                          ? "bg-red-50/10 text-red-500 border border-red-200 shadow-sm"
+                          ? "bg-red-500/10 text-red-500 border border-red-500/20"
                           : isWaiting
                             ? "bg-amber-50/60 hover:bg-amber-100/40 border border-amber-200 text-amber-900"
                             : "bg-green-50/60 hover:bg-green-100/40 border border-green-200 text-green-900"
