@@ -297,30 +297,55 @@ const PartnerDashboard: React.FC = () => {
            st === "SUCCESS" || st === "PAID" || st === "CONFIRMED" || st === "PAYMENT_HELD";
   };
 
+  // Keep todayBookings and futureBookings for the live list display unchanged
   const todayBookings = bookings.filter(b => {
-    if (!isBookingPaid(b)) return false;
-    const bDate = b.date || b.appointmentDate?.split('T')[0];
+    const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
     return bDate === todayISO || bDate === todayLocale;
   });
 
   const futureBookingsList = bookings.filter(b => {
-    if (!isBookingPaid(b)) return false;
-    const bDate = b.date || b.appointmentDate?.split('T')[0];
+    const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
     return bDate > todayISO;
   });
 
-  const todayEarnings = todayBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
-  const totalSlotsBooked = bookings.filter(b => isBookingPaid(b)).length;
+  // 1. TODAY'S EARNINGS: Sum item.amountPaid (or item.price) where item.status === "completed" OR "confirmed" AND item.date strictly matches today's local system date.
+  const todayEarnings = bookings
+    .filter(b => {
+      const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
+      const isToday = bDate === todayISO || bDate === todayLocale;
+      const isValidStatus = b.status === "completed" || b.status === "confirmed";
+      return isToday && isValidStatus;
+    })
+    .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
+
+  // 2. SLOTS TODAY: Count total document objects where item.date matches today's local system date.
+  const slotsTodayCount = bookings.filter(b => {
+    const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
+    return bDate === todayISO || bDate === todayLocale;
+  }).length;
+
+  // 3. TOTAL BOOKINGS: Count total cumulative size of all historical items linked to this partner instance where status is valid.
+  const totalSlotsBooked = bookings.filter(b => {
+    if (!b.status) return false;
+    const st = String(b.status).toLowerCase();
+    return st !== 'unpaid' && st !== 'failed' && st !== 'cancelled' && st !== 'rejected';
+  }).length;
   
-  const avgRating = ratings.length > 0 
-    ? (ratings.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / ratings.length).toFixed(1) 
+  // 4. CUSTOMER RATING: Average the item.rating numeric value across all entries containing a rating property.
+  const ratedEntries = [
+    ...ratings.filter(r => r.rating !== undefined && r.rating !== null && r.rating !== ''),
+    ...bookings.filter(b => b.rating !== undefined && b.rating !== null && b.rating !== '')
+  ];
+  const avgRating = ratedEntries.length > 0 
+    ? (ratedEntries.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) / ratedEntries.length).toFixed(1)
     : "0.0";
   const starCount = Math.round(Number(avgRating));
   
-  // Accountant AI Engine Logic: Use field from Firestore or calculate if missing
-  const walletBalance = shopData?.partner_wallet !== undefined 
-    ? (Number(shopData.partner_wallet) || 0) 
-    : (todayEarnings * 0.95);
+  // Accountant AI Engine Logic: Cumulative gross revenue minus 5% platform fee
+  const cumulativeGrossRevenue = bookings
+    .filter(b => b.status === "completed" || b.status === "confirmed" || b.status === "payment_held" || isBookingPaid(b))
+    .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
+  const walletBalance = cumulativeGrossRevenue * 0.95;
 
   const handleToggleLive = async () => {
     const nextState = !isLive;
@@ -501,7 +526,7 @@ const PartnerDashboard: React.FC = () => {
           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
             <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Slots Today</span>
             <div className="flex items-end gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{todayBookings.length}</span>
+              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{slotsTodayCount}</span>
               <span className="text-[0.5rem] text-gray-300 font-bold mb-1 uppercase tracking-widest">Active</span>
             </div>
           </div>
