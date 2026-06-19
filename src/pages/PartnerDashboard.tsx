@@ -1028,7 +1028,7 @@ const PartnerDashboard: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-8 py-6 text-center">
-                                {b.status === 'payment_held' ? (
+                                {(b.status === 'payment_held' || b.status === 'pending') ? (
                                   <div className="flex justify-center gap-2">
                                     <button
                                       onClick={async (e) => {
