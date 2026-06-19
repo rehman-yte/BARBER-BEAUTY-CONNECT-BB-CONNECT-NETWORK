@@ -830,173 +830,191 @@ const PartnerDashboard: React.FC = () => {
                 </div>
               </motion.div>
             )}
-            {activeTab === 'bookings' && (
-              <motion.div 
-                key="bookings"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="space-y-6"
-              >
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-2">
-                  <div>
-                    <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Master Booking Registry</h2>
-                    <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Live queue and scheduling archive</p>
-                  </div>
-                  
-                  <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
-                    <button 
-                      onClick={() => setBookingView('today')}
-                      className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'today' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
-                    >
-                      Today's Queue
-                    </button>
-                    <button 
-                      onClick={() => setBookingView('upcoming')}
-                      className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'upcoming' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
-                    >
-                      Upcoming Slots
-                    </button>
-                  </div>
-                </div>
+            {activeTab === 'bookings' && (() => {
+              const todayStr = new Date().toLocaleDateString('en-CA');
+              const registryTodayQueue = bookings.filter((b: any) => {
+                const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
+                const isToday = bDate === todayStr;
+                const status = b.status ? String(b.status).toLowerCase() : '';
+                const isTerminal = status === 'completed' || status === 'cancelled' || status === 'rejected' || status === 'failed';
+                return isToday && !isTerminal;
+              });
 
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Client Info</th>
-                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Service Asset</th>
-                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Schedule</th>
-                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-center">Status</th>
-                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-center">Actions</th>
-                          <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-right">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {(bookingView === 'today' ? todayBookings : futureBookingsList).map((b: any) => (
-                          <tr key={b.id} className="hover:bg-gray-50/50 transition-all group">
-                            <td className="px-8 py-6">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-bbBlue/10 flex items-center justify-center font-bold text-bbBlue text-[0.625rem] border border-bbBlue/10">
-                                   {b.clientName?.[0] || 'C'}
+              const registryUpcomingQueue = bookings.filter((b: any) => {
+                const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
+                return bDate && bDate > todayStr;
+              });
+
+              const displayedBookings = bookingView === 'today' ? registryTodayQueue : registryUpcomingQueue;
+
+              return (
+                <motion.div 
+                  key="bookings"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="space-y-6"
+                >
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-2">
+                    <div>
+                      <h2 className="text-[1.125rem] font-serif font-black uppercase tracking-tight">Master Booking Registry</h2>
+                      <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Live queue and scheduling archive</p>
+                    </div>
+                    
+                    <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+                      <button 
+                        onClick={() => setBookingView('today')}
+                        className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'today' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
+                      >
+                        Today's Queue
+                      </button>
+                      <button 
+                        onClick={() => setBookingView('upcoming')}
+                        className={`px-4 py-2 rounded-xl text-[0.5rem] font-bold uppercase tracking-widest transition-all ${bookingView === 'upcoming' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-black'}`}
+                      >
+                        Upcoming Slots
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Client Info</th>
+                            <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Service Asset</th>
+                            <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400">Schedule</th>
+                            <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-center">Status</th>
+                            <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-center">Actions</th>
+                            <th className="px-8 py-5 text-[0.5rem] font-black uppercase tracking-[0.3em] text-gray-400 text-right">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {displayedBookings.map((b: any) => (
+                            <tr key={b.id} className="hover:bg-gray-50/50 transition-all group">
+                              <td className="px-8 py-6">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-bbBlue/10 flex items-center justify-center font-bold text-bbBlue text-[0.625rem] border border-bbBlue/10">
+                                     {b.clientName?.[0] || 'C'}
+                                  </div>
+                                  <span className="text-[0.75rem] font-black uppercase tracking-tight">{b.clientName}</span>
                                 </div>
-                                <span className="text-[0.75rem] font-black uppercase tracking-tight">{b.clientName}</span>
-                              </div>
-                            </td>
-                            <td className="px-8 py-6">
-                              <span className="text-[0.625rem] font-bold uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">{b.serviceName}</span>
-                            </td>
-                            <td className="px-8 py-6">
-                              <div className="flex flex-col">
-                                <span className="text-[0.625rem] font-black uppercase">{b.time}</span>
-                                <span className="text-[0.5rem] text-gray-400 font-bold uppercase tracking-widest">{b.date}</span>
-                              </div>
-                            </td>
-                            <td className="px-8 py-6 text-center">
-                              <div className="flex flex-col items-center gap-1">
-                                <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
-                                  b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
-                                  b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
-                                  'bg-bbBlue/10 text-bbBlue'
-                                }`}>
-                                  {b.status === 'payment_held' ? 'HELD (ESCROW)' : b.status}
-                                </span>
-                                {b.status === 'payment_held' && b.heldAt && (
-                                  <EscrowTimer 
-                                    heldAt={b.heldAt} 
-                                    onTimeout={async () => {
-                                      console.log(`Booking ${b.id} timeout reached, trigger auto-refund.`);
-                                      try {
-                                        await fetch('/api/razorpay/refund', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ paymentId: b.transactionId, amount: b.price, bookingId: b.id })
-                                        });
-                                      } catch (err) {
-                                        console.error('Trigger checkout check failed for bookingId:', b.id, err);
-                                      }
-                                    }} 
-                                  />
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-8 py-6 text-center">
-                              {b.status === 'payment_held' ? (
-                                <div className="flex justify-center gap-2">
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      const confirmAccept = window.confirm("Are you sure you want to ACCEPT this booking? This will confirm the slot permanently.");
-                                      if (confirmAccept) {
-                                        setBookings(prev => prev.filter(item => item.id !== b.id));
-                                        await updateBooking(b.id, { 
-                                          status: 'confirmed', 
-                                          acceptedAt: new Date().toISOString() 
-                                        });
-                                      }
-                                    }}
-                                    className="px-4 py-2 bg-green-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95"
-                                  >
-                                    Accept
-                                  </button>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
-                                      if (confirmReject) {
-                                        setBookings(prev => prev.filter(item => item.id !== b.id));
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className="text-[0.625rem] font-bold uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">{b.serviceName}</span>
+                              </td>
+                              <td className="px-8 py-6">
+                                <div className="flex flex-col">
+                                  <span className="text-[0.625rem] font-black uppercase">{b.time}</span>
+                                  <span className="text-[0.5rem] text-gray-400 font-bold uppercase tracking-widest">{b.date}</span>
+                                </div>
+                              </td>
+                              <td className="px-8 py-6 text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${
+                                    b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                    b.status === 'completed' ? 'bg-gray-100 text-gray-400' :
+                                    'bg-bbBlue/10 text-bbBlue'
+                                  }`}>
+                                    {b.status === 'payment_held' ? 'HELD (ESCROW)' : b.status}
+                                  </span>
+                                  {b.status === 'payment_held' && b.heldAt && (
+                                    <EscrowTimer 
+                                      heldAt={b.heldAt} 
+                                      onTimeout={async () => {
+                                        console.log(`Booking ${b.id} timeout reached, trigger auto-refund.`);
                                         try {
                                           await fetch('/api/razorpay/refund', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ paymentId: b.transactionId, amount: b.price, bookingId: b.id })
                                           });
-                                        } catch (refErr) {
-                                          console.error("Refund dispatch error:", refErr);
+                                        } catch (err) {
+                                          console.error('Trigger checkout check failed for bookingId:', b.id, err);
                                         }
-                                      }
-                                    }}
-                                    className="px-4 py-2 bg-red-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg active:scale-95"
-                                  >
-                                    Reject
-                                  </button>
+                                      }} 
+                                    />
+                                  )}
                                 </div>
-                              ) : (
-                                b.status !== 'completed' && b.status !== 'rejected' && b.status !== 'failed' && b.status !== 'cancelled' && b.status !== 'Cancelled' && (
-                                  <button 
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      const confirm = window.confirm("Clear this service? This will request feedback from customer.");
-                                      if(confirm) {
-                                        await updateBooking(b.id, { status: 'completed', completedAt: new Date().toISOString() });
-                                      }
-                                    }}
-                                    className="px-4 py-2 bg-black text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg active:scale-95"
-                                  >
-                                    Clear Call
-                                  </button>
-                                )
-                              )}
-                            </td>
-                            <td className="px-8 py-6 text-right">
-                              <span className="text-[0.75rem] font-serif font-black tracking-tight">₹{b.price}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {(bookingView === 'today' ? todayBookings : futureBookingsList).length === 0 && (
-                    <div className="py-[10rem] flex flex-col items-center justify-center opacity-30 grayscale">
-                       <Clock size={40} className="text-gray-200 mb-4" />
-                       <p className="text-[0.625rem] font-bold uppercase tracking-[0.5em]">
-                         {bookingView === 'today' ? 'No Bookings for Today' : 'No Future Appointments'}
-                       </p>
+                              </td>
+                              <td className="px-8 py-6 text-center">
+                                {b.status === 'payment_held' ? (
+                                  <div className="flex justify-center gap-2">
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const confirmAccept = window.confirm("Are you sure you want to ACCEPT this booking? This will confirm the slot permanently.");
+                                        if (confirmAccept) {
+                                          setBookings(prev => prev.filter(item => item.id !== b.id));
+                                          await updateBooking(b.id, { 
+                                            status: 'confirmed', 
+                                            acceptedAt: new Date().toISOString() 
+                                          });
+                                        }
+                                      }}
+                                      className="px-4 py-2 bg-green-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95"
+                                    >
+                                      Accept
+                                    </button>
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
+                                        if (confirmReject) {
+                                          setBookings(prev => prev.filter(item => item.id !== b.id));
+                                          try {
+                                            await fetch('/api/razorpay/refund', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ paymentId: b.transactionId, amount: b.price, bookingId: b.id })
+                                            });
+                                          } catch (refErr) {
+                                            console.error("Refund dispatch error:", refErr);
+                                          }
+                                        }
+                                      }}
+                                      className="px-4 py-2 bg-red-500 text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg active:scale-95"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  b.status !== 'completed' && b.status !== 'rejected' && b.status !== 'failed' && b.status !== 'cancelled' && b.status !== 'Cancelled' && (
+                                    <button 
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const confirm = window.confirm("Clear this service? This will request feedback from customer.");
+                                        if(confirm) {
+                                          await updateBooking(b.id, { status: 'completed', completedAt: new Date().toISOString() });
+                                        }
+                                      }}
+                                      className="px-4 py-2 bg-black text-white rounded-xl text-[0.5rem] font-bold uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg active:scale-95"
+                                    >
+                                      Clear Call
+                                    </button>
+                                  )
+                                )}
+                              </td>
+                              <td className="px-8 py-6 text-right">
+                                <span className="text-[0.75rem] font-serif font-black tracking-tight font-sans">₹{b.price}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
+                    {displayedBookings.length === 0 && (
+                      <div className="py-[10rem] flex flex-col items-center justify-center opacity-30 grayscale">
+                         <Clock size={40} className="text-gray-200 mb-4" />
+                         <p className="text-[0.625rem] font-bold uppercase tracking-[0.5em]">
+                           {bookingView === 'today' ? 'NO BOOKINGS FOR TODAY' : 'NO UPCOMING APPOINTMENTS'}
+                         </p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })()}
 
           </AnimatePresence>
         </div>
