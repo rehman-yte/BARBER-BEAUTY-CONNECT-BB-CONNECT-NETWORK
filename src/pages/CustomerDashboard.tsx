@@ -377,33 +377,37 @@ interface SelectedSlotDetailsModalProps {
 const SelectedSlotDetailsModal: React.FC<SelectedSlotDetailsModalProps> = ({ item, onClose }) => {
   if (!item) return null;
 
-  const shopName = item.shopName || item.partnerBrand || item.partnerBrandName || "Partner Studio";
-  const serviceName = item.serviceName || item.service || "Premium Service";
-  const pricePaid = item.price || item.amountPaid || item.amount || "0";
-  const timeWindow = item.selectedSlot || item.timeSlot || item.slotTime || item.time || "N/A";
-  const bookingDate = item.selectedDate || item.date || "";
+  const shopName = item.shopName || item.partnerBrand || "Partner Studio";
+  const serviceName = item.serviceName || "Premium Service";
+  const pricePaid = item.price || item.amountPaid || "0";
+  const timeWindow = item.timeSlot || item.selectedSlot || "N/A";
+  const bookingDate = item.date || item.selectedDate || "";
 
-  // Chronological Status Check: If matches same-day print "Today's Slot", else print "Upcoming Day's Slot"
+  // Chronological Status Check: Compare item.date (bookingDate) with today's calendar date
   let dateStatusText = "Upcoming Day's Slot";
   if (bookingDate) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const parsedBookingDate = String(bookingDate).trim();
-    if (parsedBookingDate === todayStr) {
-      dateStatusText = "Today's Slot";
-    } else {
-      try {
-        const d1 = new Date(parsedBookingDate);
-        const d2 = new Date();
-        if (
-          d1.getFullYear() === d2.getFullYear() &&
-          d1.getMonth() === d2.getMonth() &&
-          d1.getDate() === d2.getDate()
-        ) {
-          dateStatusText = "Today's Slot";
-        }
-      } catch (e) {
-        // Fallback
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+    const todayDay = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+
+    const normalizedBookingDate = String(bookingDate).toLowerCase().trim();
+    
+    let isSameDay = false;
+    try {
+      const bDateObj = new Date(bookingDate);
+      if (!isNaN(bDateObj.getTime())) {
+        isSameDay = (
+          bDateObj.getFullYear() === today.getFullYear() &&
+          bDateObj.getMonth() === today.getMonth() &&
+          bDateObj.getDate() === today.getDate()
+        );
       }
+    } catch (e) {}
+
+    if (normalizedBookingDate === todayStr || normalizedBookingDate.includes(todayStr) || isSameDay) {
+      dateStatusText = "Today's Slot";
     }
   }
 
@@ -694,8 +698,12 @@ const CustomerDashboard: React.FC = () => {
     const waiting: any[] = [];
     const confirmed: any[] = [];
     const failed: any[] = [];
+    const seenIds = new Set<string>();
 
     rawList.forEach((b) => {
+      if (!b || !b.id || seenIds.has(b.id)) return;
+      seenIds.add(b.id);
+
       const isPaid = getNormalizedPaymentStatus(b) === "SUCCESS";
       if (!isPaid) return; // Drop list item if unpaid, incomplete, or invalid
 
@@ -961,13 +969,8 @@ const CustomerDashboard: React.FC = () => {
     try {
       await updateDoc(doc(db, "bookings", bookingId), {
         status: "failed",
-        bookingStatus: "failed",
-        paymentStatus: "failed",
-        statusReason: "Timeout: Partner did not accept within 5 minutes",
-        message: "Timeout: Partner did not accept within 5 minutes",
-        refund_status: "initiated",
-        refund_timeframe: "12 hours",
-        failure_reason: "Timeout: Partner did not accept within 5 minutes"
+        failure_reason: "Timeout: Partner did not accept within 5 minutes",
+        refund_status: "initiated"
       });
     } catch (dbErr) {
       console.error("[Silent DB Mutate Error]:", dbErr);
@@ -1021,10 +1024,15 @@ const CustomerDashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, [waitingBookings]);
 
-  const filteredBookings = 
+  // ELIMINATE DUAL-ROW GLITCH: Filter duplicates out by unique ID
+  const rawFilteredBookings = 
     activeTab === "waiting" ? waitingBookings :
     activeTab === "confirmed" ? confirmedBookings :
     failedBookings;
+
+  const filteredBookings: any[] = Array.from(
+    new Map<string, any>(rawFilteredBookings.map((item) => [item.id, item])).values()
+  );
 
   const handleRatingSubmit = async (rating: number, comment: string) => {
     if (!pendingRatingBooking) return;
@@ -1185,7 +1193,7 @@ const CustomerDashboard: React.FC = () => {
                   };
 
                   return (
-                    <motion.div
+                    <motion.tr
                       key={booking.id}
                       layout
                       initial={{ opacity: 0, y: 5 }}
@@ -1196,7 +1204,7 @@ const CustomerDashboard: React.FC = () => {
                       }}
                       className={`flex flex-col md:grid md:grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-3 md:gap-4 p-5 md:p-6 cursor-pointer transition-all duration-300 items-start md:items-center font-sans ${
                         failedOrRejected
-                          ? "bg-red-50/80 hover:bg-red-100/60 border border-red-200 text-red-900 shadow-sm shadow-red-100/50"
+                          ? "bg-red-50/10 text-red-500 border border-red-200 shadow-sm"
                           : isWaiting
                             ? "bg-amber-50/60 hover:bg-amber-100/40 border border-amber-200 text-amber-900"
                             : "bg-green-50/60 hover:bg-green-100/40 border border-green-200 text-green-900"
@@ -1205,7 +1213,7 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 1: ID Token & Shop */}
                       <div className="flex items-center justify-between w-full md:w-auto md:block">
                         <span className={`text-[0.6875rem] font-mono font-bold tracking-wider px-2.5 py-1 md:px-0 md:py-0 rounded flex items-center gap-1.5 ${
-                          failedOrRejected ? "text-red-700" : isWaiting ? "text-amber-700" : "text-green-700"
+                          failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-700" : "text-green-700"
                         }`}>
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
@@ -1224,12 +1232,12 @@ const CustomerDashboard: React.FC = () => {
                       {/* COL 2: Service & Shop */}
                       <div className="w-full md:w-auto">
                         <p className={`text-[0.8125rem] font-bold leading-tight ${
-                          failedOrRejected ? "text-red-900 font-extrabold" : isWaiting ? "text-amber-900" : "text-green-905"
+                          failedOrRejected ? "text-red-500 font-extrabold" : isWaiting ? "text-amber-900" : "text-green-905"
                         }`}>
                           {booking.serviceName}
                         </p>
                         <p className={`hidden md:block text-[0.5625rem] uppercase tracking-wider font-semibold mt-0.5 ${
-                          failedOrRejected ? "text-red-600/80" : isWaiting ? "text-amber-600" : "text-green-600"
+                          failedOrRejected ? "text-red-400" : isWaiting ? "text-amber-600" : "text-green-600"
                         }`}>
                           {booking.partnerBrandName || booking.shopName || "Studio Partner"}
                         </p>
@@ -1243,7 +1251,7 @@ const CustomerDashboard: React.FC = () => {
                           Amount
                         </span>
                         <span className={`text-[0.8125rem] font-mono font-bold ${
-                          failedOrRejected ? "text-red-700" : isWaiting ? "text-amber-700" : "text-green-700"
+                          failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-700" : "text-green-700"
                         }`}>
                           ₹{booking.amountPaid}
                         </span>
@@ -1258,12 +1266,12 @@ const CustomerDashboard: React.FC = () => {
                         </span>
                         <div className="text-right md:text-left">
                           <p className={`text-[0.75rem] font-bold ${
-                            failedOrRejected ? "text-red-900" : isWaiting ? "text-amber-900" : "text-green-909"
+                            failedOrRejected ? "text-red-500" : isWaiting ? "text-amber-900" : "text-green-909"
                           }`}>
                             {booking.selectedDate}
                           </p>
                           <p className={`text-[0.625rem] font-medium md:mt-0.5 ${
-                            failedOrRejected ? "text-red-600" : isWaiting ? "text-amber-600" : "text-green-600"
+                            failedOrRejected ? "text-red-400" : isWaiting ? "text-amber-600" : "text-green-600"
                           }`}>
                             {booking.selectedSlot}
                           </p>
@@ -1298,7 +1306,7 @@ const CustomerDashboard: React.FC = () => {
                           </span>
                         )}
                       </div>
-                    </motion.div>
+                    </motion.tr>
                   );
                 })}
               </div>
