@@ -637,9 +637,11 @@ const CustomerDashboard: React.FC = () => {
       s === "confirmed" ||
       s === "approved" ||
       s === "completed" ||
+      s === "accepted" ||
       bs === "confirmed" ||
       bs === "approved" ||
       bs === "completed" ||
+      bs === "accepted" ||
       b.partner_accepted === true ||
       b.partner_approval === true ||
       b.partnerApproved === true ||
@@ -714,9 +716,9 @@ const CustomerDashboard: React.FC = () => {
 
       if (statusVal === "pending" || statusVal === "payment_held") {
         waiting.push(b);
-      } else if (statusVal === "confirmed" || statusVal === "approved") {
+      } else if (statusVal === "confirmed" || statusVal === "accepted" || statusVal === "approved" || statusVal === "completed" || isBookingApproved(b)) {
         confirmed.push(b);
-      } else if (statusVal === "failed" || statusVal === "rejected" || statusVal === "failed_timeout" || statusVal === "rejected_timeout" || statusVal === "refunded/failed") {
+      } else {
         const baseMsg = b.message || b.statusReason || b.failure_reason || "Timeout: Partner did not accept within 5 minutes";
         const cleanMsg = baseMsg.includes("Your payment will be refunded") 
           ? baseMsg 
@@ -727,27 +729,6 @@ const CustomerDashboard: React.FC = () => {
           message: cleanMsg,
           statusReason: cleanMsg
         });
-      } else {
-        const isApproved = isBookingApproved(b);
-        const isRejected = isBookingRejected(b);
-        const secsLeft = getBookingSecondsLeft(b);
-
-        if (isApproved) {
-          confirmed.push(b);
-        } else if (isRejected || secsLeft <= 0) {
-          const baseMsg = b.message || b.statusReason || b.failure_reason || "Partner Response Timeout";
-          const cleanMsg = baseMsg.includes("Your payment will be refunded") 
-            ? baseMsg 
-            : `${baseMsg}. Your payment will be refunded within 10-20 minutes.`;
-
-          failed.push({
-            ...b,
-            message: cleanMsg,
-            statusReason: cleanMsg
-          });
-        } else {
-          waiting.push(b);
-        }
       }
     });
 
@@ -838,27 +819,18 @@ const CustomerDashboard: React.FC = () => {
             const secsLeft = getBookingSecondsLeft(b);
             if (secsLeft <= 0) {
               rejectFailedBookings.push(b);
+              handleExpired(
+                b.id,
+                b.transactionId || b.id,
+                b.amountPaid || b.amount || b.price || 0
+              );
             } else {
               waitingBookings.push(b);
             }
-          } else if (statusVal === "confirmed" || statusVal === "approved") {
+          } else if (statusVal === "confirmed" || statusVal === "accepted" || statusVal === "approved" || statusVal === "completed" || isBookingApproved(b)) {
             confirmedBookings.push(b);
-          } else if (statusVal === "failed" || statusVal === "rejected" || statusVal === "failed_timeout" || statusVal === "rejected_timeout" || statusVal === "refunded/failed") {
-            rejectFailedBookings.push(b);
           } else {
-            // Fallback status assessment checks
-            if (isBookingApproved(b)) {
-              confirmedBookings.push(b);
-            } else if (isBookingRejected(b)) {
-              rejectFailedBookings.push(b);
-            } else {
-              const secsLeft = getBookingSecondsLeft(b);
-              if (secsLeft <= 0) {
-                rejectFailedBookings.push(b);
-              } else {
-                waitingBookings.push(b);
-              }
-            }
+            rejectFailedBookings.push(b);
           }
         });
 
@@ -919,9 +891,9 @@ const CustomerDashboard: React.FC = () => {
         if (b.id === bookingId) {
           return {
             ...b,
-            status: "failed",
-            bookingStatus: "failed",
-            paymentStatus: "failed",
+            status: "failed_timeout",
+            bookingStatus: "failed_timeout",
+            paymentStatus: "failed_timeout",
             statusReason: "Timeout: Partner did not accept within 5 minutes",
             message: "Timeout: Partner did not accept within 5 minutes",
             refund_status: "initiated",
@@ -938,9 +910,9 @@ const CustomerDashboard: React.FC = () => {
       if (prev && prev.id === bookingId) {
         return {
           ...prev,
-          status: "failed",
-          bookingStatus: "failed",
-          paymentStatus: "failed",
+          status: "failed_timeout",
+          bookingStatus: "failed_timeout",
+          paymentStatus: "failed_timeout",
           statusReason: "Timeout: Partner did not accept within 5 minutes",
           message: "Timeout: Partner did not accept within 5 minutes",
           refund_status: "initiated",
@@ -971,7 +943,7 @@ const CustomerDashboard: React.FC = () => {
     // 2. Direct background database update
     try {
       await updateDoc(doc(db, "bookings", bookingId), {
-        status: "failed",
+        status: "failed_timeout",
         failure_reason: "Timeout: Partner did not accept within 5 minutes",
         refund_status: "initiated"
       });
@@ -988,6 +960,13 @@ const CustomerDashboard: React.FC = () => {
       setWaitingBookings((prevWaiting) => {
         const nextWaiting: any[] = [];
         prevWaiting.forEach((b) => {
+          const statusVal = String(b.status || b.bookingStatus || "").toLowerCase();
+          
+          // Guard: If status has migrated from waiting, evict/unmount instantly
+          if (statusVal !== "pending" && statusVal !== "payment_held") {
+            return;
+          }
+
           const secs = getBookingSecondsLeft(b);
           if (secs <= 0) {
             console.log(`[Timer Timeout Event] Evicting booking ${b.id}`);
@@ -1002,9 +981,9 @@ const CustomerDashboard: React.FC = () => {
             // Evict and move to failed states locally
             const failedCopy = {
               ...b,
-              status: "failed",
-              bookingStatus: "failed",
-              paymentStatus: "failed",
+              status: "failed_timeout",
+              bookingStatus: "failed_timeout",
+              paymentStatus: "failed_timeout",
               statusReason: "Timeout: Partner did not accept within 5 minutes",
               message: "Timeout: Partner did not accept within 5 minutes",
               refund_status: "initiated",
