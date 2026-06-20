@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, query, collection, where, orderBy, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, orderBy, updateDoc, addDoc } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -93,6 +93,31 @@ const PartnerDashboard: React.FC = () => {
   const [hasNewBooking, setHasNewBooking] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLive, setIsLive] = useState(false);
+  const [todayEarnings, setTodayEarnings] = useState<number>(0);
+  const [platformFee, setPlatformFee] = useState<number>(0);
+  const [netWalletBalance, setNetWalletBalance] = useState<number>(0);
+
+  const localClock = new Date();
+  const formatStringA = localClock.toDateString(); // "Fri Jun 19 2026"
+  const formatStringB = localClock.toLocaleDateString('en-CA'); // "2026-06-19"
+
+  const isTodayDate = (dateVal: any) => {
+    if (!dateVal) return false;
+    const str = String(dateVal).trim();
+    const isA = str === formatStringA;
+    const isB = str === formatStringB;
+    const isSubB = str.toLowerCase().includes(formatStringB.toLowerCase());
+    const isSubA = str.toLowerCase().includes(formatStringA.toLowerCase());
+    let isTimestampMatch = false;
+    try {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        isTimestampMatch = d.toLocaleDateString('en-CA') === formatStringB;
+      }
+    } catch (e) {}
+    return isA || isB || isSubB || isSubA || isTimestampMatch;
+  };
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -189,6 +214,65 @@ const PartnerDashboard: React.FC = () => {
     const interval = setInterval(handleAutoRefunds, 10000); // scan every 10 seconds
     return () => clearInterval(interval);
   }, [bookings]);
+
+  // Real-time accounting metrics and automatic 12-hour settlement logic
+  useEffect(() => {
+    // 1A. TODAY'S EARNINGS: Filter realtime database entries strictly completed on current local date
+    const completedToday = bookings.filter((item: any) => {
+      const itemDate = item.date || item.selectedDate || item.appointmentDate?.split('T')[0];
+      const isToday = isTodayDate(itemDate);
+      const status = item.status ? String(item.status).toLowerCase() : '';
+      return status === 'completed' && isToday;
+    });
+
+    let totalRevenue = 0;
+    completedToday.forEach((item: any) => {
+      totalRevenue += Number(item.amount || item.amountPaid || item.price || 0);
+    });
+
+    const fee = totalRevenue * 0.05;
+    const netWallet = totalRevenue - fee;
+
+    setTodayEarnings(totalRevenue);
+    setPlatformFee(fee);
+    setNetWalletBalance(netWallet);
+
+    // 1B. AUTO-SETTLEMENT CHRON TRIGGER LOGICAL FLOW:
+    if (!user?.uid) return;
+
+    const checkAndTriggerPayouts = async () => {
+      const now = Date.now();
+      for (const item of bookings) {
+        if (
+          item.status === 'completed' &&
+          item.settlementEligibleTime &&
+          now >= Number(item.settlementEligibleTime) &&
+          !item.payoutRequested
+        ) {
+          try {
+            const bRef = doc(db, 'bookings', item.id);
+            // Optimistically update firestore to prevent duplicate execution loops
+            await updateDoc(bRef, { payoutRequested: true });
+
+            await addDoc(collection(db, 'payout_requests'), {
+              partnerId: user.uid,
+              upiId: shopData?.upiId || '',
+              netSettlement: Number(item.amount || item.amountPaid || item.price || 0) * 0.95,
+              verificationStatus: shopData?.status || 'approved',
+              bookingId: item.id,
+              createdAt: new Date().toISOString(),
+              status: 'pending_settlement'
+            });
+            console.log(`[Auto-Settlement] Recorded log entry successfully for booking ID ${item.id}`);
+          } catch (e) {
+            console.error("[Auto-Settlement Trigger Failure]:", e);
+          }
+        }
+      }
+    };
+
+    checkAndTriggerPayouts();
+  }, [bookings, user?.uid, shopData]);
 
   // UI REAL-TIME ENGINE: Snapshot Listeners for zero-latency updates
   useEffect(() => {
@@ -303,7 +387,7 @@ const PartnerDashboard: React.FC = () => {
   // We use current Date in both ISO and Locale formats to capture all potential booking styles
   const todayISO = new Date().toISOString().split('T')[0];
   const todayLocale = new Date().toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
-  
+
   // Normalized helper to identify paid / valid booking payments (PAID, SUCCESS, payment_held)
   const isBookingPaid = (b: any): boolean => {
     if (!b) return false;
@@ -324,36 +408,35 @@ const PartnerDashboard: React.FC = () => {
     return bDate > todayISO;
   });
 
-  // 1. TODAY'S EARNINGS: Sum item.amountPaid (or item.price) where item.status === "completed" OR "confirmed" AND item.date strictly matches today's local system date.
-  const todayEarnings = bookings
-    .filter(b => {
-      const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
-      const isToday = bDate === todayISO || bDate === todayLocale;
-      const isValidStatus = b.status === "completed" || b.status === "confirmed";
-      return isToday && isValidStatus;
-    })
-    .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
+  // 1. TODAY'S EARNINGS AND PLATFORM FEE LOGIC MATRIX:
+  // Managed reactively via useEffect utilizing state hooks to prevent naming conflict & shadow warnings
 
-  // 2. SLOTS TODAY: Count total document objects where item.date matches today's local system date.
+  // 2. SLOTS TODAY: strictly count the total array length of documents received for current calendar date with status 'accepted' or 'confirmed'
   const slotsTodayCount = bookings.filter(b => {
     const bDate = b.date || b.selectedDate || b.appointmentDate?.split('T')[0];
-    return bDate === todayISO || bDate === todayLocale;
+    const isToday = isTodayDate(bDate);
+    const status = b.status ? String(b.status).toLowerCase() : '';
+    return isToday && (status === 'accepted' || status === 'confirmed');
   }).length;
 
-  // 3. TOTAL BOOKINGS: Count total cumulative size of all historical items linked to this partner instance where status is valid.
+  // 3. TOTAL BOOKINGS: Count total cumulative size of all historical items linked to this partner instance where status is valid (PRISTINE/UNTOUCHED as per instructions)
   const totalSlotsBooked = bookings.filter(b => {
     if (!b.status) return false;
     const st = String(b.status).toLowerCase();
     return st !== 'unpaid' && st !== 'failed' && st !== 'cancelled' && st !== 'rejected';
   }).length;
   
-  // 4. CUSTOMER RATING: Average the item.rating numeric value across all entries containing a rating property.
-  const ratedEntries = [
-    ...ratings.filter(r => r.rating !== undefined && r.rating !== null && r.rating !== ''),
-    ...bookings.filter(b => b.rating !== undefined && b.rating !== null && b.rating !== '')
-  ];
-  const avgRating = ratedEntries.length > 0 
-    ? (ratedEntries.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) / ratedEntries.length).toFixed(1)
+  // 4. CUSTOMER RATING: Pull dynamic rating float value using dynamic arithmetic mean of review stars precise to 1 decimal place
+  const ratingValues = [
+    ...ratings.map(r => Number(r.rating || r.stars || 0)),
+    ...bookings.map(b => Number(b.rating || b.stars || 0))
+  ].filter(v => typeof v === 'number' && !isNaN(v) && v > 0);
+
+  const totalStars = ratingValues.reduce((sum, val) => sum + val, 0);
+  const reviewCount = ratingValues.length;
+  
+  const avgRating = reviewCount > 0 
+    ? (totalStars / reviewCount).toFixed(1)
     : "0.0";
   const starCount = Math.round(Number(avgRating));
   
@@ -847,30 +930,6 @@ const PartnerDashboard: React.FC = () => {
               </motion.div>
             )}
             {activeTab === 'bookings' && (() => {
-              const localClock = new Date();
-              const formatStringA = localClock.toDateString(); // "Fri Jun 19 2026"
-              const formatStringB = localClock.toLocaleDateString('en-CA'); // "2026-06-19"
-
-              const isTodayDate = (dateVal: any) => {
-                if (!dateVal) return false;
-                const str = String(dateVal).trim();
-                const isA = str === formatStringA;
-                const isB = str === formatStringB;
-                const isSubB = str.toLowerCase().includes(formatStringB.toLowerCase());
-                const isSubA = str.toLowerCase().includes(formatStringA.toLowerCase());
-                
-                // Timestamp or Date object matching today
-                let isTimestampMatch = false;
-                try {
-                  const d = new Date(str);
-                  if (!isNaN(d.getTime())) {
-                    isTimestampMatch = d.toLocaleDateString('en-CA') === formatStringB;
-                  }
-                } catch (e) {}
-
-                return isA || isB || isSubB || isSubA || isTimestampMatch;
-              };
-
               const registryTodayQueue = bookings.filter((item: any) => {
                 const itemDate = item.date || item.selectedDate || item.appointmentDate?.split('T')[0];
                 const isToday = isTodayDate(itemDate);
@@ -1084,7 +1143,8 @@ const PartnerDashboard: React.FC = () => {
                                           try {
                                             await updateDoc(doc(db, 'bookings', b.id), { 
                                               status: 'completed', 
-                                              completedAt: new Date().toISOString() 
+                                              completedAt: new Date().toISOString(),
+                                              settlementEligibleTime: Date.now() + (12 * 60 * 60 * 1000)
                                             });
                                           } catch (err) {
                                             console.error("Failed to complete booking:", err);
