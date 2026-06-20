@@ -8,6 +8,13 @@ export default defineConfig({
     port: 3000
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    target: 'esnext',
+    rollupOptions: {
+      output: {
+        format: 'esm',
+        intro: 'const __dirname = ""; const __filename = "";'
+      }
+    }
   }
 })
