@@ -482,10 +482,20 @@ const PartnerDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleUpiInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    const normalizedValue = rawValue.trim().toLowerCase();
+    setShopData({ ...shopData, upiId: normalizedValue });
+  };
+
   const handleUpdateMasterData = async (field: string, value: any) => {
     try {
-      await updateShop(user!.uid, { [field]: value });
-      const updated = { ...shopData, [field]: value };
+      let normalizedValue = value;
+      if (field === 'upiId' && typeof value === 'string') {
+        normalizedValue = value.trim().toLowerCase();
+      }
+      await updateShop(user!.uid, { [field]: normalizedValue });
+      const updated = { ...shopData, [field]: normalizedValue };
       setShopData(updated);
       localStorage.setItem(`partner_data_${user!.uid}`, JSON.stringify(updated));
     } catch (err) {
@@ -863,7 +873,7 @@ const PartnerDashboard: React.FC = () => {
                      <div className="flex gap-4">
                         <input 
                           value={shopData?.upiId || ''}
-                          onChange={(e) => setShopData({...shopData, upiId: e.target.value})}
+                          onChange={handleUpiInputChange}
                           placeholder="merchant@upi"
                           className="flex-1 px-8 py-5 bg-gray-50 border border-gray-100 rounded-[1.5rem] focus:border-bbBlue outline-none text-sm font-mono font-bold uppercase tracking-tight transition-all"
                         />
