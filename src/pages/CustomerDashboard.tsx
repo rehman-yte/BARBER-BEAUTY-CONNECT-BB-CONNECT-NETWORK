@@ -741,17 +741,16 @@ const CustomerDashboard: React.FC = () => {
 
     setLoading(true);
 
-    // Completely isolate query inside Firestore based strictly on the active user session token
-    const q = query(
-      collection(db, "bookings"),
-      or(
-        where("customer_id", "==", user.uid),
-        where("customerId", "==", user.uid)
-      )
+    const currentUser = user;
+
+    // Query structure optimization to load only self-owned records
+    const secureCustomerQuery = query(
+      collection(db, 'bookings'),
+      where('customerId', '==', currentUser.uid)
     );
 
     const unsubscribe = onSnapshot(
-      q,
+      secureCustomerQuery,
       (snapshot) => {
         const rawList: any[] = [];
         const seenIds = new Set<string>();
@@ -766,8 +765,8 @@ const CustomerDashboard: React.FC = () => {
           seenIds.add(bookingId);
           
           // ABSOLUTE CUSTOMER IDENTITY LOCK: strictly block and ignore matches outside this unique user session
-          const bookingCustId = docData.customer_id || docData.customerId;
-          if (bookingCustId !== user.uid) {
+          const bookingCustId = docData.customerId || docData.customer_id;
+          if (bookingCustId !== currentUser.uid) {
             return;
           }
 
