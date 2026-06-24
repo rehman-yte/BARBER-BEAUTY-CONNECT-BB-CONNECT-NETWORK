@@ -1025,27 +1025,27 @@ const CustomerDashboard: React.FC = () => {
     if (!pendingRatingBooking || !user) return;
     
     const currentBooking = pendingRatingBooking;
-    const currentUser = user;
     const selectedStarsCount = rating;
     const textCommentFieldValue = comment;
 
     try {
-      const submitReviewPayload = {
+      // Construct payload matching exact database fields
+      const exactReviewPayload = {
         bookingId: currentBooking.id,
-        customerId: currentUser.uid,
-        customerName: currentUser.displayName || "Anonymous Client",
+        customer_id: currentBooking.customer_id || currentBooking.customerId || "",
+        customerName: currentBooking.customerName || "Customer",
         partnerId: currentBooking.partnerId || currentBooking.shopId || "",
-        partnerName: currentBooking.partnerName || currentBooking.shopName || "Target Vendor",
-        serviceType: currentBooking.serviceName || currentBooking.service || "Haircut",
-        rating: selectedStarsCount, // 1 to 5 numeric value
-        comment: textCommentFieldValue,
-        timestamp: serverTimestamp()
+        partnerName: currentBooking.shopName || currentBooking.partnerName || "Partner",
+        serviceName: currentBooking.serviceName || currentBooking.service || "Service",
+        rating: Number(selectedStarsCount),
+        comment: textCommentFieldValue || "",
+        createdAt: new Date().toISOString()
       };
 
-      // Background Reviews Distribution Pipeline:
-      // A) Write directly to collections/reviews as a unique master feedback log
-      await addDoc(collection(db, "reviews"), submitReviewPayload);
-      
+      // Execute Atomic Writes
+      // A) Add entry to the master 'Reviews' collection (Capital R)
+      await addDoc(collection(db, "Reviews"), exactReviewPayload);
+
       // Also write directly to collections/ratings to keep legacy admin dashboard ratings list functional
       await addDoc(collection(db, "ratings"), {
         bookingId: currentBooking.id,
@@ -1055,14 +1055,13 @@ const CustomerDashboard: React.FC = () => {
         createdAt: serverTimestamp()
       });
 
-      // B) Update target document at collections/bookings/{bookingId} with parameter review_submitted: true & rated: true
-      const bookingDocRef = doc(db, "bookings", currentBooking.id);
-      await updateDoc(bookingDocRef, {
+      // B) Update local booking document to inject 'review_submitted: true' and avoid loop
+      await updateDoc(doc(db, "bookings", currentBooking.id), {
         review_submitted: true,
         rated: true
       });
 
-      // C) Atomically update the target partner node at collections/partners/{partnerId} to recalculate overall rating profile schemas dynamically
+      // Recalculate and update partner node
       const partnerId = currentBooking.partnerId || currentBooking.shopId;
       if (partnerId) {
         const partnerDocRef = doc(db, "partners", partnerId);
@@ -1088,6 +1087,7 @@ const CustomerDashboard: React.FC = () => {
         });
       }
 
+      // Immediately after successful completion of these async calls, close the popup state modal to remove the view instantly.
       setPendingRatingBooking(null);
     } catch (error) {
       console.error("[Silent Multi-Path Feedback Pipeline Error]:", error);
@@ -1518,7 +1518,7 @@ const CustomerDashboard: React.FC = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {pendingRatingBooking && (
+        {pendingRatingBooking && pendingRatingBooking.status === "completed" && !pendingRatingBooking.review_submitted && (
           <RatingModal
             booking={pendingRatingBooking}
             onSubmit={handleRatingSubmit}
