@@ -1030,10 +1030,10 @@ const CustomerDashboard: React.FC = () => {
 
     try {
       // Construct payload matching exact database fields
-      const exactReviewPayload = {
+      const secureFeedbackData = {
         bookingId: currentBooking.id,
-        customer_id: currentBooking.customer_id || currentBooking.customerId || "",
-        customerName: currentBooking.customerName || "Customer",
+        customer_id: user.uid,
+        customerName: user.displayName || user.name || "Client",
         partnerId: currentBooking.partnerId || currentBooking.shopId || "",
         partnerName: currentBooking.shopName || currentBooking.partnerName || "Partner",
         serviceName: currentBooking.serviceName || currentBooking.service || "Service",
@@ -1044,7 +1044,7 @@ const CustomerDashboard: React.FC = () => {
 
       // Execute Atomic Writes
       // A) Add entry to the master 'Reviews' collection (Capital R)
-      await addDoc(collection(db, "Reviews"), exactReviewPayload);
+      await addDoc(collection(db, "Reviews"), secureFeedbackData);
 
       // Also write directly to collections/ratings to keep legacy admin dashboard ratings list functional
       await addDoc(collection(db, "ratings"), {
