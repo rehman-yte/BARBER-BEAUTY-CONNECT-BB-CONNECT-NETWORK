@@ -782,6 +782,12 @@ const CustomerDashboard: React.FC = () => {
             rawList.push({
               id: bookingId,
               ...docData,
+              customerId: docData.customerId || currentUser.uid,
+              customerName: docData.customerName || currentUser.displayName || "Client Account",
+              payment_status: "prepaid",
+              routing_system: "direct_split_route",
+              admin_cut_ratio: 0.05,
+              partner_cut_ratio: 0.95,
               serviceName,
               amountPaid,
               selectedDate,
