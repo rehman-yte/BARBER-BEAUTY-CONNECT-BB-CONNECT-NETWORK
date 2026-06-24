@@ -7,7 +7,7 @@ import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
 import { db } from "../lib/firebase";
-import { doc, updateDoc, collection, query, where, onSnapshot, or, and, getDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, query, where, onSnapshot, or, and, getDoc, addDoc, serverTimestamp, runTransaction } from "firebase/firestore";
 
 const parseDateToMillis = (val: any): number => {
   if (!val) return Date.now(); // Graceful fallback for local serverTimestamp synchronization latency
@@ -855,7 +855,7 @@ const CustomerDashboard: React.FC = () => {
         });
 
         // Priority rating reminder
-        const needsRating = rawList.find((b: any) => b.status === "completed" && !b.rated);
+        const needsRating = rawList.find((b: any) => b.status === "completed" && !b.rated && b.review_submitted !== true);
         if (needsRating) {
           setPendingRatingBooking(needsRating);
         }
@@ -1022,17 +1022,75 @@ const CustomerDashboard: React.FC = () => {
   );
 
   const handleRatingSubmit = async (rating: number, comment: string) => {
-    if (!pendingRatingBooking) return;
+    if (!pendingRatingBooking || !user) return;
+    
+    const currentBooking = pendingRatingBooking;
+    const currentUser = user;
+    const selectedStarsCount = rating;
+    const textCommentFieldValue = comment;
+
     try {
-      await submitRating(
-        pendingRatingBooking.id,
-        pendingRatingBooking.partnerId || pendingRatingBooking.shopId,
-        rating,
-        comment,
-      );
+      const submitReviewPayload = {
+        bookingId: currentBooking.id,
+        customerId: currentUser.uid,
+        customerName: currentUser.displayName || "Anonymous Client",
+        partnerId: currentBooking.partnerId || currentBooking.shopId || "",
+        partnerName: currentBooking.partnerName || currentBooking.shopName || "Target Vendor",
+        serviceType: currentBooking.serviceName || currentBooking.service || "Haircut",
+        rating: selectedStarsCount, // 1 to 5 numeric value
+        comment: textCommentFieldValue,
+        timestamp: serverTimestamp()
+      };
+
+      // Background Reviews Distribution Pipeline:
+      // A) Write directly to collections/reviews as a unique master feedback log
+      await addDoc(collection(db, "reviews"), submitReviewPayload);
+      
+      // Also write directly to collections/ratings to keep legacy admin dashboard ratings list functional
+      await addDoc(collection(db, "ratings"), {
+        bookingId: currentBooking.id,
+        partnerId: currentBooking.partnerId || currentBooking.shopId || "",
+        rating: selectedStarsCount,
+        comment: textCommentFieldValue,
+        createdAt: serverTimestamp()
+      });
+
+      // B) Update target document at collections/bookings/{bookingId} with parameter review_submitted: true & rated: true
+      const bookingDocRef = doc(db, "bookings", currentBooking.id);
+      await updateDoc(bookingDocRef, {
+        review_submitted: true,
+        rated: true
+      });
+
+      // C) Atomically update the target partner node at collections/partners/{partnerId} to recalculate overall rating profile schemas dynamically
+      const partnerId = currentBooking.partnerId || currentBooking.shopId;
+      if (partnerId) {
+        const partnerDocRef = doc(db, "partners", partnerId);
+        await runTransaction(db, async (transaction) => {
+          const partnerDoc = await transaction.get(partnerDocRef);
+          if (partnerDoc.exists()) {
+            const partnerData = partnerDoc.data();
+            const currentRating = partnerData.rating || partnerData.stars || 5;
+            const currentTotalRatings = partnerData.totalRatings || partnerData.ratingCount || partnerData.reviews || 0;
+            
+            const newTotalRatings = Number(currentTotalRatings) + 1;
+            const newRating = Number(((Number(currentRating) * Number(currentTotalRatings) + selectedStarsCount) / newTotalRatings).toFixed(2));
+            
+            transaction.update(partnerDocRef, {
+              rating: newRating,
+              stars: newRating,
+              totalRatings: newTotalRatings,
+              ratingCount: newTotalRatings,
+              reviews: newTotalRatings,
+              lastRating: selectedStarsCount
+            });
+          }
+        });
+      }
+
       setPendingRatingBooking(null);
     } catch (error) {
-      console.error("Failed to submit rating:", error);
+      console.error("[Silent Multi-Path Feedback Pipeline Error]:", error);
     }
   };
 
