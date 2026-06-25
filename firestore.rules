@@ -94,25 +94,9 @@ service cloud.firestore {
         incoming().adminApproved == false
       );
 
-      allow update: if (isOwner(partnerId) || isAdmin()) ? (
-        isValidPartner(incoming()) && (
-          // Admin can change anything
-          isAdmin() || (
-            // Partner can only change specific fields and CANNOT approve themselves
-            incoming().status == existing().status &&
-            incoming().adminApproved == existing().adminApproved &&
-            incoming().diff(existing()).affectedKeys().hasOnly([
-              'ownerName', 'brandName', 'mobileNumber', 'address', 'category', 
-              'workerQuantity', 'upiId', 'coords', 'services', 'shopStatus', 
-              'updatedAt', 'ownerPicture', 'govId', 'brandImages', 'workerImages',
-              'onboardingComplete'
-            ])
-          )
-        )
-      ) : (
-        // Allow authenticated users to ONLY update rating/star fields (for customer feedback submit)
+      allow update: if isOwner(partnerId) || isAdmin() || (
         isSignedIn() && 
-        incoming().diff(existing()).affectedKeys().hasOnly([
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'rating', 'stars', 'totalRatings', 'ratingCount', 'reviews', 'lastRating'
         ])
       );
