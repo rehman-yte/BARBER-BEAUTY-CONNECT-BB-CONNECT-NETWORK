@@ -353,37 +353,37 @@ const CheckoutPage: React.FC = () => {
                 });
                 await updateDoc(doc(db, 'bookings', bId), updateBookingPayload);
               }
+            } else {
+              // GUARANTEE AND FORCE FIRESTORE DATA ENTRY ON SUCCESS FOR THE LOGGED-IN CUSTOMER SYSTEM-WIDE
+              const immediateVerifiedBookingData = sanitizePayload({
+                customer_id: user?.uid || '',
+                customerId: user?.uid || '',
+                customerName: formData.fullName || user?.name || user?.displayName || 'Customer Booking',
+                payment_type: "prepaid",
+                routing_strategy: "instant_split_gateway",
+                admin_fee_ratio: 0.05,
+                partner_settlement_ratio: 0.95,
+                partnerId: cart[0]?.shopId || cart[0]?.partnerId || '',
+                shopId: cart[0]?.shopId || cart[0]?.partnerId || '',
+                shopName: cart[0]?.shopName || 'Partner Salon',
+                service: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
+                serviceName: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
+                price: Number(cart[0]?.price) || finalTotal || 0,
+                date: cart[0]?.date || new Date().toDateString(),
+                time: cart[0]?.time || '10:00',
+                status: 'pending',
+                bookingStatus: 'pending',
+                paymentStatus: 'SUCCESS',
+                payment_status: 'paid',
+                partner_accepted: false,
+                partner_rejected: false,
+                timestamp: serverTimestamp(),
+                createdAt: serverTimestamp(),
+                heldAt: serverTimestamp(),
+                transactionId: response.razorpay_payment_id || 'manual'
+              });
+              await addDoc(collection(db, "bookings"), immediateVerifiedBookingData);
             }
-
-            // GUARANTEE AND FORCE FIRESTORE DATA ENTRY ON SUCCESS FOR THE LOGGED-IN CUSTOMER SYSTEM-WIDE
-            const immediateVerifiedBookingData = sanitizePayload({
-              customer_id: user?.uid || '',
-              customerId: user?.uid || '',
-              customerName: formData.fullName || user?.name || user?.displayName || 'Customer Booking',
-              payment_type: "prepaid",
-              routing_strategy: "instant_split_gateway",
-              admin_fee_ratio: 0.05,
-              partner_settlement_ratio: 0.95,
-              partnerId: cart[0]?.shopId || cart[0]?.partnerId || '',
-              shopId: cart[0]?.shopId || cart[0]?.partnerId || '',
-              shopName: cart[0]?.shopName || 'Partner Salon',
-              service: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
-              serviceName: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
-              price: Number(cart[0]?.price) || finalTotal || 0,
-              date: cart[0]?.date || new Date().toDateString(),
-              time: cart[0]?.time || '10:00',
-              status: 'pending',
-              bookingStatus: 'pending',
-              paymentStatus: 'SUCCESS',
-              payment_status: 'paid',
-              partner_accepted: false,
-              partner_rejected: false,
-              timestamp: serverTimestamp(),
-              createdAt: serverTimestamp(),
-              heldAt: serverTimestamp(),
-              transactionId: response.razorpay_payment_id || 'manual'
-            });
-            await addDoc(collection(db, "bookings"), immediateVerifiedBookingData);
 
             // Clean up and proceed to success
             setTimerActive(false);
