@@ -491,8 +491,34 @@ async function startServer() {
   app.post('/api/razorpay/refund', async (req, res) => {
     try {
       const { paymentId, amount, bookingId } = req.body;
-      if (!paymentId) {
-        return res.status(400).json({ success: false, error: 'Missing paymentId parameter' });
+      
+      const normalizedPaymentId = String(paymentId || '').trim();
+      const isRealRazorpayPayment = normalizedPaymentId.startsWith('pay_');
+
+      if (!normalizedPaymentId || normalizedPaymentId.toLowerCase() === 'manual' || !isRealRazorpayPayment) {
+        console.log(`[Backend Razorpay Refund Bypass] Payment ID "${paymentId}" is mock, manual, or empty. Bypassing gateway refund.`);
+        
+        if (bookingId) {
+          try {
+            await updateDoc(doc(db, 'bookings', bookingId), {
+              status: 'REJECTED_TIMEOUT',
+              bookingStatus: 'failed',
+              paymentStatus: 'refunded',
+              statusReason: 'Partner Rejected / Manual Payment Bypassed',
+              refundId: 'mock_refund_' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+              refundedAt: new Date().toISOString()
+            });
+            console.log(`[Backend Firestore Sync] Bypassed booking ${bookingId} marked as REJECTED_TIMEOUT successfully.`);
+          } catch (dbErr) {
+            console.error("Failed to update bypassed booking status:", dbErr);
+          }
+        }
+        
+        return res.json({ 
+          success: true, 
+          message: "Payment refunded and slot released successfully (Bypassed mock/manual transaction).", 
+          bypassed: true 
+        });
       }
 
       const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
@@ -505,15 +531,15 @@ async function startServer() {
       });
 
       const refundOptions: any = {
-        payment_id: paymentId
+        payment_id: normalizedPaymentId
       };
 
       if (amount !== undefined && amount !== null) {
         refundOptions.amount = Math.floor(parseFloat(String(amount)) * 100);
       }
 
-      console.log(`[Backend Razorpay Refund] Initiating refund for payment ID: ${paymentId}`);
-      const refundResult = await razorpayClient.payments.refund(paymentId, refundOptions);
+      console.log(`[Backend Razorpay Refund] Initiating refund for payment ID: ${normalizedPaymentId}`);
+      const refundResult = await razorpayClient.payments.refund(normalizedPaymentId, refundOptions);
       console.log(`[Backend Razorpay Refund Success] Refund ID: ${refundResult.id}`);
 
       if (bookingId) {
