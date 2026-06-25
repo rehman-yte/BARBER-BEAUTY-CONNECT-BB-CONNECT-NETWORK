@@ -34,18 +34,39 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = (product: any) => {
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
+      const isBooking = 
+        (product.category && String(product.category).toLowerCase().includes('booking')) || 
+        (product.name && String(product.name).includes('(Booking)')) ||
+        product.type === 'booking';
+
+      if (isBooking) {
+        const priceNum = typeof product.price === 'string' 
+          ? parseInt(product.price.replace(/[^0-9]/g, '')) 
+          : product.price;
+        return [{ ...product, price: priceNum, quantity: 1 }];
+      }
+
+      // Filter out any booking items from the cart when adding products
+      const filteredPrev = prev.filter(item => {
+        const isItemBooking = 
+          (item.category && String(item.category).toLowerCase().includes('booking')) || 
+          (item.name && String(item.name).includes('(Booking)')) ||
+          item.type === 'booking';
+        return !isItemBooking;
+      });
+
+      const existing = filteredPrev.find(item => item.id === product.id);
       if (existing) {
-        return prev.map(item => 
+        return filteredPrev.map(item => 
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      // Parse price string like "₹4,500" to number
+
       const priceNum = typeof product.price === 'string' 
         ? parseInt(product.price.replace(/[^0-9]/g, '')) 
         : product.price;
         
-      return [...prev, { ...product, price: priceNum, quantity: 1 }];
+      return [...filteredPrev, { ...product, price: priceNum, quantity: 1 }];
     });
   };
 
@@ -63,7 +84,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ));
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => setCart(() => []);
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
