@@ -521,6 +521,185 @@ const CheckoutPage: React.FC = () => {
     }
   };
 
+  const initializeRazorpayProductPayment = async (orderId: string, totalAmount: number) => {
+    setLoading(true);
+    setPaymentError(null);
+
+    try {
+      if (!(window as any).Razorpay) {
+        throw new Error("Razorpay billing component was not found or is still loading. Please try again.");
+      }
+
+      let backendOrderId = '';
+      let usedKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_SxWUwa55Svm5Vt';
+
+      try {
+        const orderResponse = await fetch('/api/razorpay/create-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount: totalAmount })
+        });
+        
+        if (!orderResponse.ok) {
+          const errData = await orderResponse.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to register transaction order on backend gateway.");
+        }
+        
+        const orderResult = await orderResponse.json();
+        if (orderResult.success && (orderResult.orderId || orderResult.id)) {
+          backendOrderId = orderResult.orderId || orderResult.id;
+          if (orderResult.keyId) {
+            usedKeyId = orderResult.keyId;
+          }
+          console.log(`[Razorpay Backend Sync] Registered Razorpay Order ID: ${backendOrderId}`);
+        } else {
+          throw new Error(orderResult.error || "Invalid response schema returned from backend order generation.");
+        }
+      } catch (backendErr: any) {
+        console.error("Back-end Razorpay order registration failed:", backendErr);
+        throw new Error(backendErr.message || "Failed to initialize secure checkout transaction on backend. Please retry.");
+      }
+
+      const options = {
+        key: usedKeyId,
+        amount: Math.round(totalAmount * 100),
+        currency: "INR",
+        name: "Barber & Beauty Connect",
+        description: "Premium Products Shop checkout",
+        image: "https://api.dicebear.com/7.x/bottts/svg?seed=bbconnect",
+        order_id: backendOrderId || undefined,
+        handler: async function (response: any) {
+          setLoading(true);
+          try {
+            if (!response || !response.razorpay_payment_id) {
+              await updateDoc(doc(db, 'orders', orderId), {
+                orderStatus: 'failed',
+                paymentStatus: 'failed',
+                statusReason: "Payment Aborted/Not Processed by Customer"
+              });
+              throw new Error("Payment transaction verification failed: Missing Razorpay payment ID.");
+            }
+
+            // POST-PAYMENT ORDER CONFIRMATION TRANSITION:
+            await updateDoc(doc(db, 'orders', orderId), {
+              paymentStatus: 'paid',
+              orderStatus: 'confirmed',
+              paymentMethodDetail: 'RAZORPAY_STANDARD_FRONTEND_VERIFIED',
+              transactionId: response.razorpay_payment_id
+            });
+
+            setTimerActive(false);
+            setStep('success');
+            clearCart();
+            
+            navigate('/customer/dashboard');
+          } catch (verificationErr: any) {
+            console.error("Payment status verification error:", verificationErr);
+            setPaymentError(verificationErr.message || "Payment status updating failed. Please contact support.");
+          } finally {
+            setLoading(false);
+          }
+        },
+        prefill: {
+          name: formData.fullName || user?.name || "",
+          email: formData.email || user?.email || "",
+          contact: formData.phone || "",
+          method: "upi"
+        },
+        theme: {
+          color: "#0F52BA"
+        },
+        modal: {
+          ondismiss: async function () {
+            console.log("Razorpay checkout modal closed by customer.");
+            setLoading(false);
+            try {
+              await updateDoc(doc(db, 'orders', orderId), {
+                orderStatus: 'failed',
+                paymentStatus: 'failed',
+                statusReason: "Payment Aborted/Not Processed by Customer"
+              });
+            } catch (e) {
+              console.warn("Failed to mark order as failed on dismiss:", e);
+            }
+          }
+        }
+      };
+
+      const rzp1 = new (window as any).Razorpay(options);
+      rzp1.open();
+
+    } catch (paymentErr: any) {
+      console.error("Razorpay initiation failed:", paymentErr);
+      setPaymentError(paymentErr.message || "Could not launch Razorpay checkout. Please check the config.");
+      setLoading(false);
+    }
+  };
+
+  const handlePlaceProductOrder = async () => {
+    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
+      setPaymentError("Name, WhatsApp Number, and Delivery Address are required.");
+      return;
+    }
+    setPaymentError(null);
+    setLoading(true);
+
+    try {
+      const shippingForm = {
+        customerName: formData.fullName.trim(),
+        whatsappNumber: formData.phone.trim(),
+        deliveryAddress: formData.address.trim()
+      };
+      const currentUser = user || { uid: 'anonymous' };
+      const cartLocal = {
+        items: cart,
+        subtotal: totalPrice,
+        shipping: 0,
+        platformFee: feeAmount,
+        totalAmount: finalTotal
+      };
+      const setCheckoutStep = (stepName: string) => {
+        setStep(stepName.toLowerCase() as any);
+      };
+
+      // Create the physical product order document payload structure
+      const productOrderPayload = {
+        customerName: shippingForm.customerName, // "Rehman Farooqui"
+        customer_id: currentUser.uid,
+        whatsappNumber: shippingForm.whatsappNumber || "",
+        deliveryAddress: shippingForm.deliveryAddress, // "30 ft road musrat nagar"
+        cartItems: cartLocal.items, // Array containing the individual product records purchased
+        subtotal: Number(cartLocal.subtotal), // 1200
+        shippingCost: Number(cartLocal.shipping) || 0, // 0 (Free)
+        platformFee: Number(cartLocal.platformFee) || 0, // 84
+        totalAmount: Number(cartLocal.totalAmount), // 1284
+        paymentStatus: "unpaid",
+        orderStatus: "pending_payment",
+        createdAt: new Date().toISOString()
+      };
+
+      // Commit the order directly into the core 'orders' collection for Admin monitoring
+      const orderDocRef = await addDoc(collection(db, "orders"), productOrderPayload);
+      
+      // Advance the step counter to the Payment phase instantly to remove the loading freeze
+      setCheckoutStep("PAYMENT");
+      
+      // Set created order doc ID for standard manual/fallback flow
+      setCreatedOrderDocId(orderDocRef.id);
+
+      // Initialize Razorpay integration passing the generated document ID and complete cost matrix
+      initializeRazorpayProductPayment(orderDocRef.id, productOrderPayload.totalAmount);
+      
+    } catch (error) {
+      console.error("Critical product checkout order placement pipeline failure:", error);
+      setPaymentError("Critical product checkout order placement pipeline failure. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (cart.length === 0 && step !== 'success') {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
@@ -749,40 +928,7 @@ const CheckoutPage: React.FC = () => {
                           <ArrowLeft size={14} /> Back to Cart
                         </button>
                         <button 
-                          onClick={async () => {
-                            if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
-                              setPaymentError("Name, WhatsApp Number, and Delivery Address are required.");
-                              return;
-                            }
-                            setPaymentError(null);
-                            setLoading(true);
-                            try {
-                              const orderPayload = {
-                                customerName: formData.fullName.trim(),
-                                whatsappNumber: formData.phone.trim(),
-                                deliveryAddress: formData.address.trim(),
-                                items: cart.map(item => ({
-                                  id: item.id,
-                                  name: item.name,
-                                  price: item.price,
-                                  quantity: item.quantity,
-                                  category: item.category || 'Product',
-                                  image: item.image || ''
-                                })),
-                                totalAmount: totalPrice,
-                                status: 'pending',
-                                createdAt: new Date().toISOString()
-                              };
-                              await addDoc(collection(db, 'customer_orders'), orderPayload);
-                              setStep('success');
-                              clearCart();
-                            } catch (err: any) {
-                              console.error("Firestore customer_orders write failed:", err);
-                              setPaymentError("Could not place order. Server connectivity error, please try again.");
-                            } finally {
-                              setLoading(false);
-                            }
-                          }}
+                          onClick={handlePlaceProductOrder}
                           disabled={loading || !formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()}
                           className="bg-black hover:bg-bbBlue text-white px-10 py-4 rounded-full font-black uppercase text-[0.7rem] tracking-widest transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer shadow-lg active:scale-95"
                         >
