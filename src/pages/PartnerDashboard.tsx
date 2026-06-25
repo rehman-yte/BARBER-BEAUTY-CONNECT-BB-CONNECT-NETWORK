@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, query, collection, where, orderBy, updateDoc, addDoc } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, orderBy, updateDoc, addDoc, setDoc } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -170,6 +170,24 @@ const PartnerDashboard: React.FC = () => {
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration, setNewServiceDuration] = useState('30');
 
+  // Interactive Audios and Instant Payout State
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [isRequestingPayout, setIsRequestingPayout] = useState(false);
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      setHasInteracted(true);
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+  }, []);
+
   useEffect(() => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioRef.current.volume = 0.8;
@@ -254,7 +272,7 @@ const PartnerDashboard: React.FC = () => {
             // Optimistically update firestore to prevent duplicate execution loops
             await updateDoc(bRef, { payoutRequested: true });
 
-            await addDoc(collection(db, 'payout_requests'), {
+            await setDoc(doc(db, 'payout_requests', item.id), {
               partnerId: user.uid,
               upiId: shopData?.upiId || '',
               netSettlement: Number(item.amount || item.amountPaid || item.price || 0) * 0.95,
@@ -288,7 +306,10 @@ const PartnerDashboard: React.FC = () => {
           ...data,
           brandName: (data as any).brand_name || (data as any).brandName,
           ownerName: (data as any).owner_name || (data as any).ownerName,
-          mobile: (data as any).mobile_number || (data as any).mobile,
+          mobile: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
+          mobileNumber: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
+          workerQuota: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
+          workerQuantity: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
           upiId: (data as any).upi_id || (data as any).upiId,
           status: (data as any).status || 'pending',
           adminApproved: (data as any).adminApproved || (data as any).status === 'approved'
@@ -337,12 +358,22 @@ const PartnerDashboard: React.FC = () => {
                   alertSound.play().then(() => {
                     playbackCount++;
                     alertSound.onended = fireAlarm;
-                  }).catch(err => console.log("Audio waiting for pointer interaction context:", err));
+                  }).catch(err => {
+                    console.log("Audio waiting for pointer interaction context:", err);
+                    if (!hasInteracted) {
+                      alert("New booking received! Tap anywhere to enable sound alerts.");
+                    }
+                  });
                 }
               };
               fireAlarm();
             } else {
-              audioRef.current?.play().catch(e => console.log('Audio blocked:', e));
+              audioRef.current?.play().catch(e => {
+                console.log('Audio blocked:', e);
+                if (!hasInteracted) {
+                  alert("New activity on dashboard! Tap anywhere to enable sound alerts.");
+                }
+              });
             }
           }
         }
@@ -442,9 +473,61 @@ const PartnerDashboard: React.FC = () => {
   
   // Accountant AI Engine Logic: Cumulative gross revenue minus 5% platform fee
   const cumulativeGrossRevenue = bookings
-    .filter(b => b.status === "completed" || b.status === "confirmed" || b.status === "payment_held" || isBookingPaid(b))
+    .filter(b => b.status === "completed")
     .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
   const walletBalance = cumulativeGrossRevenue * 0.95;
+
+  const handleInstantPayoutRequest = async () => {
+    if (!user?.uid) return;
+    if (walletBalance <= 0) {
+      alert("No withdrawable balance available for instant payout.");
+      return;
+    }
+    const confirmPayout = window.confirm(`Request instant payout of ₹${walletBalance.toFixed(2)}?`);
+    if (!confirmPayout) return;
+
+    setIsRequestingPayout(true);
+    try {
+      const eligibleBookings = bookings.filter((b: any) => b.status === 'completed' && !b.payoutRequested);
+      
+      if (eligibleBookings.length > 0) {
+        for (const item of eligibleBookings) {
+          const bRef = doc(db, 'bookings', item.id);
+          await updateDoc(bRef, { payoutRequested: true });
+          
+          await setDoc(doc(db, 'payout_requests', item.id), {
+            partnerId: user.uid,
+            upiId: shopData?.upiId || '',
+            netSettlement: Number(item.amount || item.amountPaid || item.price || 0) * 0.95,
+            verificationStatus: shopData?.status || 'approved',
+            bookingId: item.id,
+            createdAt: new Date().toISOString(),
+            status: 'pending_settlement',
+            payoutType: 'instant'
+          });
+        }
+        alert("Instant payout request submitted successfully!");
+      } else {
+        // Fallback for general request
+        const requestId = `instant_${user.uid}_${Date.now()}`;
+        await setDoc(doc(db, 'payout_requests', requestId), {
+          partnerId: user.uid,
+          upiId: shopData?.upiId || '',
+          netSettlement: walletBalance,
+          verificationStatus: shopData?.status || 'approved',
+          createdAt: new Date().toISOString(),
+          status: 'pending_settlement',
+          payoutType: 'instant'
+        });
+        alert("Instant payout request registered!");
+      }
+    } catch (err) {
+      console.error("Instant payout request fail:", err);
+      alert("Failed to request instant payout. Please try again.");
+    } finally {
+      setIsRequestingPayout(false);
+    }
+  };
 
   const handleToggleLive = async () => {
     const nextState = !isLive;
@@ -494,8 +577,40 @@ const PartnerDashboard: React.FC = () => {
       if (field === 'upiId' && typeof value === 'string') {
         normalizedValue = value.trim().toLowerCase();
       }
-      await updateShop(user!.uid, { [field]: normalizedValue });
-      const updated = { ...shopData, [field]: normalizedValue };
+      
+      let updatePayload: any = { [field]: normalizedValue };
+      if (field === 'mobileNumber' || field === 'mobile' || field === 'mobile_number') {
+        updatePayload = {
+          mobile_number: normalizedValue,
+          mobileNumber: normalizedValue,
+          mobile: normalizedValue
+        };
+      } else if (field === 'workerQuantity' || field === 'workerQuota' || field === 'worker_quota') {
+        const numVal = Number(normalizedValue) || 1;
+        updatePayload = {
+          worker_quota: numVal,
+          workerQuantity: numVal,
+          workerQuota: numVal
+        };
+      } else if (field === 'brandName' || field === 'brand_name') {
+        updatePayload = {
+          brand_name: normalizedValue,
+          brandName: normalizedValue
+        };
+      } else if (field === 'ownerName' || field === 'owner_name') {
+        updatePayload = {
+          owner_name: normalizedValue,
+          ownerName: normalizedValue
+        };
+      } else if (field === 'upiId' || field === 'upi_id') {
+        updatePayload = {
+          upi_id: normalizedValue,
+          upiId: normalizedValue
+        };
+      }
+
+      await updateShop(user!.uid, updatePayload);
+      const updated = { ...shopData, ...updatePayload };
       setShopData(updated);
       localStorage.setItem(`partner_data_${user!.uid}`, JSON.stringify(updated));
     } catch (err) {
@@ -744,8 +859,12 @@ const PartnerDashboard: React.FC = () => {
                            <span className="text-[0.5rem] text-gray-400 font-bold uppercase tracking-widest">Next Settlement</span>
                            <span className="text-[0.625rem] font-bold uppercase tracking-widest">Tomorrow 10:00 AM</span>
                         </div>
-                        <button className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[0.5rem] font-bold uppercase tracking-[0.4em] transition-all">
-                          Request Instant Payout
+                        <button 
+                          onClick={handleInstantPayoutRequest}
+                          disabled={isRequestingPayout || walletBalance <= 0}
+                          className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[0.5rem] font-bold uppercase tracking-[0.4em] transition-all disabled:opacity-50"
+                        >
+                          {isRequestingPayout ? "Requesting..." : "Request Instant Payout"}
                         </button>
                       </div>
                     </div>
@@ -875,7 +994,8 @@ const PartnerDashboard: React.FC = () => {
                           value={shopData?.upiId || ''}
                           onChange={handleUpiInputChange}
                           placeholder="merchant@upi"
-                          className="flex-1 px-8 py-5 bg-gray-50 border border-gray-100 rounded-[1.5rem] focus:border-bbBlue outline-none text-sm font-mono font-bold uppercase tracking-tight transition-all"
+                          style={{ textTransform: 'lowercase' }}
+                          className="flex-1 px-8 py-5 bg-gray-50 border border-gray-100 rounded-[1.5rem] focus:border-bbBlue outline-none text-sm font-mono font-bold tracking-tight transition-all"
                         />
                         <button 
                           onClick={() => handleUpdateMasterData('upiId', shopData.upiId)}
@@ -1123,18 +1243,28 @@ const PartnerDashboard: React.FC = () => {
                                         e.stopPropagation();
                                         const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
                                         if (confirmReject) {
+                                          const originalStatus = b.status || 'payment_held';
+                                          const originalRejectedAt = b.rejectedAt || null;
                                           try {
                                             await updateDoc(doc(db, 'bookings', b.id), { 
                                               status: 'rejected', 
                                               rejectedAt: new Date().toISOString() 
                                             });
-                                            await fetch('/api/razorpay/refund', {
+                                            const response = await fetch('/api/razorpay/refund', {
                                               method: 'POST',
                                               headers: { 'Content-Type': 'application/json' },
                                               body: JSON.stringify({ paymentId: b.transactionId, amount: b.price, bookingId: b.id })
                                             });
+                                            if (!response.ok) {
+                                              throw new Error(`Refund API returned status ${response.status}`);
+                                            }
                                           } catch (refErr) {
-                                            console.error("Refund dispatch error:", refErr);
+                                            console.error("Refund dispatch error - rolling back status to original:", refErr);
+                                            alert("Refund failed or response was negative. Status rolled back to prevent locked customer funds.");
+                                            await updateDoc(doc(db, 'bookings', b.id), {
+                                              status: originalStatus,
+                                              rejectedAt: originalRejectedAt
+                                            });
                                           }
                                         }
                                       }}
