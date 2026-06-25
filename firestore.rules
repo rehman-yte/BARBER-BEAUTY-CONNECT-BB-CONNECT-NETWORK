@@ -94,7 +94,7 @@ service cloud.firestore {
         incoming().adminApproved == false
       );
 
-      allow update: if (isOwner(partnerId) || isAdmin()) && (
+      allow update: if (isOwner(partnerId) || isAdmin()) ? (
         isValidPartner(incoming()) && (
           // Admin can change anything
           isAdmin() || (
@@ -109,6 +109,12 @@ service cloud.firestore {
             ])
           )
         )
+      ) : (
+        // Allow authenticated users to ONLY update rating/star fields (for customer feedback submit)
+        isSignedIn() && 
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'rating', 'stars', 'totalRatings', 'ratingCount', 'reviews', 'lastRating'
+        ])
       );
       
       allow delete: if isAdmin();
@@ -177,6 +183,22 @@ service cloud.firestore {
 
     match /inventory/{itemId} {
       allow read, write: if true;
+    }
+
+    // -------------------------------------------------------------------------
+    // 10. REVIEWS & RATINGS COLLECTIONS
+    // -------------------------------------------------------------------------
+
+    match /Reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
   }
 }
