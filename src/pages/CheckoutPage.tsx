@@ -248,7 +248,6 @@ const CheckoutPage: React.FC = () => {
 
         const orderRef = await addDoc(collection(db, 'orders'), orderData);
         finalOrderId = orderRef.id;
-        setCreatedOrderDocId(finalOrderId);
 
         if (isSlotBooking) {
           for (const item of cart) {
@@ -283,9 +282,6 @@ const CheckoutPage: React.FC = () => {
               const bookingRef = await addDoc(collection(db, 'bookings'), bookingDocData);
               finalBookingIds.push(bookingRef.id);
             }
-          }
-          if (finalBookingIds.length > 0) {
-            setCreatedBookingDocIds(finalBookingIds);
           }
         }
       } catch (dbErr: any) {
