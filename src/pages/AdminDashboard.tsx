@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 import { 
@@ -45,7 +45,7 @@ const AdminDashboard: React.FC = () => {
   const [editingPartner, setEditingPartner] = useState<any>(null);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(PersistenceService.load('system_maintenance') || false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings';
+  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings' | 'manual_refund' | 'partner_payment_hub';
   const navigate = useNavigate();
 
   const setCurrentView = (view: string) => {
@@ -922,6 +922,309 @@ const AdminDashboard: React.FC = () => {
             </div>
           </motion.div>
         )}
+
+        {currentView === 'manual_refund' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-12 flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-serif font-bold text-black">CUSTOMER MANUAL UPI REFUNDS</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Bypass Auto-Refund Gateway & Release Manual Paybacks</p>
+              </div>
+              <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back to Overview</button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-8">
+              {/* Manual Refund Entry Tool */}
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-[#0056b3] rounded-full"></span>
+                  Quick Manual Refund Dispatcher
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Booking ID / Ref</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. bk_12345"
+                      id="quick_booking_id"
+                      className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-xl text-[11px] font-bold outline-none focus:border-bbBlue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Customer UPI ID</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. customer@upi"
+                      id="quick_upi_id"
+                      className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-xl text-[11px] font-bold outline-none focus:border-bbBlue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Amount (₹)</label>
+                    <input 
+                      type="number" 
+                      placeholder="500"
+                      id="quick_amount"
+                      className="w-full bg-gray-50 border border-gray-100 px-4 py-3 rounded-xl text-[11px] font-bold outline-none focus:border-bbBlue"
+                    />
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      const bId = (document.getElementById('quick_booking_id') as HTMLInputElement)?.value;
+                      const upi = (document.getElementById('quick_upi_id') as HTMLInputElement)?.value;
+                      const amt = (document.getElementById('quick_amount') as HTMLInputElement)?.value;
+                      if (!bId || !upi || !amt) {
+                        alert("Please fill all fields for manual refund dispatcher.");
+                        return;
+                      }
+                      try {
+                        // 1. Add to refund_requests collection
+                        await setDoc(doc(db, 'refund_requests', bId), {
+                          bookingId: bId,
+                          upiId: upi,
+                          amount: Number(amt),
+                          status: 'refunded',
+                          releasedAt: new Date().toISOString(),
+                          method: 'UPI_MANUAL'
+                        }, { merge: true });
+
+                        // 2. Add notification to the customer/partner if possible or broadcast
+                        await addDoc(collection(db, 'notifications'), {
+                          message: `Manual UPI Refund of ₹${amt} released successfully to ID: ${upi} for booking ${bId}.`,
+                          target: 'all',
+                          timestamp: new Date().toISOString(),
+                          createdAt: Timestamp.now(),
+                          type: 'STATUS UPDATE'
+                        });
+
+                        // 3. Update the booking status in Firestore if booking exists
+                        try {
+                          await updateBookingStatus(bId, 'Refunded');
+                        } catch (e) {
+                          console.log("Booking doc not found but manual refund log was created.");
+                        }
+
+                        showToast(`Refund of ₹${amt} dispatched to ${upi}!`);
+                        // Clear fields
+                        (document.getElementById('quick_booking_id') as HTMLInputElement).value = '';
+                        (document.getElementById('quick_upi_id') as HTMLInputElement).value = '';
+                        (document.getElementById('quick_amount') as HTMLInputElement).value = '';
+                        fetchStats();
+                      } catch (err) {
+                        console.error(err);
+                        alert("Failed to process manual refund.");
+                      }
+                    }}
+                    className="bg-black text-white py-3.5 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-[#0056b3] transition-all shadow-md active:scale-95 animate-none"
+                  >
+                    Release & Log Payout
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Refund Streams */}
+              <div>
+                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Refund Eligible Cancellation Stream</h3>
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                  <table className="w-full text-left text-[0.6875rem]">
+                    <thead className="bg-[#0056b3] text-white">
+                      <tr>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Booking ID</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Customer Name</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Amount</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Status</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {stats?.auditLog?.filter((l: any) => l.status === 'Cancelled' || l.status === 'refund_requested').map((log: any) => (
+                        <tr key={log.bookingId} className="hover:bg-gray-50/50 transition-all">
+                          <td className="px-8 py-5 font-mono text-gray-400">{log.bookingId}</td>
+                          <td className="px-8 py-5 font-bold text-black">{log.customerName || 'Network Member'}</td>
+                          <td className="px-8 py-5 text-gray-500 font-bold">₹{log.totalPaid.toLocaleString()}</td>
+                          <td className="px-8 py-5">
+                            <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-[0.5625rem] font-bold uppercase tracking-widest border border-red-100">
+                              Refund Outstanding
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                            <button 
+                              onClick={async () => {
+                                const upiInput = window.prompt("Enter Customer's registered UPI ID for dispatching payback:");
+                                if (!upiInput) return;
+                                try {
+                                  await setDoc(doc(db, 'refund_requests', log.bookingId), {
+                                    bookingId: log.bookingId,
+                                    upiId: upiInput,
+                                    amount: log.totalPaid,
+                                    status: 'refunded',
+                                    releasedAt: new Date().toISOString(),
+                                    method: 'UPI_MANUAL'
+                                  }, { merge: true });
+
+                                  await updateBookingStatus(log.bookingId, 'Refunded');
+                                  
+                                  await addDoc(collection(db, 'notifications'), {
+                                    message: `Manual UPI Refund of ₹${log.totalPaid} released successfully to ID: ${upiInput} for booking ${log.bookingId}.`,
+                                    target: 'all',
+                                    timestamp: new Date().toISOString(),
+                                    createdAt: Timestamp.now(),
+                                    type: 'STATUS UPDATE'
+                                  });
+
+                                  showToast(`Refund of ₹${log.totalPaid} released successfully!`);
+                                  fetchStats();
+                                } catch (err) {
+                                  console.error(err);
+                                  alert("Failed to process refund");
+                                }
+                              }}
+                              className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest bg-black text-white hover:bg-[#0056b3] transition-all font-sans"
+                            >
+                              Dispatch Payout
+                            </button>
+                          </td>
+                        </tr>
+                      )) || (
+                        <tr>
+                          <td colSpan={5} className="text-center py-10 text-gray-300 font-bold uppercase">No cancellation pending refunds</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {currentView === 'partner_payment_hub' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-12 flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-serif font-bold text-black">PARTNER PAYMENT HUB</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Account AI 12-Hour 5% Commission & Settlement Registry</p>
+              </div>
+              <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back to Overview</button>
+            </div>
+
+            {/* Rolling Window & Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <div className="bg-black text-white p-8 rounded-[2.5rem] relative overflow-hidden">
+                <div className="absolute top-4 right-4 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-bbBlue rounded-full animate-pulse"></span>
+                  <span className="text-[8px] text-bbBlue font-bold uppercase tracking-widest">Active Cycle</span>
+                </div>
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-2">Rolling Settlement Cycle</p>
+                <p className="text-4xl font-serif font-bold text-white">12h 00m</p>
+                <div className="w-full bg-white/10 h-1 rounded-full mt-4 overflow-hidden">
+                  <div className="bg-bbBlue h-full w-[85%] animate-pulse"></div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Standard AI Commission</p>
+                <p className="text-4xl font-serif font-bold text-black">5.0%</p>
+                <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase tracking-widest">Calculated dynamically on gross volume</p>
+              </div>
+
+              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Total Net Pending Cycle</p>
+                <p className="text-4xl font-serif font-bold text-bbBlue">
+                  ₹{stats?.settlements?.reduce((sum: number, s: any) => sum + (s.totalAmount * 0.95), 0).toLocaleString() || 0}
+                </p>
+                <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase tracking-widest">All outstanding partner balances</p>
+              </div>
+            </div>
+
+            {/* Partner Settlement List */}
+            <div>
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Partner Settlement Registry</h3>
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                <table className="w-full text-left text-[0.6875rem]">
+                  <thead className="bg-[#0056b3] text-white">
+                    <tr>
+                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner Shop</th>
+                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Registered UPI ID</th>
+                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Gross 12h Vol</th>
+                      <th className="px-8 py-4 font-bold uppercase tracking-widest">5% Fee Deduction</th>
+                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout Release</th>
+                      <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Operational Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {stats?.allPartners?.map((p: any) => {
+                      // Calculate gross volume from completed/eligible bookings
+                      const partnerBookings = stats?.auditLog?.filter((l: any) => l.shopId === p.id && (l.status === 'payment_held' || l.status === 'settlement_due' || l.status === 'Confirmed' || l.status === 'Accepted'));
+                      const grossAmount = partnerBookings?.reduce((sum: number, b: any) => sum + b.totalPaid, 0) || 0;
+                      const commission = grossAmount * 0.05;
+                      const netPayout = grossAmount - commission;
+                      const registeredUpi = p.upiId || p.upi_id || 'unregistered@upi';
+
+                      if (grossAmount === 0) return null;
+
+                      return (
+                        <tr key={p.id} className="hover:bg-gray-50/50 transition-all">
+                          <td className="px-8 py-5 font-bold text-black">{p.brandName || p.brand_name}</td>
+                          <td className="px-8 py-5 font-mono text-bbBlue">{registeredUpi}</td>
+                          <td className="px-8 py-5 text-gray-500 font-bold">₹{grossAmount.toLocaleString()}</td>
+                          <td className="px-8 py-5 text-red-500 font-bold">-₹{commission.toLocaleString()}</td>
+                          <td className="px-8 py-5 text-emerald-600 font-bold">₹{netPayout.toLocaleString()}</td>
+                          <td className="px-8 py-5 text-right">
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  // 1. Release settlement logs in Firestore
+                                  await setDoc(doc(db, 'partner_settlements', p.id + '_' + Date.now()), {
+                                    partnerId: p.id,
+                                    partnerName: p.brandName || p.brand_name,
+                                    upiId: registeredUpi,
+                                    grossAmount,
+                                    commission,
+                                    netPayout,
+                                    releasedAt: new Date().toISOString()
+                                  });
+
+                                  // 2. Trigger localized message insert into partner's bell notification stream
+                                  await addDoc(collection(db, 'notifications'), {
+                                    message: `Settlement payout of ₹${netPayout.toLocaleString()} released to your registered UPI ID ${registeredUpi} after 5% platform commission deduction.`,
+                                    target: p.id, // direct partner target
+                                    timestamp: new Date().toISOString(),
+                                    createdAt: Timestamp.now(),
+                                    type: 'GLOBAL BROADCAST'
+                                  });
+
+                                  // 3. Mark the partner's bookings as Settled (or 'completed')
+                                  for (const b of partnerBookings) {
+                                    await updateBookingStatus(b.bookingId, 'completed');
+                                  }
+
+                                  showToast(`Released ₹${netPayout.toLocaleString()} to ${p.brandName}! Notification triggered.`);
+                                  fetchStats();
+                                } catch (err) {
+                                  console.error(err);
+                                  alert("Failed to release partner settlement");
+                                }
+                              }}
+                              className="px-6 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest bg-black text-white hover:bg-emerald-600 transition-all font-sans"
+                            >
+                              Release & Notify
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }).filter(Boolean)}
+                    {(!stats?.allPartners || stats.allPartners.length === 0) && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-10 text-gray-300 font-bold uppercase">No active settlements in current 12h cycle</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </main>
 
       {/* Admin Bottom Navigation */}
@@ -934,6 +1237,8 @@ const AdminDashboard: React.FC = () => {
           { id: 'shops', label: 'shops' },
           { id: 'ledger', label: 'ledger' },
           { id: 'feedback', label: 'Feedback' },
+          { id: 'manual_refund', label: 'Refunds' },
+          { id: 'partner_payment_hub', label: 'Payout Hub' },
           { id: 'broadcast', label: 'Global' },
           { id: 'settings', label: 'Systems' }
         ].map((v) => (

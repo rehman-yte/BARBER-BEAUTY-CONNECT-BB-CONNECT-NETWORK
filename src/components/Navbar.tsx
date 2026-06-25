@@ -235,31 +235,33 @@ const Navbar: React.FC = () => {
                       </>
                     )}
 
-                    {user.role === 'admin' && (
-                      <>
-                        <Link to="/admin/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">🔐</span> Admin Control
-                        </Link>
-                        <Link to="/admin/manage-live-shops" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">🛠️</span> CONTROL SHOPS
-                        </Link>
-                        <Link to="/admin/dropship" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">📦</span> MANAGE INVENTORY
-                        </Link>
-                        <Link to="/admin/dashboard?view=verification" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">🛡️</span> Partner Vetting
-                        </Link>
-                        <Link to="/admin/dashboard?view=ledger" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">💸</span> Revenue Ledger
-                        </Link>
-                        <Link to="/admin/dashboard?view=broadcast" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">📢</span> Global Broadcast
-                        </Link>
-                        <Link to="/admin/dashboard?view=feedback" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
-                          <span className="opacity-50">💬</span> Feedback Hub
-                        </Link>
-                      </>
-                    )}
+                    {user.role === 'admin' && (() => {
+                      const adminDropdownOptions = [
+                        { label: "👑 Admin Control", path: "/admin/dashboard", icon: "🔐" },
+                        { label: "✂️ Control Shops", path: "/admin/manage-live-shops", icon: "🛠️" },
+                        { label: "📦 Manage Inventory", path: "/admin/dropship", icon: "📦" },
+                        { label: "🤝 Partner Vetting", path: "/admin/dashboard?view=verification", icon: "🛡️" },
+                        { label: "📈 Revenue Ledger", path: "/admin/dashboard?view=ledger", icon: "💸" },
+                        { label: "📢 Global Broadcast", path: "/admin/dashboard?view=broadcast", icon: "📢" },
+                        { label: "💬 Feedback Hub", path: "/admin/dashboard?view=feedback", icon: "💬" },
+                        { label: "💸 Customer Refund Panel", path: "/admin/dashboard?view=manual_refund", icon: "💸" },
+                        { label: "🏦 Partner Payment Hub", path: "/admin/dashboard?view=partner_payment_hub", icon: "🏦" }
+                      ];
+                      return (
+                        <>
+                          {adminDropdownOptions.map((option, idx) => (
+                            <Link 
+                              key={idx}
+                              to={option.path} 
+                              onClick={() => setShowDropdown(false)} 
+                              className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all"
+                            >
+                              <span className="opacity-50">{option.icon}</span> {option.label.toUpperCase()}
+                            </Link>
+                          ))}
+                        </>
+                      );
+                    })()}
 
                     <div className="border-t border-gray-50 mt-1">
                       <button 
