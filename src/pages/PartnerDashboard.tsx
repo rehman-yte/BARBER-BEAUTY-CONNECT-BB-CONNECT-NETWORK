@@ -1,3 +1,5 @@
+/* PARTNER_PORTAL_PERMANENTLY_LOCKED */
+/* SECURITY_LAYER_LOCKED */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';

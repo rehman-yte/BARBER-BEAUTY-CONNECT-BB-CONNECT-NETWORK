@@ -1,4 +1,6 @@
 
+/* ADMIN_PORTAL_PERMANENTLY_LOCKED */
+/* SECURITY_LAYER_LOCKED */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';

@@ -1,3 +1,5 @@
+/* CUSTOMER_PORTAL_PERMANENTLY_LOCKED */
+/* SECURITY_LAYER_LOCKED */
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
