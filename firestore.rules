@@ -184,15 +184,5 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
-
-    // -------------------------------------------------------------------------
-    // 11. VERIFICATION QUEUE COLLECTION
-    // -------------------------------------------------------------------------
-
-    match /verification_queue/{partnerId} {
-      allow read: if isOwner(partnerId) || isAdmin();
-      allow create, update: if isOwner(partnerId) || isAdmin();
-      allow delete: if isAdmin();
-    }
   }
 }
