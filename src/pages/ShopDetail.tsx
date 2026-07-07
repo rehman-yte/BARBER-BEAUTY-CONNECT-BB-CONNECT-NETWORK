@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getShopById, addBooking } from '../services/logic_engine';
+import { db } from '../lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const ShopDetail: React.FC = () => {
   const { id } = useParams();
@@ -17,6 +19,33 @@ const ShopDetail: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [dynamicSlots, setDynamicSlots] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const fetchDynamicSlots = async () => {
+      if (!id) return;
+      try {
+        const slotsQuery = query(
+          collection(db, "partner_slots_configuration"),
+          where("partnerId", "==", String(id))
+        );
+        const snapshot = await getDocs(slotsQuery);
+        if (snapshot && !snapshot.empty) {
+          const loadedSlots = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setDynamicSlots(loadedSlots);
+        } else {
+          setDynamicSlots([]);
+        }
+      } catch (err) {
+        console.error("Error fetching dynamic slots:", err);
+        setDynamicSlots([]);
+      }
+    };
+    fetchDynamicSlots();
+  }, [id]);
   
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const mapRef = useRef<any>(null);
@@ -161,6 +190,18 @@ const ShopDetail: React.FC = () => {
     slotTime.setHours(hour, min, 0, 0);
     return new Date() > slotTime;
   };
+
+  const displaySlots = dynamicSlots.length > 0 
+    ? dynamicSlots.map(ds => ({
+        id: ds.id || `dyn-${ds.time || ds.timeString}`,
+        time: ds.timeString || ds.time || '12:00',
+        available: ds.available !== false
+      }))
+    : allSlots.map(slot => ({
+        id: slot,
+        time: slot,
+        available: !isSlotDisabled(slot)
+      }));
 
   const handleBooking = () => {
     if (!selectedSlot || !shopData || !selectedService) return;
@@ -411,21 +452,21 @@ const ShopDetail: React.FC = () => {
              <div className="space-y-[1.5rem]">
                 <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest text-center">Select Time</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-[0.75rem]">
-                   {allSlots.map((slot) => {
-                      const disabled = isSlotDisabled(slot);
-                      const isSelected = selectedSlot === slot;
+                   {displaySlots.map((slotItem) => {
+                      const disabled = !slotItem.available;
+                      const isSelected = selectedSlot === slotItem.time;
                       return (
                          <button
-                            key={slot}
+                            key={slotItem.id}
                             disabled={disabled}
-                            onClick={() => setSelectedSlot(slot)}
+                            onClick={() => setSelectedSlot(slotItem.time)}
                             className={`py-[0.875rem] rounded-xl text-[0.625rem] font-bold tracking-widest transition-all ${
                                isSelected ? 'bg-bbBlue text-white shadow-lg' : 
                                disabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-50' : 
                                'bg-white border border-gray-100 text-charcoal hover:border-bbBlue hover:text-bbBlue'
                             }`}
                          >
-                            {slot}
+                            {slotItem.time}
                          </button>
                       );
                    })}
