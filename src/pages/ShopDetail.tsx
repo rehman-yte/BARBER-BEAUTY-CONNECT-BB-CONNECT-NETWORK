@@ -126,42 +126,50 @@ const ShopDetail: React.FC = () => {
     }
 
     // Routing Logic
-    if (userLocation && mapRef.current) {
-      const routingControl = (window as any).L.Routing.control({
-        waypoints: [
-          L.latLng(userLocation.lat, userLocation.lng),
-          L.latLng(shopData.lat, shopData.lng)
-        ],
-        routeWhileDragging: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-        show: false, // Hide the text directions panel
-        lineOptions: {
-          styles: [{ color: '#2358E1', opacity: 0.8, weight: 6 }]
-        },
-        createMarker: function(i: number, waypoint: any) {
-          return L.marker(waypoint.latLng, {
-            draggable: false,
-            icon: L.icon({
-              iconUrl: i === 0 
-                ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
-                : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41]
-            })
-          });
-        }
-      }).addTo(mapRef.current);
+    if (userLocation && mapRef.current && L && L.Routing && L.Routing.control) {
+      try {
+        const routingControl = L.Routing.control({
+          waypoints: [
+            L.latLng(userLocation.lat, userLocation.lng),
+            L.latLng(shopData.lat, shopData.lng)
+          ],
+          routeWhileDragging: false,
+          addWaypoints: false,
+          draggableWaypoints: false,
+          fitSelectedRoutes: true,
+          show: false, // Hide the text directions panel
+          lineOptions: {
+            styles: [{ color: '#2358E1', opacity: 0.8, weight: 6 }]
+          },
+          createMarker: function(i: number, waypoint: any) {
+            return L.marker(waypoint.latLng, {
+              draggable: false,
+              icon: L.icon({
+                iconUrl: i === 0 
+                  ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
+                  : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+              })
+            });
+          }
+        }).addTo(mapRef.current);
 
-      return () => {
-        if (mapRef.current) {
-          mapRef.current.removeControl(routingControl);
-        }
-      };
+        return () => {
+          if (mapRef.current) {
+            try {
+              mapRef.current.removeControl(routingControl);
+            } catch (cleanupErr) {
+              console.warn("Leaflet cleanup warning:", cleanupErr);
+            }
+          }
+        };
+      } catch (routingErr) {
+        console.error("Leaflet routing setup warning:", routingErr);
+      }
     }
   }, [shopData, userLocation]);
 

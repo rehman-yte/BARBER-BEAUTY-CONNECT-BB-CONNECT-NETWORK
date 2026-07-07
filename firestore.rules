@@ -102,6 +102,12 @@ service cloud.firestore {
       );
       
       allow delete: if isAdmin();
+
+      // Services Sub-collection Security Rules
+      match /services/{serviceId} {
+        allow read: if true;
+        allow write: if isOwner(partnerId) || isAdmin();
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -183,6 +189,15 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 11. PARTNER SLOTS CONFIGURATION
+    // -------------------------------------------------------------------------
+    match /partner_slots_configuration/{slotId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }
