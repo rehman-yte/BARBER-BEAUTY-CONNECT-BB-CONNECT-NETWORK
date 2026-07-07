@@ -5,8 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getShopById, addBooking } from '../services/logic_engine';
-import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const ShopDetail: React.FC = () => {
   const { id } = useParams();
@@ -19,33 +17,6 @@ const ShopDetail: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [dynamicSlots, setDynamicSlots] = useState<any[]>([]);
-  
-  useEffect(() => {
-    const fetchDynamicSlots = async () => {
-      if (!id) return;
-      try {
-        const slotsQuery = query(
-          collection(db, "partner_slots_configuration"),
-          where("partnerId", "==", String(id))
-        );
-        const snapshot = await getDocs(slotsQuery);
-        if (snapshot && !snapshot.empty) {
-          const loadedSlots = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setDynamicSlots(loadedSlots);
-        } else {
-          setDynamicSlots([]);
-        }
-      } catch (err) {
-        console.error("Error fetching dynamic slots:", err);
-        setDynamicSlots([]);
-      }
-    };
-    fetchDynamicSlots();
-  }, [id]);
   
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const mapRef = useRef<any>(null);
@@ -126,50 +97,42 @@ const ShopDetail: React.FC = () => {
     }
 
     // Routing Logic
-    if (userLocation && mapRef.current && L && L.Routing && L.Routing.control) {
-      try {
-        const routingControl = L.Routing.control({
-          waypoints: [
-            L.latLng(userLocation.lat, userLocation.lng),
-            L.latLng(shopData.lat, shopData.lng)
-          ],
-          routeWhileDragging: false,
-          addWaypoints: false,
-          draggableWaypoints: false,
-          fitSelectedRoutes: true,
-          show: false, // Hide the text directions panel
-          lineOptions: {
-            styles: [{ color: '#2358E1', opacity: 0.8, weight: 6 }]
-          },
-          createMarker: function(i: number, waypoint: any) {
-            return L.marker(waypoint.latLng, {
-              draggable: false,
-              icon: L.icon({
-                iconUrl: i === 0 
-                  ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
-                  : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-              })
-            });
-          }
-        }).addTo(mapRef.current);
+    if (userLocation && mapRef.current) {
+      const routingControl = (window as any).L.Routing.control({
+        waypoints: [
+          L.latLng(userLocation.lat, userLocation.lng),
+          L.latLng(shopData.lat, shopData.lng)
+        ],
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        show: false, // Hide the text directions panel
+        lineOptions: {
+          styles: [{ color: '#2358E1', opacity: 0.8, weight: 6 }]
+        },
+        createMarker: function(i: number, waypoint: any) {
+          return L.marker(waypoint.latLng, {
+            draggable: false,
+            icon: L.icon({
+              iconUrl: i === 0 
+                ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
+                : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41]
+            })
+          });
+        }
+      }).addTo(mapRef.current);
 
-        return () => {
-          if (mapRef.current) {
-            try {
-              mapRef.current.removeControl(routingControl);
-            } catch (cleanupErr) {
-              console.warn("Leaflet cleanup warning:", cleanupErr);
-            }
-          }
-        };
-      } catch (routingErr) {
-        console.error("Leaflet routing setup warning:", routingErr);
-      }
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.removeControl(routingControl);
+        }
+      };
     }
   }, [shopData, userLocation]);
 
@@ -198,18 +161,6 @@ const ShopDetail: React.FC = () => {
     slotTime.setHours(hour, min, 0, 0);
     return new Date() > slotTime;
   };
-
-  const displaySlots = dynamicSlots.length > 0 
-    ? dynamicSlots.map(ds => ({
-        id: ds.id || `dyn-${ds.time || ds.timeString}`,
-        time: ds.timeString || ds.time || '12:00',
-        available: ds.available !== false
-      }))
-    : allSlots.map(slot => ({
-        id: slot,
-        time: slot,
-        available: !isSlotDisabled(slot)
-      }));
 
   const handleBooking = () => {
     if (!selectedSlot || !shopData || !selectedService) return;
@@ -460,21 +411,21 @@ const ShopDetail: React.FC = () => {
              <div className="space-y-[1.5rem]">
                 <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest text-center">Select Time</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-[0.75rem]">
-                   {displaySlots.map((slotItem) => {
-                      const disabled = !slotItem.available;
-                      const isSelected = selectedSlot === slotItem.time;
+                   {allSlots.map((slot) => {
+                      const disabled = isSlotDisabled(slot);
+                      const isSelected = selectedSlot === slot;
                       return (
                          <button
-                            key={slotItem.id}
+                            key={slot}
                             disabled={disabled}
-                            onClick={() => setSelectedSlot(slotItem.time)}
+                            onClick={() => setSelectedSlot(slot)}
                             className={`py-[0.875rem] rounded-xl text-[0.625rem] font-bold tracking-widest transition-all ${
                                isSelected ? 'bg-bbBlue text-white shadow-lg' : 
                                disabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-50' : 
                                'bg-white border border-gray-100 text-charcoal hover:border-bbBlue hover:text-bbBlue'
                             }`}
                          >
-                            {slotItem.time}
+                            {slot}
                          </button>
                       );
                    })}
