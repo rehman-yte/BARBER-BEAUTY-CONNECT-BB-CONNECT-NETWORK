@@ -379,23 +379,7 @@ const ShopDetail: React.FC = () => {
              </div>
           </div>
 
-          <div className="space-y-[1.5rem]">
-             <h3 className="text-[0.75rem] font-bold uppercase tracking-widest text-charcoal">Registry Portfolio</h3>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-[1rem]">
-                {(shopData.services || []).map((s: any, i: number) => (
-                   <button 
-                      key={i}
-                      onClick={() => setSelectedService(s)}
-                      className={`flex justify-between items-center p-[1.5rem] rounded-3xl border transition-all ${
-                        selectedService?.name === s.name ? 'border-bbBlue bg-bbBlue/5 shadow-inner' : 'border-gray-100 hover:border-bbBlue/30'
-                      }`}
-                   >
-                      <span className="text-[0.875rem] font-bold text-charcoal uppercase tracking-tight">{s.name}</span>
-                      <span className="text-[0.875rem] font-mono font-bold text-bbBlue">₹{s.price}</span>
-                   </button>
-                ))}
-             </div>
-          </div>
+
         </div>
 
         {/* RIGHT: Booking Engine */}
@@ -406,7 +390,7 @@ const ShopDetail: React.FC = () => {
              {/* Select Service Section */}
              <div className="space-y-[1rem] mb-[2.5rem]">
                 <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest text-center">Select Service</p>
-                <div className="grid grid-cols-1 gap-[0.75rem]">
+                <div className="max-h-[240px] overflow-y-auto pr-1.5 space-y-[0.75rem] bg-white border border-gray-100 p-3 rounded-3xl shadow-inner scrollbar-thin">
                    {(shopData.services || []).map((service: any) => {
                       const isSelected = selectedService?.name === service.name || selectedService?.id === service.id;
                       return (
@@ -417,7 +401,7 @@ const ShopDetail: React.FC = () => {
                             className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center justify-between ${
                                isSelected 
                                  ? 'bg-bbBlue text-white border-bbBlue shadow-lg shadow-bbBlue/20' 
-                                 : 'bg-white border-gray-100 text-charcoal hover:border-bbBlue/40'
+                                 : 'bg-gray-50/50 border-gray-100 text-charcoal hover:border-bbBlue/40 hover:bg-white'
                             }`}
                          >
                             <div className="flex flex-col gap-0.5">
