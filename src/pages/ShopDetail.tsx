@@ -6,6 +6,13 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getShopById, addBooking } from '../services/logic_engine';
 
+const DEFAULT_SALON_SERVICES = [
+  { id: 'srv-1', name: 'Haircut & Styling', price: 299, duration: '30 mins' },
+  { id: 'srv-2', name: 'Beard Grooming & Trim', price: 199, duration: '20 mins' },
+  { id: 'srv-3', name: 'Royal Hair & Head Massage', price: 349, duration: '30 mins' },
+  { id: 'srv-4', name: 'Facial & Skin Cleansing', price: 499, duration: '45 mins' }
+];
+
 const ShopDetail: React.FC = () => {
   const { id } = useParams();
   const { user } = useAuth();
@@ -29,13 +36,17 @@ const ShopDetail: React.FC = () => {
       try {
         const data = await getShopById(id);
         if (data) {
-          setShopData(data);
-          if (data.services && data.services.length > 0) {
-            setSelectedService(data.services[0]);
-          } else {
-            // Default fallback service if no custom services found
-            setSelectedService({ id: 'srv-default', name: 'Haircut & Grooming', price: 299, duration: '30 mins' });
-          }
+          const rawServices = data.services && data.services.length > 0 ? data.services : DEFAULT_SALON_SERVICES;
+          const processedServices = rawServices.map((s: any, idx: number) => ({
+            id: s.id || `srv-${idx}`,
+            name: s.name || s.serviceName || s.title || s.label || s.service || `Service #${idx + 1}`,
+            price: typeof s.price === 'number' ? s.price : (parseInt(String(s.price || s.servicePrice || s.amount || 299).replace(/[^0-9]/g, '')) || 299),
+            duration: s.duration ? (typeof s.duration === 'number' ? `${s.duration} mins` : String(s.duration)) : '30 mins'
+          }));
+          
+          const fullShop = { ...data, services: processedServices };
+          setShopData(fullShop);
+          setSelectedService(processedServices[0]);
         } else {
           navigate('/customer/explore');
         }
@@ -392,6 +403,38 @@ const ShopDetail: React.FC = () => {
           <div className="p-[2rem] md:p-[3rem] border border-gray-100 rounded-[3rem] shadow-sm bg-gray-50/30">
              <h2 className="text-[1.5rem] font-serif font-bold text-bbBlue-deep mb-[2rem] text-center uppercase tracking-tight">Schedule Your Slot</h2>
              
+             {/* Select Service Section */}
+             <div className="space-y-[1rem] mb-[2.5rem]">
+                <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest text-center">Select Service</p>
+                <div className="grid grid-cols-1 gap-[0.75rem]">
+                   {(shopData.services || []).map((service: any) => {
+                      const isSelected = selectedService?.name === service.name || selectedService?.id === service.id;
+                      return (
+                         <button
+                            key={service.id || service.name}
+                            type="button"
+                            onClick={() => setSelectedService(service)}
+                            className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center justify-between ${
+                               isSelected 
+                                 ? 'bg-bbBlue text-white border-bbBlue shadow-lg shadow-bbBlue/20' 
+                                 : 'bg-white border-gray-100 text-charcoal hover:border-bbBlue/40'
+                            }`}
+                         >
+                            <div className="flex flex-col gap-0.5">
+                               <span className="text-[0.875rem] font-bold tracking-tight uppercase">{service.name}</span>
+                               <span className={`text-[0.625rem] font-medium tracking-wider ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>
+                                 ⏱ {service.duration || '30 mins'}
+                               </span>
+                            </div>
+                            <span className={`text-[1rem] font-mono font-bold ${isSelected ? 'text-white' : 'text-bbBlue'}`}>
+                               ₹{service.price}
+                            </span>
+                         </button>
+                      );
+                   })}
+                </div>
+             </div>
+
              <div className="space-y-[1rem] mb-[2.5rem]">
                 <p className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest text-center">Select Date</p>
                 <div className="flex justify-between overflow-x-auto gap-[0.75rem] pb-[0.5rem] scrollbar-hide">

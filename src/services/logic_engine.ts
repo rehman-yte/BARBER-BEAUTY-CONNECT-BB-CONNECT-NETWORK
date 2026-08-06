@@ -274,10 +274,18 @@ export const getShopById = async (id: string): Promise<any> => {
     const statusVal = String(data.status || 'approved').toLowerCase();
     const isApprovedOrActive = data.adminApproved === true || statusVal === 'approved' || statusVal === 'active';
 
+    const rawServicesList = services.length > 0 ? services : (data.services || []);
+    const normalizedServices = rawServicesList.map((s: any, idx: number) => ({
+      id: s.id || `srv-${idx}`,
+      name: s.name || s.serviceName || s.title || s.label || s.service || `Service #${idx + 1}`,
+      price: typeof s.price === 'number' ? s.price : (parseInt(String(s.price || s.servicePrice || s.amount || 299).replace(/[^0-9]/g, '')) || 299),
+      duration: s.duration ? (typeof s.duration === 'number' ? `${s.duration} mins` : String(s.duration)) : '30 mins'
+    }));
+
     return {
       id: docSnap.id,
       ...data,
-      services: services.length > 0 ? services : (data.services || []), // Fallback to array for migration
+      services: normalizedServices,
       brandName: data.brand_name || data.brandName || 'Partner Salon',
       ownerName: data.owner_name || data.ownerName || 'Master Professional',
       mobile: data.mobile_number || data.mobile,
