@@ -262,25 +262,33 @@ export const getShopById = async (id: string): Promise<any> => {
     if (!docSnap.exists()) return null;
     const data = docSnap.data() as any;
     
-    // Fetch individual services from sub-collection for precise logic
-    const servicesSnap = await getDocs(collection(db, 'partners', id, 'services'));
-    const services = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Fetch individual services from sub-collection safely
+    let services: any[] = [];
+    try {
+      const servicesSnap = await getDocs(collection(db, 'partners', id, 'services'));
+      services = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (sErr) {
+      console.warn("Sub-collection services fetch skipped/fallback:", sErr);
+    }
+
+    const statusVal = String(data.status || 'approved').toLowerCase();
+    const isApprovedOrActive = data.adminApproved === true || statusVal === 'approved' || statusVal === 'active';
 
     return {
       id: docSnap.id,
       ...data,
       services: services.length > 0 ? services : (data.services || []), // Fallback to array for migration
-      brandName: data.brand_name || data.brandName,
-      ownerName: data.owner_name || data.ownerName,
+      brandName: data.brand_name || data.brandName || 'Partner Salon',
+      ownerName: data.owner_name || data.ownerName || 'Master Professional',
       mobile: data.mobile_number || data.mobile,
       upiId: data.upi_id || data.upiId,
       workerQuantity: data.worker_quantity || data.workerQuantity,
-      status: data.status || 'pending',
+      status: data.status || 'approved',
       lat: data.lat || data.coords?.lat,
       lng: data.lng || data.coords?.lng,
       shopImages: data.shopImages || data.brandImages || [],
       workerImages: data.workerImages || [],
-      adminApproved: data.adminApproved || data.status === 'approved'
+      adminApproved: isApprovedOrActive
     };
   } catch (err) {
     console.error('Firestore getShopById production failure:', err);

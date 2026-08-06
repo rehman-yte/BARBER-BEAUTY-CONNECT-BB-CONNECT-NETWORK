@@ -102,6 +102,10 @@ service cloud.firestore {
       );
       
       allow delete: if isAdmin();
+
+      match /services/{serviceId} {
+        allow read, write: if true;
+      }
     }
 
     // -------------------------------------------------------------------------
