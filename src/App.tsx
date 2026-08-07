@@ -129,9 +129,9 @@ const AppRoutes: React.FC = () => {
 
 const LayoutWrapper: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-white overflow-x-hidden w-full">
       <Navbar />
-      <main className="flex-grow w-full pt-[5rem]">
+      <main className="flex-grow w-full pt-[4.5rem] md:pt-[5rem]">
         <AppRoutes />
       </main>
       <Footer />
