@@ -301,27 +301,49 @@ const PartnerDashboard: React.FC = () => {
     const unsubscribeShop = onSnapshot(shopRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const shop: any = {
-          id: docSnap.id,
-          ...data,
-          brandName: (data as any).brand_name || (data as any).brandName,
-          ownerName: (data as any).owner_name || (data as any).ownerName,
-          mobile: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
-          mobileNumber: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
-          workerQuota: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
-          workerQuantity: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
-          upiId: (data as any).upi_id || (data as any).upiId,
-          status: (data as any).status || 'pending',
-          adminApproved: (data as any).adminApproved || (data as any).status === 'approved'
-        };
-        setShopData(shop);
-        setIsLive(shop.isLive || false);
-        localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
+        const incomingServices = Array.isArray((data as any).services) ? (data as any).services : [];
+        
+        setShopData((prev: any) => {
+          const currentServices = prev?.services && prev.services.length > 0 ? prev.services : incomingServices;
+          const shop: any = {
+            id: docSnap.id,
+            ...data,
+            services: currentServices,
+            brandName: (data as any).brand_name || (data as any).brandName,
+            ownerName: (data as any).owner_name || (data as any).ownerName,
+            mobile: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
+            mobileNumber: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
+            workerQuota: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
+            workerQuantity: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
+            upiId: (data as any).upi_id || (data as any).upiId,
+            status: (data as any).status || 'pending',
+            adminApproved: (data as any).adminApproved || (data as any).status === 'approved'
+          };
+          setIsLive(shop.isLive || false);
+          localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
+          return shop;
+        });
       }
       setLoading(false);
     }, (err) => {
       console.error("Shop snapshot error:", err);
       setLoading(false);
+    });
+
+    // 1B. Services Sub-collection Real-Time Listener
+    const servicesRef = collection(db, 'partners', user.uid, 'services');
+    const unsubscribeServices = onSnapshot(servicesRef, (servicesSnap) => {
+      if (!servicesSnap.empty) {
+        const sList = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setShopData((prev: any) => {
+          if (!prev) return prev;
+          const merged = { ...prev, services: sList };
+          localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }, (sErr) => {
+      console.warn("Services listener skipped/fallback:", sErr);
     });
 
     // 2. Bookings Listener (Dual Path: Partner or Auditor)
@@ -619,28 +641,31 @@ const PartnerDashboard: React.FC = () => {
   };
 
   const handleSaveService = async () => {
-    if (!newServiceName || !newServicePrice) return;
+    if (!newServiceName || !newServicePrice || !user?.uid) return;
     
     const servicePayload = {
-      name: newServiceName,
+      name: newServiceName.trim(),
       price: Number(newServicePrice),
-      duration: Number(newServiceDuration)
+      duration: Number(newServiceDuration) || 30
     };
 
     try {
+      let updatedServices: any[] = [];
+      const currentServices = Array.isArray(shopData?.services) ? shopData.services : [];
+
       if (editingServiceId) {
-        await updateShopService(user!.uid, editingServiceId, servicePayload);
-        const updatedServices = shopData.services.map((s: any) => 
+        await updateShopService(user.uid, editingServiceId, servicePayload);
+        updatedServices = currentServices.map((s: any) => 
           s.id === editingServiceId ? { ...s, ...servicePayload } : s
         );
-        setShopData({ ...shopData, services: updatedServices });
       } else {
-        const newService = await addShopService(user!.uid, servicePayload);
-        setShopData({ 
-          ...shopData, 
-          services: [...(shopData.services || []), newService] 
-        });
+        const newService = await addShopService(user.uid, servicePayload);
+        updatedServices = [...currentServices, newService];
       }
+
+      const updatedShop = { ...shopData, services: updatedServices };
+      setShopData(updatedShop);
+      localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(updatedShop));
 
       setNewServiceName('');
       setNewServicePrice('');
@@ -649,22 +674,31 @@ const PartnerDashboard: React.FC = () => {
       setEditingServiceId(null);
     } catch (err) {
       console.error("Asset sync fail:", err);
+      alert("Failed to save service. Please check network connection.");
     }
   };
 
   const handleEditService = (service: any) => {
     setEditingServiceId(service.id);
     setNewServiceName(service.name);
-    setNewServicePrice(service.price.toString());
-    setNewServiceDuration(service.duration?.toString() || '30');
+    setNewServicePrice(service.price ? service.price.toString() : '');
+    setNewServiceDuration(service.duration ? String(service.duration).replace(/[^0-9]/g, '') : '30');
     setIsAddingService(true);
   };
 
   const handleRemoveService = async (serviceId: string) => {
+    if (!user?.uid) return;
+    const confirmDelete = window.confirm("Are you sure you want to delete this service?");
+    if (!confirmDelete) return;
+
     try {
-      await deleteShopService(user!.uid, serviceId);
-      const updatedServices = shopData.services.filter((s: any) => s.id !== serviceId);
-      setShopData({ ...shopData, services: updatedServices });
+      await deleteShopService(user.uid, serviceId);
+      const currentServices = Array.isArray(shopData?.services) ? shopData.services : [];
+      const updatedServices = currentServices.filter((s: any) => s.id !== serviceId && s.name !== serviceId);
+      
+      const updatedShop = { ...shopData, services: updatedServices };
+      setShopData(updatedShop);
+      localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(updatedShop));
     } catch (err) {
       console.error("Asset removal fail:", err);
     }
@@ -908,38 +942,42 @@ const PartnerDashboard: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {shopData?.services?.map((service: any) => (
-                    <div key={service.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative group overflow-hidden">
-                       <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                         <button 
-                          onClick={() => handleEditService(service)}
-                          className="w-10 h-10 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-lg"
-                         >
-                           <Settings size={16} />
-                         </button>
-                         <button 
-                          onClick={() => handleRemoveService(service.id)}
-                          className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg"
-                         >
-                           <Trash2 size={16} />
-                         </button>
+                    <div key={service.id} className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                       <div className="flex items-start justify-between gap-3 mb-3">
+                         <div className="w-10 h-10 sm:w-12 sm:h-12 bg-bbBlue/5 rounded-2xl flex items-center justify-center text-bbBlue font-serif font-black text-lg sm:text-xl shrink-0">
+                           ₹
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <button 
+                            onClick={() => handleEditService(service)}
+                            title="Edit Service"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-sm active:scale-95"
+                           >
+                             <Settings size={15} />
+                           </button>
+                           <button 
+                            onClick={() => handleRemoveService(service.id)}
+                            title="Delete Service"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95"
+                           >
+                             <Trash2 size={15} />
+                           </button>
+                         </div>
                        </div>
                        
-                       <div className="space-y-4">
-                          <div className="w-12 h-12 bg-bbBlue/5 rounded-2xl flex items-center justify-center text-bbBlue font-serif font-black text-xl">
-                            $
-                          </div>
+                       <div className="space-y-3">
                           <div>
-                            <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-1">SKU: {service.id?.slice(-8)}</p>
-                            <h4 className="text-[1rem] font-black uppercase tracking-tight leading-tight">{service.name}</h4>
+                            <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-0.5">SKU: {service.id?.slice(-8)}</p>
+                            <h4 className="text-[0.9375rem] sm:text-[1rem] font-black uppercase tracking-tight leading-tight">{service.name}</h4>
                           </div>
-                          <div className="flex items-center gap-4 pt-4 border-t border-gray-50">
+                          <div className="flex items-center gap-4 pt-3 border-t border-gray-50">
                              <div className="flex flex-col">
-                               <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Price</span>
-                               <span className="text-[1rem] font-serif font-black tracking-tight">₹{service.price}</span>
+                               <span className="text-[0.45rem] sm:text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Price</span>
+                               <span className="text-[0.875rem] sm:text-[1rem] font-serif font-black tracking-tight">₹{service.price}</span>
                              </div>
                              <div className="flex flex-col border-l border-gray-100 pl-4">
-                               <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">ETA</span>
-                               <span className="text-[1rem] font-serif font-black tracking-tight">{service.duration || '30'}m</span>
+                               <span className="text-[0.45rem] sm:text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Duration</span>
+                               <span className="text-[0.875rem] sm:text-[1rem] font-serif font-black tracking-tight">{service.duration || '30'}m</span>
                              </div>
                           </div>
                        </div>

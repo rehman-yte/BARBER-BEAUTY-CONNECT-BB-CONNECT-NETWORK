@@ -263,10 +263,10 @@ export const getShopById = async (id: string): Promise<any> => {
     const data = docSnap.data() as any;
     
     // Fetch individual services from sub-collection safely
-    let services: any[] = [];
+    let subServices: any[] = [];
     try {
       const servicesSnap = await getDocs(collection(db, 'partners', id, 'services'));
-      services = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      subServices = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (sErr) {
       console.warn("Sub-collection services fetch skipped/fallback:", sErr);
     }
@@ -274,7 +274,20 @@ export const getShopById = async (id: string): Promise<any> => {
     const statusVal = String(data.status || 'approved').toLowerCase();
     const isApprovedOrActive = data.adminApproved === true || statusVal === 'approved' || statusVal === 'active';
 
-    const rawServicesList = services.length > 0 ? services : (data.services || []);
+    const mainDocServices = Array.isArray(data.services) ? data.services : [];
+    
+    // Combine sub-collection services and main doc services with deduplication
+    const serviceMap = new Map();
+    mainDocServices.forEach((s: any, idx: number) => {
+      const sid = s.id || `srv-${idx}`;
+      if (sid) serviceMap.set(sid, { ...s, id: sid });
+    });
+    subServices.forEach((s: any, idx: number) => {
+      const sid = s.id || `sub-srv-${idx}`;
+      if (sid) serviceMap.set(sid, { ...s, id: sid });
+    });
+
+    const rawServicesList = Array.from(serviceMap.values());
     const normalizedServices = rawServicesList.map((s: any, idx: number) => ({
       id: s.id || `srv-${idx}`,
       name: s.name || s.serviceName || s.title || s.label || s.service || `Service #${idx + 1}`,
@@ -310,10 +323,39 @@ export const getShopById = async (id: string): Promise<any> => {
 
 export const addShopService = async (partnerId: string, service: any) => {
   try {
-    const serviceId = service.id || Date.now().toString();
-    const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
-    await setDoc(docRef, { ...service, id: serviceId, createdAt: Timestamp.now() });
-    return { ...service, id: serviceId };
+    const serviceId = service.id || `srv_${Date.now()}`;
+    const cleanService = {
+      ...service,
+      id: serviceId,
+      name: String(service.name || 'Custom Service'),
+      price: Number(service.price) || 0,
+      duration: service.duration ? (typeof service.duration === 'number' ? `${service.duration} mins` : String(service.duration)) : '30 mins',
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Try writing to sub-collection
+    try {
+      const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
+      await setDoc(docRef, cleanService);
+    } catch (sErr) {
+      console.warn("Subcollection setDoc failed/skipped:", sErr);
+    }
+
+    // 2. Dual Sync: Update main partner document services array
+    try {
+      const partnerRef = doc(db, 'partners', partnerId);
+      const partnerSnap = await getDoc(partnerRef);
+      if (partnerSnap.exists()) {
+        const pData = partnerSnap.data();
+        const currentServices = Array.isArray(pData.services) ? pData.services : [];
+        const updatedServices = [...currentServices.filter((s: any) => s.id !== serviceId), cleanService];
+        await updateDoc(partnerRef, { services: updatedServices });
+      }
+    } catch (mErr) {
+      console.warn("Main partner doc services update skipped:", mErr);
+    }
+
+    return cleanService;
   } catch (err) {
     console.error("addShopService fail:", err);
     throw err;
@@ -322,8 +364,30 @@ export const addShopService = async (partnerId: string, service: any) => {
 
 export const updateShopService = async (partnerId: string, serviceId: string, updates: any) => {
   try {
-    const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
-    await updateDoc(docRef, updates);
+    // 1. Try updating sub-collection
+    try {
+      const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
+      await updateDoc(docRef, updates);
+    } catch (sErr) {
+      console.warn("Subcollection updateDoc failed/skipped:", sErr);
+    }
+
+    // 2. Dual Sync: Update main partner document services array
+    try {
+      const partnerRef = doc(db, 'partners', partnerId);
+      const partnerSnap = await getDoc(partnerRef);
+      if (partnerSnap.exists()) {
+        const pData = partnerSnap.data();
+        const currentServices = Array.isArray(pData.services) ? pData.services : [];
+        const updatedServices = currentServices.map((s: any) => 
+          s.id === serviceId ? { ...s, ...updates } : s
+        );
+        await updateDoc(partnerRef, { services: updatedServices });
+      }
+    } catch (mErr) {
+      console.warn("Main partner doc services update skipped:", mErr);
+    }
+
     return true;
   } catch (err) {
     console.error("updateShopService fail:", err);
@@ -333,8 +397,28 @@ export const updateShopService = async (partnerId: string, serviceId: string, up
 
 export const deleteShopService = async (partnerId: string, serviceId: string) => {
   try {
-    const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
-    await deleteDoc(docRef);
+    // 1. Try deleting from sub-collection
+    try {
+      const docRef = doc(db, 'partners', partnerId, 'services', serviceId);
+      await deleteDoc(docRef);
+    } catch (sErr) {
+      console.warn("Subcollection deleteDoc failed/skipped:", sErr);
+    }
+
+    // 2. Dual Sync: Remove from main partner document services array
+    try {
+      const partnerRef = doc(db, 'partners', partnerId);
+      const partnerSnap = await getDoc(partnerRef);
+      if (partnerSnap.exists()) {
+        const pData = partnerSnap.data();
+        const currentServices = Array.isArray(pData.services) ? pData.services : [];
+        const updatedServices = currentServices.filter((s: any) => s.id !== serviceId && s.name !== serviceId);
+        await updateDoc(partnerRef, { services: updatedServices });
+      }
+    } catch (mErr) {
+      console.warn("Main partner doc services delete skipped:", mErr);
+    }
+
     return true;
   } catch (err) {
     console.error("deleteShopService fail:", err);
