@@ -691,11 +691,11 @@ const PartnerDashboard: React.FC = () => {
       <main className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6">
         
         {/* LIVE STATUS BAR (RELOCATED FROM HEADER) */}
-        <div className="bg-white px-8 py-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="bg-white px-4 sm:px-8 py-4 sm:py-6 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-white font-serif font-black overflow-hidden border border-gray-100 uppercase relative group shrink-0"
+              className="w-10 h-10 sm:w-12 sm:h-12 bg-black rounded-2xl flex items-center justify-center text-white font-serif font-black overflow-hidden border border-gray-100 uppercase relative group shrink-0"
             >
                {shopData?.ownerPicture && shopData.ownerPicture !== 'pending_upload' ? <img src={shopData.ownerPicture} className="w-full h-full object-cover" /> : shopData?.brandName?.[0] || 'B'}
                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity font-sans">
@@ -703,34 +703,34 @@ const PartnerDashboard: React.FC = () => {
                </div>
             </button>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleProfileUpload} />
-            <div>
-              <h2 className="text-[1rem] font-black uppercase tracking-tight">{shopData?.brandName || 'Partner Hub'}</h2>
+            <div className="min-w-0">
+              <h2 className="text-[0.875rem] sm:text-[1rem] font-black uppercase tracking-tight truncate">{shopData?.brandName || 'Partner Hub'}</h2>
               <div className="flex items-center gap-1.5">
                 <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                <span className="text-[0.5625rem] font-bold text-gray-400 uppercase tracking-[0.2em]">
+                <span className="text-[0.5rem] sm:text-[0.5625rem] font-bold text-gray-400 uppercase tracking-[0.15em] sm:tracking-[0.2em] truncate">
                   {isLive ? 'Network Active' : 'Station Offline'}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <div className="hidden md:flex flex-col text-right mr-4">
               <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Protocol Status</span>
               <span className={`text-[0.625rem] font-black uppercase tracking-widest ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
                 {isLive ? 'Ready for Bookings' : 'Suspended'}
               </span>
             </div>
-            <div className="flex items-center gap-3 bg-gray-50 px-6 py-3 rounded-full border border-gray-100">
-              <span className={`text-[0.5rem] font-black uppercase tracking-[0.2em] ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
+            <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 px-3.5 sm:px-6 py-2 sm:py-3 rounded-full border border-gray-100">
+              <span className={`text-[0.45rem] sm:text-[0.5rem] font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] ${isLive ? 'text-green-600' : 'text-gray-400'}`}>
                 {isLive ? 'GO OFFLINE' : 'GO LIVE'}
               </span>
               <button 
                 onClick={handleToggleLive}
-                className={`relative w-12 h-6 rounded-full p-1 transition-all duration-300 ${isLive ? 'bg-green-500' : 'bg-gray-300'}`}
+                className={`relative w-10 sm:w-12 h-5 sm:h-6 rounded-full p-0.5 sm:p-1 transition-all duration-300 ${isLive ? 'bg-green-500' : 'bg-gray-300'}`}
               >
                 <motion.div 
-                  animate={{ x: isLive ? 24 : 0 }}
+                  animate={{ x: isLive ? (window.innerWidth < 640 ? 20 : 24) : 0 }}
                   className="w-4 h-4 bg-white rounded-full shadow-sm"
                 />
               </button>
@@ -739,32 +739,32 @@ const PartnerDashboard: React.FC = () => {
         </div>
         
         {/* STATS GRID (SWIGGY STYLE) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
-            <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Today's Earnings</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-white p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
+            <span className="text-[0.45rem] sm:text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.15em] sm:tracking-[0.2em] mb-3 sm:mb-4">Today's Earnings</span>
             <div className="flex items-end gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">₹{todayEarnings}</span>
-              <span className="text-[0.5rem] text-green-500 font-bold mb-1">↑ 12%</span>
+              <span className="text-[1.25rem] sm:text-[1.5rem] font-serif font-black leading-none tracking-tighter">₹{todayEarnings}</span>
+              <span className="text-[0.45rem] sm:text-[0.5rem] text-green-500 font-bold mb-0.5">↑ 12%</span>
             </div>
           </div>
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
-            <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Slots Today</span>
+          <div className="bg-white p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
+            <span className="text-[0.45rem] sm:text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.15em] sm:tracking-[0.2em] mb-3 sm:mb-4">Slots Today</span>
             <div className="flex items-end gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{slotsTodayCount}</span>
-              <span className="text-[0.5rem] text-gray-300 font-bold mb-1 uppercase tracking-widest">Active</span>
+              <span className="text-[1.25rem] sm:text-[1.5rem] font-serif font-black leading-none tracking-tighter">{slotsTodayCount}</span>
+              <span className="text-[0.45rem] sm:text-[0.5rem] text-gray-300 font-bold mb-0.5 uppercase tracking-widest">Active</span>
             </div>
           </div>
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
-            <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Total Bookings</span>
+          <div className="bg-white p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
+            <span className="text-[0.45rem] sm:text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.15em] sm:tracking-[0.2em] mb-3 sm:mb-4">Total Bookings</span>
             <div className="flex items-end gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{totalSlotsBooked}</span>
-              <span className="text-[0.5rem] text-gray-300 font-bold mb-1 uppercase tracking-widest">Total</span>
+              <span className="text-[1.25rem] sm:text-[1.5rem] font-serif font-black leading-none tracking-tighter">{totalSlotsBooked}</span>
+              <span className="text-[0.45rem] sm:text-[0.5rem] text-gray-300 font-bold mb-0.5 uppercase tracking-widest">Total</span>
             </div>
           </div>
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
-            <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Customer Rating</span>
+          <div className="bg-white p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:shadow-md transition-all">
+            <span className="text-[0.45rem] sm:text-[0.5rem] font-bold text-gray-400 uppercase tracking-[0.15em] sm:tracking-[0.2em] mb-3 sm:mb-4">Customer Rating</span>
             <div className="flex items-center gap-1">
-              <span className="text-[1.5rem] font-serif font-black leading-none tracking-tighter">{avgRating}</span>
+              <span className="text-[1.25rem] sm:text-[1.5rem] font-serif font-black leading-none tracking-tighter">{avgRating}</span>
               <div className="flex gap-0.5 ml-1">
                 {[1,2,3,4,5].map(i => (
                   <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= starCount ? 'bg-bbBlue' : 'bg-gray-200'}`}></div>
@@ -775,7 +775,7 @@ const PartnerDashboard: React.FC = () => {
         </div>
 
         {/* TAB NAVIGATION */}
-        <div className="flex gap-2 p-1 bg-white rounded-full border border-gray-100 shadow-sm w-fit overflow-x-auto no-scrollbar">
+        <div className="flex gap-1 sm:gap-2 p-1 bg-white rounded-full border border-gray-100 shadow-sm w-full max-w-full overflow-x-auto no-scrollbar scroll-smooth">
           {[
             { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} /> },
             { id: 'services', label: 'Services', icon: <Plus size={14} /> },
@@ -785,7 +785,7 @@ const PartnerDashboard: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[0.625rem] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-charcoal'}`}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-full text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-wider sm:tracking-widest transition-all whitespace-nowrap flex-1 shrink-0 ${activeTab === tab.id ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-charcoal'}`}
             >
               {tab.icon}
               {tab.label}
