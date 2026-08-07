@@ -955,162 +955,243 @@ const AdminDashboard: React.FC = () => {
 
         {currentView === 'manual_refund' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mb-12 flex justify-between items-end">
+            <div className="mb-8 flex justify-between items-end">
               <div>
                 <h2 className="text-3xl font-serif font-bold text-black">CUSTOMER MANUAL UPI REFUNDS</h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Auto-Detection of Unconfirmed/Timed-out/Cancelled Slots & Direct UPI Payback Engine</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Verified Real-Payment Customer Refund Stream & Direct UPI Payback Engine</p>
               </div>
               <button onClick={() => setCurrentView('overview')} className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black">Back to Overview</button>
             </div>
 
-            <div className="grid grid-cols-1 gap-8">
-              {/* Search Bar for Slot Booking ID / Customer Details */}
-              <div className="bg-white border border-gray-100 p-6 rounded-[2.5rem] shadow-sm flex flex-col md:flex-row items-center gap-4">
+            <div className="grid grid-cols-1 gap-6">
+              {/* Search Bar for Customer Details / Slot Booking ID */}
+              <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col md:flex-row items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-[#0056b3]/10 text-[#0056b3] flex items-center justify-center font-bold text-lg shrink-0">
                   🔍
                 </div>
                 <div className="flex-1 w-full">
-                  <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Search Customer & Slot Booking Record</label>
+                  <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Search Verified Paid Customer & Slot Record</label>
                   <input 
                     type="text" 
                     value={refundSearchQuery}
                     onChange={(e) => setRefundSearchQuery(e.target.value)}
-                    placeholder="ENTER SLOT BOOKING ID (e.g. bk_12345 / TXN-...), CUSTOMER NAME, OR UPI ID..."
-                    className="w-full bg-gray-50 border border-gray-100 px-5 py-3.5 rounded-xl text-[12px] font-bold outline-none focus:border-bbBlue transition-all text-black"
+                    placeholder="TYPE SLOT BOOKING ID (e.g. bk_12345), CUSTOMER NAME, MOBILE, OR UPI ID..."
+                    className="w-full bg-gray-50 border border-gray-100 px-5 py-3 rounded-xl text-[12px] font-bold outline-none focus:border-bbBlue transition-all text-black"
                   />
                 </div>
                 {refundSearchQuery && (
                   <button 
                     onClick={() => setRefundSearchQuery('')}
-                    className="px-5 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[10px] font-bold uppercase tracking-widest shrink-0"
+                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[10px] font-bold uppercase tracking-widest shrink-0"
                   >
                     Clear Search
                   </button>
                 )}
               </div>
 
-              {/* XYZ Customer System Record Search Results Card */}
-              {refundSearchQuery.trim() !== '' && (
-                <div>
-                  <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-[#0056b3] rounded-full animate-ping"></span>
-                    XYZ Customer System Match Results ({
-                      stats?.auditLog?.filter((l: any) => 
-                        l.bookingId?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                        l.transactionId?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                        l.customerName?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                        l.customerUpi?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                        l.customerMobile?.includes(refundSearchQuery.trim()) ||
-                        l.partnerName?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase())
-                      ).length || 0
-                    })
-                  </h3>
+              {/* SINGLE UNIFIED SCROLLABLE BOX CONTAINER FOR VERIFIED PAID REFUNDS */}
+              <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+                <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-[#0056b3] rounded-full animate-pulse"></span>
+                    <h3 className="text-[10px] font-bold text-black uppercase tracking-widest">
+                      Verified Real Payment Customer Stream ({
+                        stats?.auditLog?.filter((l: any) => {
+                          const isRealPaid = (l.totalPaid > 0) && (
+                            l.paymentStatus === 'success' || 
+                            l.paymentStatus === 'paid' || 
+                            l.rawBooking?.paymentStatus === 'success' || 
+                            l.rawBooking?.paymentStatus === 'paid' || 
+                            l.rawBooking?.paid === true || 
+                            l.rawBooking?.isPaid === true ||
+                            l.rawBooking?.paymentId || 
+                            (l.transactionId && l.transactionId !== l.bookingId) || 
+                            ['payment_held', 'refund_requested', 'settlement_due'].includes(l.status)
+                          );
+                          if (!isRealPaid) return false;
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {stats?.auditLog?.filter((l: any) => 
-                      l.bookingId?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.transactionId?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.customerName?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.customerUpi?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.customerMobile?.includes(refundSearchQuery.trim()) ||
-                      l.partnerName?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase())
-                    ).map((log: any) => (
-                      <div key={log.bookingId} className="bg-white border-2 border-[#0056b3]/20 p-6 rounded-[2rem] shadow-sm relative overflow-hidden">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <span className="bg-[#0056b3] text-white px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
-                              Customer Record Found
-                            </span>
-                            <h4 className="text-lg font-bold text-black mt-2">{log.customerName || 'XYZ Customer'}</h4>
-                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">UPI ID: <span className="font-bold text-black">{log.customerUpi || 'Not Available'}</span></p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold text-black">₹{log.totalPaid.toLocaleString()}</p>
-                            <span className={`text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md inline-block mt-1 ${
-                              log.status === 'Refunded' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                              {log.status === 'Refunded' ? 'Refund Settled' : 'Refund Outstanding'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="bg-gray-50 p-4 rounded-xl text-[11px] space-y-1.5 mb-5 border border-gray-100">
-                          <div className="flex justify-between"><span className="text-gray-400 font-bold uppercase text-[9px]">Slot Booking ID:</span><span className="font-mono font-bold text-black">{log.bookingId}</span></div>
-                          {log.transactionId && <div className="flex justify-between"><span className="text-gray-400 font-bold uppercase text-[9px]">Transaction ID:</span><span className="font-mono font-bold text-gray-600">{log.transactionId}</span></div>}
-                          <div className="flex justify-between"><span className="text-gray-400 font-bold uppercase text-[9px]">Partner Salon:</span><span className="font-bold text-black">{log.partnerName}</span></div>
-                          <div className="flex justify-between"><span className="text-gray-400 font-bold uppercase text-[9px]">Service & Slot:</span><span className="font-bold text-gray-700">{log.serviceName} ({log.bookingDate} @ {log.timeSlot})</span></div>
-                          <div className="flex justify-between"><span className="text-gray-400 font-bold uppercase text-[9px]">Slot Failure Reason:</span><span className="font-bold text-red-600">{log.cancelReason}</span></div>
-                        </div>
-
-                        {log.status !== 'Refunded' ? (
-                          <button 
-                            onClick={async () => {
-                              const upiInput = window.prompt(`Confirm Customer UPI ID to dispatch ₹${log.totalPaid}:`, log.customerUpi || '');
-                              if (!upiInput) return;
-                              try {
-                                await setDoc(doc(db, 'refund_requests', log.bookingId), {
-                                  bookingId: log.bookingId,
-                                  upiId: upiInput,
-                                  amount: log.totalPaid,
-                                  status: 'refunded',
-                                  releasedAt: new Date().toISOString(),
-                                  method: 'UPI_MANUAL'
-                                }, { merge: true });
-
-                                await updateBookingStatus(log.bookingId, 'Refunded');
-                                
-                                await addDoc(collection(db, 'notifications'), {
-                                  message: `Manual UPI Refund of ₹${log.totalPaid} released successfully to ID: ${upiInput} for booking ${log.bookingId}.`,
-                                  target: 'all',
-                                  timestamp: new Date().toISOString(),
-                                  createdAt: Timestamp.now(),
-                                  type: 'STATUS UPDATE'
-                                });
-
-                                showToast(`Refund of ₹${log.totalPaid} released to ${upiInput}!`);
-                                fetchStats();
-                              } catch (err) {
-                                console.error(err);
-                                alert("Failed to process refund");
-                              }
-                            }}
-                            className="w-full bg-[#0056b3] text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-black transition-all shadow-md active:scale-95"
-                          >
-                            Dispatch Manual UPI Refund (₹{log.totalPaid})
-                          </button>
-                        ) : (
-                          <div className="w-full bg-green-50 text-green-700 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest text-center border border-green-200">
-                            ✓ Payback Already Settled & Logged
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {stats?.auditLog?.filter((l: any) => 
-                      l.bookingId?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.transactionId?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.customerName?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.customerUpi?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase()) ||
-                      l.customerMobile?.includes(refundSearchQuery.trim()) ||
-                      l.partnerName?.toLowerCase().includes(refundSearchQuery.trim().toLowerCase())
-                    ).length === 0 && (
-                      <div className="col-span-full bg-white p-8 rounded-2xl text-center border border-gray-100">
-                        <p className="text-gray-400 font-bold text-xs uppercase">No matching customer booking record found for "{refundSearchQuery}"</p>
-                      </div>
-                    )}
+                          if (refundSearchQuery && refundSearchQuery.trim() !== '') {
+                            const q = refundSearchQuery.trim().toLowerCase();
+                            return (
+                              l.bookingId?.toLowerCase().includes(q) ||
+                              l.transactionId?.toLowerCase().includes(q) ||
+                              l.customerName?.toLowerCase().includes(q) ||
+                              l.customerUpi?.toLowerCase().includes(q) ||
+                              l.customerMobile?.includes(q) ||
+                              l.partnerName?.toLowerCase().includes(q)
+                            );
+                          }
+                          return true;
+                        }).length || 0
+                      })
+                    </h3>
                   </div>
+                  <span className="text-[9px] font-bold bg-[#0056b3]/10 text-[#0056b3] px-3 py-1 rounded-full uppercase">
+                    {refundSearchQuery ? 'Filtered Search View' : 'Auto Scroll Engine Active'}
+                  </span>
                 </div>
-              )}
 
-              {/* Quick Manual Refund Dispatcher Entry Tool */}
-              <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-6 flex items-center gap-2">
+                {/* Scrollable Container (up-down scroll) */}
+                <div className="max-h-[460px] overflow-y-auto overflow-x-auto">
+                  <table className="w-full text-left text-[0.6875rem]">
+                    <thead className="bg-[#0056b3] text-white sticky top-0 z-10">
+                      <tr>
+                        <th className="px-6 py-3.5 font-bold uppercase tracking-widest">Booking ID & Date</th>
+                        <th className="px-6 py-3.5 font-bold uppercase tracking-widest">Customer Details</th>
+                        <th className="px-6 py-3.5 font-bold uppercase tracking-widest">Partner Salon</th>
+                        <th className="px-6 py-3.5 font-bold uppercase tracking-widest">Real Paid Amt</th>
+                        <th className="px-6 py-3.5 font-bold uppercase tracking-widest">Slot Status & Reason</th>
+                        <th className="px-6 py-3.5 font-bold uppercase tracking-widest text-right">Refund Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {stats?.auditLog?.filter((l: any) => {
+                        // Strict check for real payment
+                        const isRealPaid = (l.totalPaid > 0) && (
+                          l.paymentStatus === 'success' || 
+                          l.paymentStatus === 'paid' || 
+                          l.rawBooking?.paymentStatus === 'success' || 
+                          l.rawBooking?.paymentStatus === 'paid' || 
+                          l.rawBooking?.paid === true || 
+                          l.rawBooking?.isPaid === true ||
+                          l.rawBooking?.paymentId || 
+                          (l.transactionId && l.transactionId !== l.bookingId) || 
+                          ['payment_held', 'refund_requested', 'settlement_due'].includes(l.status)
+                        );
+                        if (!isRealPaid) return false;
+
+                        if (refundSearchQuery && refundSearchQuery.trim() !== '') {
+                          const q = refundSearchQuery.trim().toLowerCase();
+                          return (
+                            l.bookingId?.toLowerCase().includes(q) ||
+                            l.transactionId?.toLowerCase().includes(q) ||
+                            l.customerName?.toLowerCase().includes(q) ||
+                            l.customerUpi?.toLowerCase().includes(q) ||
+                            l.customerMobile?.includes(q) ||
+                            l.partnerName?.toLowerCase().includes(q)
+                          );
+                        }
+                        return true;
+                      }).map((log: any) => (
+                        <tr key={log.bookingId} className="hover:bg-blue-50/30 transition-all">
+                          <td className="px-6 py-4 font-mono text-black font-bold">
+                            {log.bookingId}
+                            {log.transactionId && log.transactionId !== log.bookingId && (
+                              <span className="block text-[8px] text-gray-400 font-normal">TXN: {log.transactionId}</span>
+                            )}
+                            <span className="block text-[8px] text-[#0056b3] font-normal">{log.bookingDate} @ {log.timeSlot}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-black block">{log.customerName || 'XYZ Customer'}</span>
+                            <span className="text-[9px] text-[#0056b3] font-mono font-bold block">UPI: {log.customerUpi}</span>
+                            {log.customerMobile && <span className="text-[8px] text-gray-400 block">Ph: {log.customerMobile}</span>}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-gray-700">{log.partnerName}</td>
+                          <td className="px-6 py-4 text-black font-bold text-sm">
+                            ₹{log.totalPaid.toLocaleString()}
+                            <span className="block text-[7px] text-green-600 font-bold uppercase">Verified Paid</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[0.5625rem] font-bold uppercase tracking-widest inline-block mb-1 border ${
+                              log.status === 'Refunded' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-100'
+                            }`}>
+                              {log.cancelReason || 'Slot Not Confirmed'}
+                            </span>
+                            <span className="block text-[8px] text-gray-400 uppercase font-semibold">Status: {log.status}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {log.status !== 'Refunded' ? (
+                              <button 
+                                onClick={async () => {
+                                  const upiInput = window.prompt(`Confirm Customer UPI ID to dispatch ₹${log.totalPaid}:`, log.customerUpi || '');
+                                  if (!upiInput) return;
+                                  try {
+                                    await setDoc(doc(db, 'refund_requests', log.bookingId), {
+                                      bookingId: log.bookingId,
+                                      upiId: upiInput,
+                                      amount: log.totalPaid,
+                                      status: 'refunded',
+                                      releasedAt: new Date().toISOString(),
+                                      method: 'UPI_MANUAL'
+                                    }, { merge: true });
+
+                                    await updateBookingStatus(log.bookingId, 'Refunded');
+                                    
+                                    await addDoc(collection(db, 'notifications'), {
+                                      message: `Manual UPI Refund of ₹${log.totalPaid} released successfully to ID: ${upiInput} for booking ${log.bookingId}.`,
+                                      target: 'all',
+                                      timestamp: new Date().toISOString(),
+                                      createdAt: Timestamp.now(),
+                                      type: 'STATUS UPDATE'
+                                    });
+
+                                    showToast(`Refund of ₹${log.totalPaid} dispatched to ${upiInput}!`);
+                                    fetchStats();
+                                  } catch (err) {
+                                    console.error(err);
+                                    alert("Failed to process refund");
+                                  }
+                                }}
+                                className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest bg-black text-white hover:bg-[#0056b3] transition-all shadow-sm active:scale-95 font-sans"
+                              >
+                                Dispatch Payout
+                              </button>
+                            ) : (
+                              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider inline-block">
+                                ✓ Settled
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {stats?.auditLog?.filter((l: any) => {
+                        const isRealPaid = (l.totalPaid > 0) && (
+                          l.paymentStatus === 'success' || 
+                          l.paymentStatus === 'paid' || 
+                          l.rawBooking?.paymentStatus === 'success' || 
+                          l.rawBooking?.paymentStatus === 'paid' || 
+                          l.rawBooking?.paid === true || 
+                          l.rawBooking?.isPaid === true ||
+                          l.rawBooking?.paymentId || 
+                          (l.transactionId && l.transactionId !== l.bookingId) || 
+                          ['payment_held', 'refund_requested', 'settlement_due'].includes(l.status)
+                        );
+                        if (!isRealPaid) return false;
+
+                        if (refundSearchQuery && refundSearchQuery.trim() !== '') {
+                          const q = refundSearchQuery.trim().toLowerCase();
+                          return (
+                            l.bookingId?.toLowerCase().includes(q) ||
+                            l.transactionId?.toLowerCase().includes(q) ||
+                            l.customerName?.toLowerCase().includes(q) ||
+                            l.customerUpi?.toLowerCase().includes(q) ||
+                            l.customerMobile?.includes(q) ||
+                            l.partnerName?.toLowerCase().includes(q)
+                          );
+                        }
+                        return true;
+                      }).length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-12 text-gray-400 font-bold uppercase tracking-wider text-xs">
+                            {refundSearchQuery ? `No verified paid customer record matching "${refundSearchQuery}"` : 'No outstanding paid refund records found.'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Quick Offline Manual Refund Dispatcher Entry Tool */}
+              <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm">
+                <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-4 flex items-center gap-2">
                   <span className="w-2 h-2 bg-[#0056b3] rounded-full"></span>
                   Quick Offline Manual Refund Dispatcher
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <div>
-                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Slot Booking ID / Ref</label>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Slot Booking ID / Ref</label>
                     <input 
                       type="text" 
                       placeholder="e.g. bk_12345"
@@ -1119,7 +1200,7 @@ const AdminDashboard: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Customer UPI ID</label>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Customer UPI ID</label>
                     <input 
                       type="text" 
                       placeholder="e.g. customer@upi"
@@ -1128,7 +1209,7 @@ const AdminDashboard: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Amount (₹)</label>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Amount (₹)</label>
                     <input 
                       type="number" 
                       placeholder="500"
@@ -1146,7 +1227,6 @@ const AdminDashboard: React.FC = () => {
                         return;
                       }
                       try {
-                        // 1. Add to refund_requests collection
                         await setDoc(doc(db, 'refund_requests', bId), {
                           bookingId: bId,
                           upiId: upi,
@@ -1156,7 +1236,6 @@ const AdminDashboard: React.FC = () => {
                           method: 'UPI_MANUAL'
                         }, { merge: true });
 
-                        // 2. Add notification to the customer/partner if possible or broadcast
                         await addDoc(collection(db, 'notifications'), {
                           message: `Manual UPI Refund of ₹${amt} released successfully to ID: ${upi} for booking ${bId}.`,
                           target: 'all',
@@ -1165,15 +1244,13 @@ const AdminDashboard: React.FC = () => {
                           type: 'STATUS UPDATE'
                         });
 
-                        // 3. Update the booking status in Firestore if booking exists
                         try {
                           await updateBookingStatus(bId, 'Refunded');
                         } catch (e) {
-                          console.log("Booking doc not found but manual refund log was created.");
+                          console.log("Booking doc update skipped.");
                         }
 
                         showToast(`Refund of ₹${amt} dispatched to ${upi}!`);
-                        // Clear fields
                         (document.getElementById('quick_booking_id') as HTMLInputElement).value = '';
                         (document.getElementById('quick_upi_id') as HTMLInputElement).value = '';
                         (document.getElementById('quick_amount') as HTMLInputElement).value = '';
@@ -1183,99 +1260,10 @@ const AdminDashboard: React.FC = () => {
                         alert("Failed to process manual refund.");
                       }
                     }}
-                    className="bg-black text-white py-3.5 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-[#0056b3] transition-all shadow-md active:scale-95 animate-none"
+                    className="bg-black text-white py-3 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-[#0056b3] transition-all shadow-md active:scale-95"
                   >
                     Release & Log Payout
                   </button>
-                </div>
-              </div>
-
-              {/* Automatic Refund Stream for Failed / Timed-out / Cancelled Slots */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Auto-Detected Slot Failure Refund Stream</h3>
-                  <span className="text-[9px] font-bold bg-[#0056b3]/10 text-[#0056b3] px-3 py-1 rounded-full uppercase">
-                    Auto Sync Active
-                  </span>
-                </div>
-                <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                  <table className="w-full text-left text-[0.6875rem]">
-                    <thead className="bg-[#0056b3] text-white">
-                      <tr>
-                        <th className="px-6 py-4 font-bold uppercase tracking-widest">Booking ID</th>
-                        <th className="px-6 py-4 font-bold uppercase tracking-widest">Customer Details</th>
-                        <th className="px-6 py-4 font-bold uppercase tracking-widest">Partner Salon</th>
-                        <th className="px-6 py-4 font-bold uppercase tracking-widest">Amount</th>
-                        <th className="px-6 py-4 font-bold uppercase tracking-widest">Failure Cause</th>
-                        <th className="px-6 py-4 font-bold uppercase tracking-widest text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {stats?.auditLog?.filter((l: any) => 
-                        ['Cancelled', 'cancelled', 'rejected', 'Rejected', 'timed_out', 'Timed Out', 'timeout', 'pending', 'Pending', 'unconfirmed', 'Unconfirmed', 'refund_requested', 'payment_held'].includes(l.status) && l.status !== 'Refunded'
-                      ).map((log: any) => (
-                        <tr key={log.bookingId} className="hover:bg-gray-50/50 transition-all">
-                          <td className="px-6 py-5 font-mono text-black font-bold">
-                            {log.bookingId}
-                            <span className="block text-[8px] text-gray-400 font-normal">{log.bookingDate} ({log.timeSlot})</span>
-                          </td>
-                          <td className="px-6 py-5">
-                            <span className="font-bold text-black block">{log.customerName || 'Customer'}</span>
-                            <span className="text-[9px] text-[#0056b3] font-mono font-bold block">{log.customerUpi}</span>
-                          </td>
-                          <td className="px-6 py-5 font-bold text-gray-700">{log.partnerName}</td>
-                          <td className="px-6 py-5 text-black font-bold text-sm">₹{log.totalPaid.toLocaleString()}</td>
-                          <td className="px-6 py-5">
-                            <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-[0.5625rem] font-bold uppercase tracking-widest border border-red-100 block w-fit mb-1">
-                              {log.cancelReason || 'Slot Not Confirmed'}
-                            </span>
-                            <span className="text-[8px] text-gray-400 font-bold uppercase">Status: {log.status}</span>
-                          </td>
-                          <td className="px-6 py-5 text-right">
-                            <button 
-                              onClick={async () => {
-                                const upiInput = window.prompt("Enter/Confirm Customer's registered UPI ID for payback:", log.customerUpi || '');
-                                if (!upiInput) return;
-                                try {
-                                  await setDoc(doc(db, 'refund_requests', log.bookingId), {
-                                    bookingId: log.bookingId,
-                                    upiId: upiInput,
-                                    amount: log.totalPaid,
-                                    status: 'refunded',
-                                    releasedAt: new Date().toISOString(),
-                                    method: 'UPI_MANUAL'
-                                  }, { merge: true });
-
-                                  await updateBookingStatus(log.bookingId, 'Refunded');
-                                  
-                                  await addDoc(collection(db, 'notifications'), {
-                                    message: `Manual UPI Refund of ₹${log.totalPaid} released successfully to ID: ${upiInput} for booking ${log.bookingId}.`,
-                                    target: 'all',
-                                    timestamp: new Date().toISOString(),
-                                    createdAt: Timestamp.now(),
-                                    type: 'STATUS UPDATE'
-                                  });
-
-                                  showToast(`Refund of ₹${log.totalPaid} released successfully!`);
-                                  fetchStats();
-                                } catch (err) {
-                                  console.error(err);
-                                  alert("Failed to process refund");
-                                }
-                              }}
-                              className="px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest bg-black text-white hover:bg-[#0056b3] transition-all font-sans shadow-sm active:scale-95"
-                            >
-                              Dispatch Payout
-                            </button>
-                          </td>
-                        </tr>
-                      )) || (
-                        <tr>
-                          <td colSpan={6} className="text-center py-10 text-gray-300 font-bold uppercase">No pending slot refunds detected</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>
