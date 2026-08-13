@@ -2,7 +2,6 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import crypto from 'crypto';
@@ -10,9 +9,8 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import Razorpay from 'razorpay';
 
-// Resolve paths dynamically for CJS/ESM compatibility
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Safe root path resolution for CJS/ESM compatibility
+const rootDir = process.cwd();
 
 // Initialize Firebase for Backend Database Sync
 const firebaseConfig = {
@@ -27,8 +25,8 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
-const MASTER_DATA_PATH = path.join(__dirname, 'master_data.csv');
-const CONFIG_PATH = path.join(__dirname, 'admin_config.json');
+const MASTER_DATA_PATH = path.join(rootDir, 'master_data.csv');
+const CONFIG_PATH = path.join(rootDir, 'admin_config.json');
 
 // Initialize config if not exists
 if (!fs.existsSync(CONFIG_PATH)) {
@@ -902,9 +900,10 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
+    const distPath = path.join(rootDir, 'dist');
+    app.use(express.static(distPath));
     app.get('*all', (req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 

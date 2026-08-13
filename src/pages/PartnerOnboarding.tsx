@@ -43,6 +43,22 @@ const PartnerOnboarding: React.FC = () => {
     }
   }, [user, loading, navigate]);
 
+  const getPreviewUrl = (val: File | string | null): string => {
+    if (!val) return '';
+    if (val instanceof File) {
+      return URL.createObjectURL(val);
+    }
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed || trimmed === 'pending_upload' || trimmed === 'null') return '';
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
+        return trimmed;
+      }
+      return `data:image/jpeg;base64,${trimmed}`;
+    }
+    return '';
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -119,75 +135,56 @@ const PartnerOnboarding: React.FC = () => {
     /* LOCKED - POINT 2: ONBOARDING COMPLETION LOGIC */
     setIsProcessing(true);
     
-    // Image Resizing Helper (Maintains document size under 1MB limit by enforcing strict size and quality limits)
-    const resizeImage = (file: File, maxDimension: number = 400): Promise<string> => new Promise((resolve, reject) => {
+    // High-Resolution Image Processing Helper (Converts files into HD Data URLs while maintaining safe document size)
+    const resizeImage = (file: File, maxDimension: number = 1024, quality: number = 0.80): Promise<string> => new Promise((resolve) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = Math.round(height * (maxDimension / width));
-              width = maxDimension;
-            } else {
-              width = Math.round(width * (maxDimension / height));
-              height = maxDimension;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          // Using constant 0.5 quality for extra-aggressive compression to ensure total payload is < 200KB
-          resolve(canvas.toDataURL('image/jpeg', 0.5));
-        };
-        img.onerror = () => reject(new Error("Image Load Error"));
-      };
-      reader.onerror = () => reject(new Error("File Read Error"));
-    });
-
-    // Helper to compress/reduce Base64 string directly using Canvas
-    const compressBase64 = (base64Str: string, maxDim: number = 300, quality: number = 0.4): Promise<string> => {
-      return new Promise((resolve) => {
-        if (!base64Str || !base64Str.startsWith('data:image')) {
-          resolve(base64Str);
+        const resultDataUrl = e.target?.result as string;
+        if (!resultDataUrl) {
+          resolve('');
           return;
         }
         const img = new Image();
-        img.src = base64Str;
+        img.crossOrigin = 'anonymous';
+        img.src = resultDataUrl;
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round(height * (maxDim / width));
-              width = maxDim;
-            } else {
-              width = Math.round(width * (maxDim / height));
-              height = maxDim;
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round(height * (maxDimension / width));
+                width = maxDimension;
+              } else {
+                width = Math.round(width * (maxDimension / height));
+                height = maxDimension;
+              }
             }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-          } else {
-            resolve(base64Str);
+            
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressedUrl = canvas.toDataURL('image/jpeg', quality);
+              resolve(compressedUrl);
+            } else {
+              resolve(resultDataUrl);
+            }
+          } catch (err) {
+            console.warn("Canvas resize fallback:", err);
+            resolve(resultDataUrl);
           }
         };
-        img.onerror = () => resolve(base64Str);
-      });
-    };
+        img.onerror = () => resolve(resultDataUrl);
+      };
+      reader.onerror = () => resolve('');
+    });
 
     const clearFormState = () => {
       setFormData({
@@ -228,36 +225,27 @@ const PartnerOnboarding: React.FC = () => {
 
       if (!activeUid) throw new Error("Authentication failed. Please try again.");
 
-      // Convert and resize all images in parallel
-      const rawOwnerPicture = formData.ownerPicture instanceof File 
-        ? await resizeImage(formData.ownerPicture) 
-        : (formData.ownerPicture || 'pending_upload');
+      // Convert and resize all images in parallel at high resolution
+      const ownerPictureUrl = formData.ownerPicture instanceof File 
+        ? await resizeImage(formData.ownerPicture, 1024, 0.82) 
+        : (typeof formData.ownerPicture === 'string' ? formData.ownerPicture : 'pending_upload');
         
-      const rawGovId = formData.govId instanceof File 
-        ? await resizeImage(formData.govId) 
-        : (formData.govId || 'pending_upload');
+      const govIdUrl = formData.govId instanceof File 
+        ? await resizeImage(formData.govId, 1024, 0.82) 
+        : (typeof formData.govId === 'string' ? formData.govId : 'pending_upload');
 
-      const rawBrandImages = await Promise.all(
-        formData.shopImages.map(async img => img instanceof File ? await resizeImage(img) : img)
+      const brandImagesList = await Promise.all(
+        formData.shopImages.map(async img => img instanceof File ? await resizeImage(img, 1024, 0.80) : img)
       );
 
-      const rawWorkerImages = await Promise.all(
-        formData.workerImages.map(async img => img instanceof File ? await resizeImage(img) : img)
+      const workerImagesList = await Promise.all(
+        formData.workerImages.map(async img => img instanceof File ? await resizeImage(img, 1024, 0.80) : img)
       );
 
-      // Perform direct extra-compression on base64 strings
-      const ownerPictureUrl = typeof rawOwnerPicture === 'string' ? await compressBase64(rawOwnerPicture, 300, 0.4) : rawOwnerPicture;
-      const govIdUrl = typeof rawGovId === 'string' ? await compressBase64(rawGovId, 300, 0.4) : rawGovId;
+      const validBrandImages = brandImagesList.filter(img => typeof img === 'string' && img.length > 0 && img !== 'null');
+      const validWorkerImages = workerImagesList.filter(img => typeof img === 'string' && img.length > 0 && img !== 'null');
       
-      const compressedBrandImages = await Promise.all(
-        rawBrandImages.filter(Boolean).map(img => typeof img === 'string' ? compressBase64(img, 300, 0.4) : img)
-      );
-
-      const compressedWorkerImages = await Promise.all(
-        rawWorkerImages.filter(Boolean).map(img => typeof img === 'string' ? compressBase64(img, 300, 0.4) : img)
-      );
-      
-      // 1. Prepare payload
+      // 1. Prepare high-resolution payload
       const shopPayload: any = {
         uid: activeUid,
         ownerName: formData.ownerName,
@@ -269,47 +257,34 @@ const PartnerOnboarding: React.FC = () => {
         upiId: formData.upiId,
         coords: { lat: formData.lat, lng: formData.lng },
         status: 'pending',
-        verification_status: 'pending', // Explicit status representation asked by senior dev
+        verification_status: 'pending',
         onboardingComplete: true,
         ownerPicture: ownerPictureUrl,
-        govtIdUrl: govIdUrl, // Roadmap compliant name
-        govId: govIdUrl, // Legacy compat
-        brandImages: compressedBrandImages,
-        workerImages: compressedWorkerImages,
+        govtIdUrl: govIdUrl,
+        govId: govIdUrl,
+        brandImages: validBrandImages,
+        workerImages: validWorkerImages,
+        shopImages: validBrandImages,
         updatedAt: new Date().toISOString()
       };
 
-      // 2. REDUCE PAYLOAD: If the total physical payload size exceeds 800KB, strip base64 schemas
-      const getPayloadSizeKB = (obj: any): number => {
-        return JSON.stringify(obj).length / 1024;
-      };
+      // Check payload size and adjust if approaching Firestore 1MB limit without stripping Data URIs
+      const payloadString = JSON.stringify(shopPayload);
+      const payloadKB = payloadString.length / 1024;
+      console.log(`High-Resolution Firestore Payload size: ${payloadKB.toFixed(2)} KB`);
 
-      let currentSizeKB = getPayloadSizeKB(shopPayload);
-      console.log(`Computed Firestore Payload size: ${currentSizeKB.toFixed(2)} KB`);
-
-      if (currentSizeKB > 800) {
-        console.warn("Payload size exceeds 800KB target limit. Initiating stripping of non-essential metadata...");
-        
-        const stripPrefix = (str: string): string => {
-          if (!str) return str;
-          return str.replace(/^data:image\/[a-z]+;base64,/, '');
-        };
-
-        if (shopPayload.ownerPicture) {
-          shopPayload.ownerPicture = stripPrefix(shopPayload.ownerPicture);
-        }
-        if (shopPayload.govtIdUrl) {
-          shopPayload.govtIdUrl = stripPrefix(shopPayload.govtIdUrl);
-          shopPayload.govId = shopPayload.govtIdUrl;
-        }
-        if (Array.isArray(shopPayload.brandImages)) {
-          shopPayload.brandImages = shopPayload.brandImages.map(img => typeof img === 'string' ? stripPrefix(img) : img);
-        }
-        if (Array.isArray(shopPayload.workerImages)) {
-          shopPayload.workerImages = shopPayload.workerImages.map(img => typeof img === 'string' ? stripPrefix(img) : img);
-        }
-
-        console.log(`Highly optimized payload size after stripping: ${getPayloadSizeKB(shopPayload).toFixed(2)} KB`);
+      if (payloadKB > 850) {
+        console.warn("Payload size close to 850KB limit. Optimizing resolution slightly for fast transmission...");
+        // If payload is unusually large (e.g. 10+ high resolution images), re-compress brand & worker images with 800px & 0.65 quality
+        const reCompressedBrand = await Promise.all(
+          formData.shopImages.map(async img => img instanceof File ? await resizeImage(img, 800, 0.65) : img)
+        );
+        const reCompressedWorker = await Promise.all(
+          formData.workerImages.map(async img => img instanceof File ? await resizeImage(img, 800, 0.65) : img)
+        );
+        shopPayload.brandImages = reCompressedBrand.filter(Boolean);
+        shopPayload.shopImages = shopPayload.brandImages;
+        shopPayload.workerImages = reCompressedWorker.filter(Boolean);
       }
 
       // Execute and await Firestore setDoc write fully
@@ -662,9 +637,15 @@ const PartnerOnboarding: React.FC = () => {
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-[3.5rem]"
                 >
-                  <div className="border-l-4 border-bbBlue pl-6">
-                    <h2 className="text-[1.875rem] font-serif font-bold text-charcoal mb-[0.25rem] uppercase tracking-tight">Security & Media</h2>
-                    <p className="text-[0.625rem] text-gray-400 font-bold uppercase tracking-widest">Protocol 04: Visual verification and settlement gateway</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-l-4 border-bbBlue pl-6 gap-2">
+                    <div>
+                      <h2 className="text-[1.875rem] font-serif font-bold text-charcoal mb-[0.25rem] uppercase tracking-tight">Security & Media</h2>
+                      <p className="text-[0.625rem] text-gray-400 font-bold uppercase tracking-widest">Protocol 04: Visual verification and settlement gateway</p>
+                    </div>
+                    <span className="self-start sm:self-auto text-[0.5625rem] bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5 shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      High-Res Image Upload Ready
+                    </span>
                   </div>
 
                   <div className="space-y-[3rem]">
@@ -674,12 +655,12 @@ const PartnerOnboarding: React.FC = () => {
                         <label className="text-[0.5625rem] font-bold text-charcoal uppercase tracking-[0.4em] mb-4 block">Proprietor Master Portrait</label>
                         <label className="w-full h-[15rem] bg-gray-50 border-2 border-dashed border-gray-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative group bg-white">
                           <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'ownerPicture')} />
-                          {formData.ownerPicture ? (
-                            <img src={formData.ownerPicture instanceof File ? URL.createObjectURL(formData.ownerPicture) : (typeof formData.ownerPicture === 'string' ? formData.ownerPicture : '')} className="w-full h-full object-cover" alt="Owner" />
+                          {getPreviewUrl(formData.ownerPicture) ? (
+                            <img src={getPreviewUrl(formData.ownerPicture)} className="w-full h-full object-cover" alt="Owner" />
                           ) : (
                             <div className="text-center group-hover:scale-110 transition-transform">
                               <User className="text-gray-200 w-12 h-12 mx-auto mb-2" />
-                              <span className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-widest">Upload Portrait</span>
+                              <span className="text-[0.5rem] font-bold text-gray-300 uppercase tracking-widest">Upload High-Res Portrait</span>
                             </div>
                           )}
                         </label>
@@ -691,8 +672,8 @@ const PartnerOnboarding: React.FC = () => {
                           {formData.shopImages.map((img, idx) => (
                             <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative group bg-white">
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'shopImages', idx)} />
-                              {img ? (
-                                <img src={img instanceof File ? URL.createObjectURL(img) : (typeof img === 'string' ? img : '')} className="w-full h-full object-cover" alt="Portfolio" />
+                              {getPreviewUrl(img) ? (
+                                <img src={getPreviewUrl(img)} className="w-full h-full object-cover" alt="Portfolio" />
                               ) : (
                                 <Camera className="text-gray-200 w-6 h-6 group-hover:rotate-12 transition-transform" />
                               )}
@@ -709,8 +690,8 @@ const PartnerOnboarding: React.FC = () => {
                         {formData.workerImages.slice(0, formData.workerCount).map((img, idx) => (
                           <label key={idx} className="aspect-square bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-bbBlue transition-all overflow-hidden relative group bg-white">
                             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'workerImages', idx)} />
-                            {img ? (
-                              <img src={img instanceof File ? URL.createObjectURL(img) : (typeof img === 'string' ? img : '')} className="w-full h-full object-cover shadow-inner" alt="Specialist" />
+                            {getPreviewUrl(img) ? (
+                              <img src={getPreviewUrl(img)} className="w-full h-full object-cover shadow-inner" alt="Specialist" />
                             ) : (
                               <User className="text-gray-200 w-8 h-8 group-hover:scale-110 transition-transform" />
                             )}

@@ -43,6 +43,19 @@ export interface FinancialSummary {
 }
 
 /**
+ * Helper to ensure valid Data URL or HTTP image link
+ */
+export const ensureDataUrl = (src: any): string => {
+  if (!src || typeof src !== 'string') return '';
+  const trimmed = src.trim();
+  if (!trimmed || trimmed === 'pending_upload' || trimmed === 'null' || trimmed === 'undefined') return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+  return `data:image/jpeg;base64,${trimmed}`;
+};
+
+/**
  * PARTNER / SHOP SERVICES
  */
 
@@ -52,6 +65,8 @@ export const getShops = async (): Promise<any[]> => {
     const querySnapshot = await getDocs(collection(db, 'partners'));
     return querySnapshot.docs.map(docSnapshot => {
       const data = docSnapshot.data() as any;
+      const rawShopImgs = data.shopImages || data.brandImages || [];
+      const rawWorkerImgs = data.workerImages || data.staffImages || [];
       return { 
         id: docSnapshot.id, 
         ...data,
@@ -60,8 +75,10 @@ export const getShops = async (): Promise<any[]> => {
         mobile: data.mobile_number || data.mobile,
         lat: data.lat || data.coords?.lat,
         lng: data.lng || data.coords?.lng,
-        shopImages: data.shopImages || data.brandImages || [],
-        workerImages: data.workerImages || [],
+        ownerPicture: ensureDataUrl(data.ownerPicture || data.photoURL),
+        govtIdUrl: ensureDataUrl(data.govtIdUrl || data.govId || data.gov_id),
+        shopImages: Array.isArray(rawShopImgs) ? rawShopImgs.map(ensureDataUrl).filter(Boolean) : [],
+        workerImages: Array.isArray(rawWorkerImgs) ? rawWorkerImgs.map(ensureDataUrl).filter(Boolean) : [],
         adminApproved: data.adminApproved || data.status === 'approved' || data.status === 'active'
       };
     });
@@ -82,15 +99,18 @@ export const getPendingPartners = async (): Promise<any[]> => {
     const querySnapshot = await getDocs(collection(db, 'verification_queue'));
     return querySnapshot.docs.map(docSnapshot => {
       const data = docSnapshot.data() as any;
+      const rawShopImgs = data.shopImages || data.brandImages || [];
+      const rawWorkerImgs = data.workerImages || data.staffImages || [];
       return {
         id: docSnapshot.id,
         ...data,
         brandName: data.brandName || data.brand_name || 'Unnamed Shop',
         ownerName: data.ownerName || data.owner_name || 'N/A',
         workerCount: data.workerCount || data.workerQuantity || data.worker_quantity || 1,
-        govtIdUrl: data.govtIdUrl || data.govId || data.gov_id || 'pending_upload',
-        shopImages: data.shopImages || data.brandImages || [],
-        workerImages: data.workerImages || data.staffImages || [],
+        ownerPicture: ensureDataUrl(data.ownerPicture || data.photoURL),
+        govtIdUrl: ensureDataUrl(data.govtIdUrl || data.govId || data.gov_id || 'pending_upload'),
+        shopImages: Array.isArray(rawShopImgs) ? rawShopImgs.map(ensureDataUrl).filter(Boolean) : [],
+        workerImages: Array.isArray(rawWorkerImgs) ? rawWorkerImgs.map(ensureDataUrl).filter(Boolean) : [],
         mobile: data.mobile || data.mobileNumber || 'N/A'
       };
     });
@@ -101,15 +121,18 @@ export const getPendingPartners = async (): Promise<any[]> => {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => {
       const data = doc.data() as any;
+      const rawShopImgs = data.shopImages || data.brandImages || [];
+      const rawWorkerImgs = data.workerImages || data.staffImages || [];
       return {
         id: doc.id,
         ...data,
         brandName: data.brandName || data.brand_name || 'Unnamed Shop',
         ownerName: data.ownerName || data.owner_name || 'N/A',
         workerCount: data.workerCount || data.workerQuantity || data.worker_quantity || 1,
-        govtIdUrl: data.govtIdUrl || data.govId || data.gov_id || 'pending_upload',
-        shopImages: data.shopImages || data.brandImages || [],
-        workerImages: data.workerImages || data.staffImages || [],
+        ownerPicture: ensureDataUrl(data.ownerPicture || data.photoURL),
+        govtIdUrl: ensureDataUrl(data.govtIdUrl || data.govId || data.gov_id || 'pending_upload'),
+        shopImages: Array.isArray(rawShopImgs) ? rawShopImgs.map(ensureDataUrl).filter(Boolean) : [],
+        workerImages: Array.isArray(rawWorkerImgs) ? rawWorkerImgs.map(ensureDataUrl).filter(Boolean) : [],
         mobile: data.mobile || data.mobileNumber || 'N/A'
       };
     });
@@ -126,6 +149,8 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
     const querySnapshot = await getDocs(q);
     const results = querySnapshot.docs.map(docSnapshot => {
       const data = docSnapshot.data() as any;
+      const rawShopImgs = data.shopImages || data.brandImages || [];
+      const rawWorkerImgs = data.workerImages || data.staffImages || [];
       return { 
         id: docSnapshot.id, 
         ...data,
@@ -134,8 +159,10 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
         mobile: data.mobile_number || data.mobile,
         lat: data.lat || data.coords?.lat,
         lng: data.lng || data.coords?.lng,
-        shopImages: data.shopImages || data.brandImages || [],
-        workerImages: data.workerImages || [],
+        ownerPicture: ensureDataUrl(data.ownerPicture || data.photoURL),
+        govtIdUrl: ensureDataUrl(data.govtIdUrl || data.govId || data.gov_id),
+        shopImages: Array.isArray(rawShopImgs) ? rawShopImgs.map(ensureDataUrl).filter(Boolean) : [],
+        workerImages: Array.isArray(rawWorkerImgs) ? rawWorkerImgs.map(ensureDataUrl).filter(Boolean) : [],
         adminApproved: data.adminApproved || data.status === 'approved' || data.status === 'active'
       };
     });
@@ -295,6 +322,9 @@ export const getShopById = async (id: string): Promise<any> => {
       duration: s.duration ? (typeof s.duration === 'number' ? `${s.duration} mins` : String(s.duration)) : '30 mins'
     }));
 
+    const rawShopImgs = data.shopImages || data.brandImages || [];
+    const rawWorkerImgs = data.workerImages || data.staffImages || [];
+
     return {
       id: docSnap.id,
       ...data,
@@ -307,8 +337,10 @@ export const getShopById = async (id: string): Promise<any> => {
       status: data.status || 'approved',
       lat: data.lat || data.coords?.lat,
       lng: data.lng || data.coords?.lng,
-      shopImages: data.shopImages || data.brandImages || [],
-      workerImages: data.workerImages || [],
+      ownerPicture: ensureDataUrl(data.ownerPicture || data.photoURL),
+      govtIdUrl: ensureDataUrl(data.govtIdUrl || data.govId || data.gov_id),
+      shopImages: Array.isArray(rawShopImgs) ? rawShopImgs.map(ensureDataUrl).filter(Boolean) : [],
+      workerImages: Array.isArray(rawWorkerImgs) ? rawWorkerImgs.map(ensureDataUrl).filter(Boolean) : [],
       adminApproved: isApprovedOrActive
     };
   } catch (err) {
