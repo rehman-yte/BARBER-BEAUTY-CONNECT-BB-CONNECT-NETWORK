@@ -77,7 +77,6 @@ const Footer: React.FC = () => {
         <div className="mt-[5rem] pt-[2rem] border-t border-bbBlue/10 flex flex-col md:flex-row justify-between items-center gap-[1.5rem] text-[0.5625rem] font-bold text-blue-200/50 uppercase tracking-[0.2em]">
           <span className="text-white/80">© {new Date().getFullYear()} <span className="text-bbBlue">BB CONNECT NETWORK</span>. ALL RIGHTS RESERVED.</span>
           <div className="flex gap-[2rem]">
-            <Link to="/admin-login" className="hover:text-bbBlue transition-colors">Admin</Link>
             <Link to="/privacy" className="hover:text-bbBlue transition-colors">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-bbBlue transition-colors">Terms of Service</Link>
             <Link to="/cookies" className="hover:text-bbBlue transition-colors">Cookies</Link>
