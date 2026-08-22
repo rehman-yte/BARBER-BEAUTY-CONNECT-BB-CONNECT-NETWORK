@@ -7,6 +7,7 @@ import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
 import { db } from "../lib/firebase";
+import { CustomerWalletHeaderWidget } from "../components/CustomerWalletHeaderWidget";
 import { doc, updateDoc, collection, query, where, onSnapshot, or, and, getDoc, addDoc, serverTimestamp, runTransaction } from "firebase/firestore";
 
 const parseDateToMillis = (val: any): number => {
@@ -1155,6 +1156,11 @@ const CustomerDashboard: React.FC = () => {
             </div>
           </div>
         </header>
+
+        {/* TOP WALLET WIDGET CONTAINER */}
+        {user?.uid && (
+          <CustomerWalletHeaderWidget db={db} customerId={user.uid} />
+        )}
 
         {/* 2. ESCROW & STATUS TABS */}
         <div className="flex border-b border-gray-100 mb-[3rem] overflow-x-auto scrollbar-hide bg-white sticky top-[5rem] z-20 py-[0.5rem]">
