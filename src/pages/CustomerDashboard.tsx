@@ -852,8 +852,15 @@ const CustomerDashboard: React.FC = () => {
             confirmedBookings.push(b);
           } else {
             rejectFailedBookings.push(b);
-            // AUTO-REFUND TRIGGER: Auto-credit to wallet for cancelled/rejected bookings
-            if (b.wallet_credited !== true && b.walletCredited !== true && (b.amountPaid || b.price)) {
+            // AUTO-REFUND TRIGGER: Auto-credit to wallet for cancelled/rejected bookings with Idempotency check
+            if (
+              b.refundStatus !== "PROCESSED" &&
+              b.refund_status !== "PROCESSED" &&
+              b.status !== "CANCELLED_REFUNDED" &&
+              b.wallet_credited !== true &&
+              b.walletCredited !== true &&
+              (b.amountPaid || b.price)
+            ) {
               WalletService.creditWalletForCancelledBooking(
                 currentUser.uid,
                 b,
@@ -878,10 +885,17 @@ const CustomerDashboard: React.FC = () => {
           return prev;
         });
 
-        // Priority rating reminder
-        const needsRating = rawList.find((b: any) => b.status === "completed" && !b.rated && b.review_submitted !== true);
+        // Priority rating reminder: STRICT RULE - ONLY trigger when booking.status === "completed" (marked completed by Partner)
+        const needsRating = rawList.find(
+          (b: any) =>
+            String(b.status || b.bookingStatus || "").toLowerCase() === "completed" &&
+            !b.rated &&
+            b.review_submitted !== true
+        );
         if (needsRating) {
           setPendingRatingBooking(needsRating);
+        } else {
+          setPendingRatingBooking(null);
         }
       },
       (error) => {
@@ -1570,13 +1584,16 @@ const CustomerDashboard: React.FC = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {pendingRatingBooking && pendingRatingBooking.status === "completed" && !pendingRatingBooking.review_submitted && (
-          <RatingModal
-            booking={pendingRatingBooking}
-            onSubmit={handleRatingSubmit}
-            onClose={() => setPendingRatingBooking(null)}
-          />
-        )}
+        {pendingRatingBooking &&
+          String(pendingRatingBooking.status || pendingRatingBooking.bookingStatus || "").toLowerCase() === "completed" &&
+          !pendingRatingBooking.review_submitted &&
+          !pendingRatingBooking.rated && (
+            <RatingModal
+              booking={pendingRatingBooking}
+              onSubmit={handleRatingSubmit}
+              onClose={() => setPendingRatingBooking(null)}
+            />
+          )}
       </AnimatePresence>
     </div>
   );

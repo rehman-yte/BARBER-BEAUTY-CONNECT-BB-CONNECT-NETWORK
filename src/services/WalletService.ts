@@ -122,9 +122,15 @@ export class WalletService {
         }
 
         const bData = bookingDoc.data();
-        // Prevent duplicate wallet credit for the same booking
-        if (bData.wallet_credited === true || bData.walletCredited === true) {
-          console.log(`[WalletService] Booking ${booking.id} already credited to wallet.`);
+        // IDEMPOTENCY / ATOMIC LOCK: If refundStatus is already 'PROCESSED' or previously credited, EXIT IMMEDIATELY
+        if (
+          bData.refundStatus === 'PROCESSED' ||
+          bData.refund_status === 'PROCESSED' ||
+          bData.status === 'CANCELLED_REFUNDED' ||
+          bData.wallet_credited === true ||
+          bData.walletCredited === true
+        ) {
+          console.log(`[WalletService] Idempotency check: Booking ${booking.id} refund already processed. Exiting immediately.`);
           return { alreadyCredited: true, balance: 0 };
         }
 
@@ -136,20 +142,24 @@ export class WalletService {
 
         const newBalance = currentBalance + amount;
 
-        // 1. Update user's walletBalance
+        // 1. Update user's walletBalance by exact original paid amount
         transaction.set(userRef, {
           walletBalance: newBalance,
           updatedAt: serverTimestamp()
         }, { merge: true });
 
-        // 2. Mark booking as wallet credited
+        // 2. Mark booking document with refundStatus = "PROCESSED" and status = "CANCELLED_REFUNDED"
         transaction.update(bookingRef, {
+          refundStatus: 'PROCESSED',
+          status: 'CANCELLED_REFUNDED',
+          bookingStatus: 'CANCELLED_REFUNDED',
           wallet_credited: true,
           walletCredited: true,
-          refund_status: 'credited_to_wallet',
+          refund_status: 'PROCESSED',
           refund_timeframe: 'Instant (Credited to BB Connect Wallet)',
           statusReason: reason,
-          failure_reason: reason
+          failure_reason: reason,
+          refundProcessedAt: serverTimestamp()
         });
 
         return { alreadyCredited: false, newBalance };
