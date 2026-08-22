@@ -7,10 +7,10 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   GoogleAuthProvider, 
-  signInWithPopup,
-  sendPasswordResetEmail,
-  setPersistence,
-  browserLocalPersistence
+  signInWithPopup, 
+  sendPasswordResetEmail, 
+  setPersistence, 
+  browserLocalPersistence 
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
@@ -44,6 +44,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const SESSION_KEY = 'bb_network_session';
 const ROLE_KEY = 'bb_network_role';
+export const OFFICIAL_ADMIN_EMAIL = (adminConfig.adminEmail || 'haidartheworldking@gmail.com').toLowerCase().trim();
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(() => {
@@ -52,6 +53,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!saved) return null;
       const parsed = JSON.parse(saved);
       
+      // Strict Security Check on Cached Admin Session
+      if (parsed && parsed.role === 'admin') {
+        const cachedEmail = (parsed.email || '').toLowerCase().trim();
+        if (cachedEmail !== OFFICIAL_ADMIN_EMAIL) {
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(ROLE_KEY);
+          return null;
+        }
+      }
+
       // Aggressive Flag Sync for Partners
       const isRegistered = localStorage.getItem(`bb_registered_${parsed.uid}`) === 'true';
                           
@@ -91,8 +102,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
+        const userEmail = (firebaseUser.email || '').toLowerCase().trim();
+        const isOfficialAdmin = userEmail === OFFICIAL_ADMIN_EMAIL;
+
+        // 1. ABSOLUTE ADMIN VERIFICATION: Strictly haidartheworldking@gmail.com
+        if (isOfficialAdmin) {
+          console.log(`[AUTH ARCHITECT] Official Admin Verified: ${userEmail}`);
+          const adminUser: AppUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || 'System Admin',
+            role: 'admin',
+            user_type: 'admin',
+            status: 'active',
+            token: adminConfig.adminSecret,
+            onboardingComplete: true
+          };
+          setUser(adminUser);
+          setLoading(false);
+
+          // Guarantee admin doc exists in Firestore
+          setDoc(doc(db, 'admins', firebaseUser.uid), {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || 'System Admin',
+            role: 'admin',
+            status: 'active',
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(() => {});
+          return;
+        }
+
         const storedRole = localStorage.getItem(ROLE_KEY) as 'customer' | 'partner' | 'admin' | null;
-        console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${storedRole})`);
+        // Non-official accounts are strictly forbidden from having 'admin' role
+        const safeStoredRole = (storedRole === 'admin') ? 'customer' : storedRole;
+        console.log(`[AUTH ARCHITECT] Resolving Identity for ${firebaseUser.uid} (Intended Role: ${safeStoredRole})`);
         
         const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number = 8000): Promise<T> => {
           const timeout = new Promise<never>((_, reject) => 
@@ -105,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isRegisteredCache = localStorage.getItem(REGISTERED_KEY) === 'true';
 
         // OPTIMIZATION: Immediate Recognition for Registered Partners
-        if (isRegisteredCache && storedRole === 'partner') {
+        if (isRegisteredCache && safeStoredRole === 'partner') {
           const cachedSession = localStorage.getItem(SESSION_KEY);
           let baseData = cachedSession ? JSON.parse(cachedSession) : null;
           
@@ -150,24 +194,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         try {
-          // 1. Check Admin
-          const adminDoc = await withTimeout(getDoc(doc(db, 'admins', firebaseUser.uid)));
-          if (adminDoc.exists()) {
-            const adminData = adminDoc.data();
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: adminData.name || 'System Admin',
-              role: 'admin',
-              user_type: 'admin',
-              status: 'active',
-              token: adminConfig.adminSecret,
-              onboardingComplete: true
-            });
-            setLoading(false);
-            return;
-          }
-
           // 2. Check Partner
           const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid)));
           
@@ -214,8 +240,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const cached = localStorage.getItem(SESSION_KEY);
           
           if (isRegisteredCache || cached) {
-            const parsed = cached ? JSON.parse(cached) : { uid: firebaseUser.uid, role: storedRole || 'partner', onboardingComplete: true };
-            if (parsed.uid === firebaseUser.uid) {
+            const parsed = cached ? JSON.parse(cached) : { uid: firebaseUser.uid, role: safeStoredRole || 'partner', onboardingComplete: true };
+            if (parsed.uid === firebaseUser.uid && parsed.role !== 'admin') {
               setUser({ ...parsed, onboardingComplete: isRegisteredCache ? true : parsed.onboardingComplete });
               setLoading(false);
               return;
@@ -224,16 +250,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // 4. NEW USER LOGIC (Not found in any collection or timeout reached)
-        const finalRole = storedRole || 'customer';
+        const finalRole: 'customer' | 'partner' = safeStoredRole || 'customer';
         const wasOnboarded = (isRegisteredCache && finalRole === 'partner');
         
-        // Final fallback if no record found
+        // Final fallback if no record found (Never admin)
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           name: firebaseUser.displayName || (finalRole === 'partner' ? 'Partner Studio' : 'Network User'),
-          role: finalRole as any,
-          user_type: finalRole as any,
+          role: finalRole,
+          user_type: finalRole,
           status: wasOnboarded ? 'active' : null,
           onboardingComplete: wasOnboarded
         });
@@ -304,6 +330,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const bypassLogin = (email: string, role: 'admin' | 'partner' | 'customer') => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (role === 'admin' && cleanEmail !== OFFICIAL_ADMIN_EMAIL) {
+      console.warn("Unauthorized administrative bypass attempt rejected.");
+      throw new Error(`Unauthorized Admin: Only ${OFFICIAL_ADMIN_EMAIL} can access the admin panel.`);
+    }
     console.log(`Executing Administrative Bypass for: ${email}`);
     localStorage.setItem(ROLE_KEY, role);
     const mockUser: AppUser = {
@@ -324,9 +355,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.setItem(ROLE_KEY, role);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      // Logic for record creation is now moved to the onAuthStateChanged resolver 
-      // to ensure consistency between first-time login and subsequent refreshes.
+      const userCredential = await signInWithPopup(auth, provider);
+      const authedEmail = (userCredential.user.email || '').toLowerCase().trim();
+
+      if (role === 'admin' && authedEmail !== OFFICIAL_ADMIN_EMAIL) {
+        // Immediate termination of unauthorized admin sign-in attempt
+        await signOut(auth);
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(ROLE_KEY);
+        setUser(null);
+        throw new Error(`Access Denied: Only the official administrator Gmail (${OFFICIAL_ADMIN_EMAIL}) is authorized to access the Admin Panel.`);
+      }
     } catch (err: any) {
       localStorage.removeItem(ROLE_KEY);
       console.error("Firebase Google Auth error:", err);

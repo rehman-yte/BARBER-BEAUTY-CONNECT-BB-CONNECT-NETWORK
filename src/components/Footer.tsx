@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import officialLogo from './offical_logoBB.jpeg';
 
 const Footer: React.FC = () => {
   return (
@@ -9,13 +10,20 @@ const Footer: React.FC = () => {
         
         {/* About Column */}
         <div className="flex flex-col gap-[1.5rem]">
-          <Link to="/" className="flex flex-col items-center md:items-start leading-none group">
-            <span className="text-[1.25rem] font-serif font-bold text-white tracking-tight group-hover:text-bbBlue transition-colors">
-              BB CONNECT
-            </span>
-            <span className="text-[0.5rem] font-bold text-bbBlue/70 uppercase tracking-[0.3em] mt-[0.25rem] group-hover:text-bbBlue transition-colors">
-              OFFICIAL NETWORK
-            </span>
+          <Link to="/" className="flex items-center justify-center md:justify-start gap-3 group">
+            <img 
+              src={officialLogo} 
+              alt="BB Connect Network Logo" 
+              className="w-10 h-10 object-contain rounded-xl border border-white/10 shadow-md bg-white/5 p-0.5 group-hover:scale-105 transition-transform" 
+            />
+            <div className="flex flex-col leading-none">
+              <span className="text-[1.25rem] font-serif font-bold text-white tracking-tight group-hover:text-bbBlue transition-colors">
+                BB CONNECT
+              </span>
+              <span className="text-[0.5rem] font-bold text-bbBlue/70 uppercase tracking-[0.3em] mt-[0.25rem] group-hover:text-bbBlue transition-colors">
+                OFFICIAL NETWORK
+              </span>
+            </div>
           </Link>
           <p className="text-[0.75rem] leading-relaxed font-medium text-blue-100/80">
             The premium digital infrastructure for the global grooming and beauty industry. Providing quality, security, and elite connection.

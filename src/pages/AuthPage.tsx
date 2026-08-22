@@ -96,10 +96,22 @@ const AuthPage: React.FC = () => {
         )}
 
         <div className="space-y-6">
-          <div className="p-6 bg-bbBlue/5 rounded-[2rem] border border-bbBlue/10 text-center">
-            <p className="text-[0.6875rem] font-medium text-bbBlue leading-relaxed">
-              Google Account required for secure biometric-level authentication. 
-              Manual login has been deactivated for security.
+          <div className={`p-6 rounded-[2rem] border text-center transition-colors ${
+            role === 'admin' 
+              ? 'bg-amber-500/10 border-amber-500/20' 
+              : 'bg-bbBlue/5 border-bbBlue/10'
+          }`}>
+            <p className={`text-[0.6875rem] font-medium leading-relaxed ${
+              role === 'admin' ? 'text-amber-800' : 'text-bbBlue'
+            }`}>
+              {role === 'admin' ? (
+                <>
+                  <span className="font-bold block mb-1">🔐 Master Admin Security Protocol</span>
+                  Admin Portal access is strictly verified for authorized account: <span className="font-bold font-mono">haidartheworldking@gmail.com</span>
+                </>
+              ) : (
+                'Google Account required for secure authentication. Choose your Google account to proceed.'
+              )}
             </p>
           </div>
 
@@ -113,7 +125,9 @@ const AuthPage: React.FC = () => {
             ) : (
               <>
                 <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /></svg>
-                <span className="text-[0.875rem] font-bold tracking-widest uppercase">Continue with Google</span>
+                <span className="text-[0.875rem] font-bold tracking-widest uppercase">
+                  {role === 'admin' ? 'Verify Official Admin Google' : 'Continue with Google'}
+                </span>
               </>
             )}
           </button>

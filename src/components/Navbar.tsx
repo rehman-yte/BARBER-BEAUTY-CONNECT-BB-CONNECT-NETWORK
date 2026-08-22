@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { getBookings, updateShop, subscribeToNotifications } from '../services/logic_engine';
 import { ShoppingBag } from 'lucide-react';
+import officialLogo from './offical_logoBB.jpeg';
 
 const Navbar: React.FC = () => {
   const { user, logout, updateUser } = useAuth();
@@ -119,8 +120,22 @@ const Navbar: React.FC = () => {
   if (isOnboarding) {
     return (
       <nav className="fixed top-0 left-0 right-0 z-[1000] bg-charcoal border-b border-white/5 h-[5rem] flex items-center px-[5%] justify-between shadow-2xl">
-        <div className="flex flex-col"><span className="text-[1rem] font-serif font-black text-white tracking-widest uppercase">Network <span className="text-bbBlue">Admission</span></span></div>
-        <div className="flex items-center gap-4"><span className="text-[0.625rem] font-bold text-white/30 uppercase tracking-widest">Protocol Active</span><div className="w-2 h-2 rounded-full bg-bbBlue animate-pulse"></div></div>
+        <Link to="/" className="flex items-center gap-3 group">
+          <img 
+            src={officialLogo} 
+            alt="BB Connect Network" 
+            className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-xl border border-white/10 shadow-md bg-white/5 p-0.5 group-hover:scale-105 transition-transform" 
+          />
+          <div className="flex flex-col">
+            <span className="text-[0.95rem] sm:text-[1rem] font-serif font-black text-white tracking-widest uppercase">
+              Network <span className="text-bbBlue">Admission</span>
+            </span>
+          </div>
+        </Link>
+        <div className="flex items-center gap-4">
+          <span className="text-[0.625rem] font-bold text-white/30 uppercase tracking-widest">Protocol Active</span>
+          <div className="w-2 h-2 rounded-full bg-bbBlue animate-pulse"></div>
+        </div>
       </nav>
     );
   }
@@ -128,13 +143,20 @@ const Navbar: React.FC = () => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-md border-b border-gray-100 h-[4.5rem] sm:h-[5rem] shadow-sm">
       <div className="w-full max-w-[1440px] mx-auto px-3 sm:px-6 md:px-[5%] h-full flex justify-between items-center gap-2">
-        <Link to="/" className="flex flex-col items-start leading-none group min-w-0 shrink">
-          <span className="text-[0.7rem] xs:text-[0.8rem] sm:text-[0.95rem] lg:text-[1rem] font-serif font-bold text-black tracking-tight truncate max-w-[130px] xs:max-w-[170px] sm:max-w-none">
-            BARBER & BEAUTY CONNECT
-          </span>
-          <span className="text-[0.38rem] sm:text-[0.48rem] font-bold text-bbBlue uppercase tracking-[0.1em] sm:tracking-[0.3em] mt-0.5 truncate">
-            BB CONNECT NETWORK
-          </span>
+        <Link to="/" className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0 shrink select-none">
+          <img 
+            src={officialLogo} 
+            alt="BB Connect Network Logo" 
+            className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 object-contain rounded-xl border border-gray-100 shadow-xs group-hover:scale-105 transition-transform duration-300 bg-white shrink-0" 
+          />
+          <div className="flex flex-col items-start leading-tight min-w-0">
+            <span className="text-[0.72rem] xs:text-[0.82rem] sm:text-[0.95rem] lg:text-[1.02rem] font-serif font-bold text-black tracking-tight truncate max-w-[130px] xs:max-w-[170px] sm:max-w-none">
+              BARBER & BEAUTY CONNECT
+            </span>
+            <span className="text-[0.38rem] sm:text-[0.48rem] font-bold text-bbBlue uppercase tracking-[0.1em] sm:tracking-[0.25em] mt-0.5 truncate">
+              BB CONNECT NETWORK
+            </span>
+          </div>
         </Link>
 
         <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0">

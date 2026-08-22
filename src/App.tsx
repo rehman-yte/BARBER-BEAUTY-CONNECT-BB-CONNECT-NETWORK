@@ -1,8 +1,10 @@
 /* UNIFIED AUTHENTICATION & ROUTING SYSTEM v4.0 */
-import React from 'react';
+import React, { useState } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'motion/react';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import SplashScreen from "./components/SplashScreen";
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 import ExplorePage from "./pages/ExplorePage";
@@ -54,6 +56,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
     if (user.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
     if (user.role === 'customer') return <Navigate to="/customer/explore" replace />;
+  }
+
+  // STRICT ADMIN EMAIL REINFORCEMENT
+  if (allowedRole === 'admin') {
+    const isOfficialAdmin = user.role === 'admin' && (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com';
+    if (!isOfficialAdmin) {
+      return <Navigate to="/auth" replace />;
+    }
   }
 
   const isOnboardingPath = location.pathname === '/partner/signup' || location.pathname === '/onboarding';
@@ -140,9 +150,16 @@ const LayoutWrapper: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <AuthProvider>
       <CartProvider>
+        <AnimatePresence mode="wait">
+          {showSplash && (
+            <SplashScreen onComplete={() => setShowSplash(false)} durationSeconds={5} />
+          )}
+        </AnimatePresence>
         <HashRouter>
           <LayoutWrapper />
         </HashRouter>
