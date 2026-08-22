@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getBookings, submitRating } from "../services/logic_engine";
+import { WalletService, WalletTransaction } from "../services/WalletService";
 import RatingModal from "../components/RatingModal";
 
 import { PersistenceService } from "../services/PersistenceService";
@@ -525,6 +527,20 @@ const CustomerDashboard: React.FC = () => {
   const [confirmedBookings, setConfirmedBookings] = useState<any[]>([]);
   const [failedBookings, setFailedBookings] = useState<any[]>([]);
 
+  // BB CONNECT WALLET STATE
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
+
+  // Real-time Wallet Subscription
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = WalletService.subscribeCustomerWallet(user.uid, (bal, txs) => {
+      setWalletBalance(bal);
+      setWalletTransactions(txs);
+    });
+    return () => unsub();
+  }, [user?.uid]);
+
   // Success Popup control states
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [popupData, setPopupData] = useState<any>(null);
@@ -836,6 +852,14 @@ const CustomerDashboard: React.FC = () => {
             confirmedBookings.push(b);
           } else {
             rejectFailedBookings.push(b);
+            // AUTO-REFUND TRIGGER: Auto-credit to wallet for cancelled/rejected bookings
+            if (b.wallet_credited !== true && b.walletCredited !== true && (b.amountPaid || b.price)) {
+              WalletService.creditWalletForCancelledBooking(
+                currentUser.uid,
+                b,
+                b.statusReason || b.failure_reason || "Booking Cancelled / Rejected by Partner"
+              );
+            }
           }
         });
 
@@ -889,6 +913,16 @@ const CustomerDashboard: React.FC = () => {
   const handleExpired = async (bookingId: string, transactionId: string, price: any) => {
     console.log(`[Auto-Refund Trigger] Booking ${bookingId} has expired. evicting from waiting list...`);
     
+    // Auto-credit customer wallet for timeout
+    if (user?.uid) {
+      const targetBooking = bookings.find((b) => b.id === bookingId) || { id: bookingId, transactionId, price, amountPaid: price };
+      WalletService.creditWalletForCancelledBooking(
+        user.uid,
+        targetBooking,
+        "Timeout: Partner did not accept within 5 minutes"
+      );
+    }
+
     // Direct local eviction & reassignment to failed list to skip Firestore delay
     setWaitingBookings((prev) => prev.filter((item) => item.id !== bookingId));
     setBookings((prev) =>
@@ -1146,12 +1180,30 @@ const CustomerDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-[2.5rem] bg-white p-[2rem] rounded-[2rem] border border-gray-100 shadow-inner">
-            <div className="text-center">
+          {/* METRICS ROW: Total Bookings & Wallet Container side-by-side */}
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-4 bg-white p-4 md:p-6 rounded-[2rem] border border-gray-100 shadow-inner" id="customer-header-metrics">
+            {/* Total Bookings Container */}
+            <div className="text-center px-4 py-1" id="customer-total-bookings-container">
               <p className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest mb-[0.25rem]">
                 Total Bookings
               </p>
               <p className="text-[1.875rem] font-serif font-bold text-bbBlue">{bookings.length}</p>
+            </div>
+
+            {/* Subtle Divider */}
+            <div className="hidden sm:block w-px h-12 bg-gray-100" />
+
+            {/* Dedicated Wallet Container */}
+            <div className="text-center px-5 py-2.5 bg-blue-50/40 rounded-2xl border border-blue-100/60 flex flex-col items-center justify-center min-w-[130px]" id="customer-wallet-container">
+              <div className="flex items-center gap-1.5 mb-[0.25rem]">
+                <Wallet size={12} className="text-bbBlue" />
+                <p className="text-[0.5rem] font-bold text-bbBlue uppercase tracking-widest">
+                  Wallet Balance
+                </p>
+              </div>
+              <p className="text-[1.875rem] font-serif font-bold text-charcoal" id="customer-wallet-balance-display">
+                ₹{walletBalance.toFixed(0)}
+              </p>
             </div>
           </div>
         </header>

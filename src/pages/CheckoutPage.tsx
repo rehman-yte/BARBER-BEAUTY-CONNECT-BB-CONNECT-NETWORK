@@ -8,6 +8,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/fi
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
 import { getSettings } from '../services/logic_engine';
+import { WalletService } from '../services/WalletService';
 
 // Purged Razorpay Script Integrations. Using Direct UPI Intent Interface.
 
@@ -68,6 +69,17 @@ const CheckoutPage: React.FC = () => {
   const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'processing' | 'success'>('cart');
   const [loading, setLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [useWalletOption, setUseWalletOption] = useState<boolean>(false);
+
+  // Live Wallet Balance Subscription
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = WalletService.subscribeCustomerWallet(user.uid, (bal) => {
+      setWalletBalance(bal);
+    });
+    return () => unsub();
+  }, [user?.uid]);
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'wallet' | 'netbanking' | 'card'>('upi');
   const [paymentDetails, setPaymentDetails] = useState({
     upiId: '',
@@ -134,6 +146,49 @@ const CheckoutPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleWalletPayment = async () => {
+    if (!user?.uid) {
+      setPaymentError("Please login to proceed with wallet payment.");
+      navigate("/login");
+      return;
+    }
+
+    if (walletBalance < finalTotal) {
+      setPaymentError(`Insufficient wallet balance. Balance: ₹${walletBalance}, Required: ₹${finalTotal}`);
+      return;
+    }
+
+    setLoading(true);
+    setPaymentError(null);
+
+    try {
+      const customerName = formData.fullName || user?.name || user?.displayName || "Customer";
+      const result = await WalletService.payViaWallet(
+        user.uid,
+        customerName,
+        cart,
+        totalPrice,
+        feeAmount
+      );
+
+      if (result.success) {
+        setTimerActive(false);
+        setStep('success');
+        clearCart();
+
+        const primaryBookingId = result.bookingIds?.[0] || '';
+        setTimeout(() => {
+          navigate(primaryBookingId ? `/customer/dashboard?payment=success&bookingId=${primaryBookingId}` : '/customer/dashboard');
+        }, 1200);
+      }
+    } catch (err: any) {
+      console.error("[Wallet Payment Error]:", err);
+      setPaymentError(err.message || "Failed to process payment via BB Connect Wallet.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePayment = async (provider: 'GPay' | 'PhonePe' | 'Paytm') => {
@@ -1053,6 +1108,79 @@ const CheckoutPage: React.FC = () => {
                     <div className="space-y-4">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 pl-1 font-sans">Select Payment Method</p>
                       
+                      {/* 1. BB CONNECT WALLET PAYMENT OPTION (Dedicated Container) */}
+                      <div
+                        id="checkout-wallet-container"
+                        className={`p-6 rounded-[1.5rem] border-2 transition-all duration-200 ${
+                          walletBalance >= finalTotal
+                            ? "border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/30 hover:shadow-lg"
+                            : "border-gray-200 bg-gray-50/70 opacity-75"
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg shadow-md shrink-0 ${
+                              walletBalance >= finalTotal ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-gray-200 text-gray-400"
+                            }`}>
+                              <Wallet size={22} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-xs font-black uppercase tracking-wider text-charcoal">Pay via BB Connect Wallet</p>
+                                {walletBalance >= finalTotal ? (
+                                  <span className="text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 py-0.5 px-2.5 rounded-full border border-emerald-200">
+                                    SUFFICIENT BALANCE
+                                  </span>
+                                ) : (
+                                  <span className="text-[8px] font-black uppercase tracking-widest bg-gray-200 text-gray-600 py-0.5 px-2.5 rounded-full">
+                                    GATEWAY REQUIRED
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">
+                                Available Balance: <strong className="text-charcoal font-mono font-black">₹{walletBalance.toFixed(0)}</strong>
+                              </p>
+                              {walletBalance === 0 ? (
+                                <p className="text-[9px] text-red-500 font-bold uppercase tracking-widest mt-0.5">
+                                  ● Condition 1: Zero Balance — Must pay via Online Gateway
+                                </p>
+                              ) : walletBalance < finalTotal ? (
+                                <p className="text-[9px] text-amber-600 font-bold uppercase tracking-widest mt-0.5">
+                                  ● Condition 2: Insufficient Balance (Need ₹{finalTotal - walletBalance} more) — No partial split allowed
+                                </p>
+                              ) : (
+                                <p className="text-[9px] text-emerald-700 font-bold uppercase tracking-widest mt-0.5">
+                                  ● Condition 3: Instant 1-Click Booking — Exact ₹{finalTotal} will be deducted & remainder kept
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            id="pay-via-wallet-btn"
+                            disabled={walletBalance < finalTotal || loading}
+                            onClick={handleWalletPayment}
+                            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all shrink-0 flex items-center justify-center gap-2 ${
+                              walletBalance >= finalTotal && !loading
+                                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 cursor-pointer active:scale-95"
+                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            }`}
+                          >
+                            {loading ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                PROCESSING...
+                              </>
+                            ) : (
+                              <>
+                                <Check size={14} /> PAY ₹{finalTotal} VIA WALLET
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 gap-4 font-sans">
                         {/* Razorpay Secure Gateway */}
                         <button 

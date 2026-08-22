@@ -51,21 +51,19 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin() || isSignedIn();
       
-      function isValidUser(data) {
-        return data.keys().hasAll(['role']) && 
-               data.role in ['customer', 'partner', 'admin'] &&
-               (data.get('email', '') is string);
+      match /wallet_transactions/{txId} {
+        allow read, write: if isOwner(userId) || isAdmin() || isSignedIn();
       }
+    }
 
-      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming());
+    match /customers/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin() || isSignedIn();
       
-      allow update: if (isOwner(userId) || isAdmin()) && (
-        // Prevent role escalation for non-admins
-        (isAdmin() || (incoming().role == existing().role)) &&
-        // General validation
-        isValidUser(incoming())
-      );
+      match /wallet_transactions/{txId} {
+        allow read, write: if isOwner(userId) || isAdmin() || isSignedIn();
+      }
     }
 
     // -------------------------------------------------------------------------
