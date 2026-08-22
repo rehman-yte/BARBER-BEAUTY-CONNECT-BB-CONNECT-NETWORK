@@ -518,6 +518,14 @@ const CustomerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"waiting" | "confirmed" | "failed">("waiting");
   const [pendingRatingBooking, setPendingRatingBooking] = useState<any>(null);
+  const [dismissedRatingBookingIds, setDismissedRatingBookingIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("bb_dismissed_rating_ids");
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [selectedFailedBooking, setSelectedFailedBooking] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
@@ -886,12 +894,37 @@ const CustomerDashboard: React.FC = () => {
         });
 
         // Priority rating reminder: STRICT RULE - ONLY trigger when booking.status === "completed" (marked completed by Partner)
+        // AND booking.isRated === false AND booking.ratingDismissed !== true
+        const isBookingDismissed = (b: any) => {
+          if (!b) return true;
+          if (b.ratingDismissed === true || b.rating_dismissed === true) return true;
+          if (b.id && dismissedRatingBookingIds.includes(b.id)) return true;
+          try {
+            if (b.id && localStorage.getItem(`rating_dismissed_${b.id}`) === "true") return true;
+            const storedList = JSON.parse(localStorage.getItem("bb_dismissed_rating_ids") || "[]");
+            if (b.id && Array.isArray(storedList) && storedList.includes(b.id)) return true;
+          } catch (e) {}
+          return false;
+        };
+
+        const isBookingCompleted = (b: any) => {
+          if (!b) return false;
+          const status = String(b.status || b.bookingStatus || "").toUpperCase();
+          return status === "COMPLETED";
+        };
+
+        const isBookingAlreadyRated = (b: any) => {
+          if (!b) return true;
+          return b.isRated === true || b.rated === true || b.review_submitted === true;
+        };
+
         const needsRating = rawList.find(
           (b: any) =>
-            String(b.status || b.bookingStatus || "").toLowerCase() === "completed" &&
-            !b.rated &&
-            b.review_submitted !== true
+            isBookingCompleted(b) &&
+            !isBookingAlreadyRated(b) &&
+            !isBookingDismissed(b)
         );
+
         if (needsRating) {
           setPendingRatingBooking(needsRating);
         } else {
@@ -1069,6 +1102,29 @@ const CustomerDashboard: React.FC = () => {
     new Map<string, any>(rawFilteredBookings.map((item) => [item.id, item])).values()
   );
 
+  const handleCloseRatingModal = (bookingId?: string) => {
+    setPendingRatingBooking(null);
+    if (!bookingId) return;
+
+    setDismissedRatingBookingIds((prev) => {
+      if (prev.includes(bookingId)) return prev;
+      const next = [...prev, bookingId];
+      try {
+        localStorage.setItem("bb_dismissed_rating_ids", JSON.stringify(next));
+        localStorage.setItem(`rating_dismissed_${bookingId}`, "true");
+      } catch (e) {}
+      return next;
+    });
+
+    // Also persist in Firestore so it remains dismissed across refreshes and devices
+    try {
+      updateDoc(doc(db, "bookings", bookingId), {
+        ratingDismissed: true,
+        rating_dismissed: true,
+      }).catch((err) => console.warn("[Rating Dismiss Sync Error]:", err));
+    } catch (e) {}
+  };
+
   const handleRatingSubmit = async (rating: number, comment: string) => {
     if (!pendingRatingBooking || !user) return;
     
@@ -1103,10 +1159,23 @@ const CustomerDashboard: React.FC = () => {
         createdAt: serverTimestamp()
       });
 
-      // B) Update local booking document to inject 'review_submitted: true' and avoid loop
+      // B) Update local booking document to inject 'review_submitted: true', 'rated: true', 'isRated: true', and 'ratingDismissed: true' to avoid loop
       await updateDoc(doc(db, "bookings", currentBooking.id), {
         review_submitted: true,
-        rated: true
+        rated: true,
+        isRated: true,
+        ratingDismissed: true
+      });
+
+      // Update state and local storage
+      setDismissedRatingBookingIds((prev) => {
+        if (prev.includes(currentBooking.id)) return prev;
+        const next = [...prev, currentBooking.id];
+        try {
+          localStorage.setItem("bb_dismissed_rating_ids", JSON.stringify(next));
+          localStorage.setItem(`rating_dismissed_${currentBooking.id}`, "true");
+        } catch (e) {}
+        return next;
       });
 
       // Recalculate and update partner node
@@ -1585,13 +1654,15 @@ const CustomerDashboard: React.FC = () => {
 
       <AnimatePresence>
         {pendingRatingBooking &&
-          String(pendingRatingBooking.status || pendingRatingBooking.bookingStatus || "").toLowerCase() === "completed" &&
+          String(pendingRatingBooking.status || pendingRatingBooking.bookingStatus || "").toUpperCase() === "COMPLETED" &&
           !pendingRatingBooking.review_submitted &&
-          !pendingRatingBooking.rated && (
+          !pendingRatingBooking.rated &&
+          !pendingRatingBooking.isRated &&
+          !pendingRatingBooking.ratingDismissed && (
             <RatingModal
               booking={pendingRatingBooking}
               onSubmit={handleRatingSubmit}
-              onClose={() => setPendingRatingBooking(null)}
+              onClose={() => handleCloseRatingModal(pendingRatingBooking.id)}
             />
           )}
       </AnimatePresence>

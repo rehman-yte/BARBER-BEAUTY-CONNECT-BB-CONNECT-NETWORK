@@ -39,8 +39,13 @@ const RatingModal: React.FC<RatingModalProps> = ({ booking, onSubmit, onClose })
         exit={{ scale: 0.9, y: 30 }}
         className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl relative"
       >
-        <button onClick={onClose} className="absolute top-6 right-6 text-gray-400 hover:text-charcoal z-10 transition-colors">
-          <X size={24} />
+        <button 
+          id="rating-modal-close-btn"
+          onClick={onClose} 
+          className="absolute top-6 right-6 text-gray-400 hover:text-charcoal z-10 transition-colors p-2 rounded-full hover:bg-gray-100"
+          aria-label="Close Rating Modal"
+        >
+          <X size={20} />
         </button>
 
         <div className="bg-bbBlue p-10 text-white text-center">
@@ -90,20 +95,34 @@ const RatingModal: React.FC<RatingModalProps> = ({ booking, onSubmit, onClose })
             />
           </div>
 
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full py-5 bg-black text-white rounded-2xl font-bold uppercase text-[10px] tracking-[0.3em] flex items-center justify-center gap-3 transition-all hover:bg-bbBlue disabled:bg-gray-200 shadow-xl shadow-bbBlue/20"
-          >
-            {isSubmitting ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <>
-                <Send size={16} />
-                Submit Feedback
-              </>
-            )}
-          </button>
+          <div className="space-y-3">
+            <button
+              type="button"
+              id="rating-modal-submit-btn"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full py-5 bg-black text-white rounded-2xl font-bold uppercase text-[10px] tracking-[0.3em] flex items-center justify-center gap-3 transition-all hover:bg-bbBlue disabled:bg-gray-200 shadow-xl shadow-bbBlue/20 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <Send size={16} />
+                  Submit Feedback
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              id="rating-modal-dismiss-btn"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="w-full py-2 text-center text-gray-400 hover:text-charcoal font-bold uppercase text-[9px] tracking-[0.2em] transition-colors"
+            >
+              Dismiss / Rate Later
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
