@@ -738,73 +738,93 @@ const AdminDashboard: React.FC = () => {
             <div className="space-y-12">
               <div>
                 <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Pending Settlements</h3>
-                <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                  <table className="w-full text-left text-[0.6875rem]">
-                    <thead className="bg-[#0056b3] text-white">
-                      <tr>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Total Revenue</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Platform Fee ({fee}%)</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {stats?.settlements?.map((s: any) => (
-                        <tr key={s.shopId} className="hover:bg-gray-50/50 transition-all">
-                          <td className="px-8 py-5 font-bold text-black">{s.brandName}</td>
-                          <td className="px-8 py-5 text-gray-500">₹{s.totalAmount.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-red-500 font-bold">-₹{s.platformFee.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-[#0056b3] font-bold">₹{s.partnerPayout.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-right">
-                            <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-[0.5625rem] font-bold uppercase tracking-widest border border-amber-100">
-                              Pending Cycle
-                            </span>
-                          </td>
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[38vh] scroll-smooth divide-y divide-gray-50">
+                    <table className="w-full text-left text-[0.6875rem] border-collapse relative">
+                      <thead className="sticky top-0 z-20 bg-[#0056b3] text-white shadow-xs">
+                        <tr>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Total Revenue</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Platform Fee ({fee}%)</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {stats?.settlements?.length > 0 ? (
+                          stats?.settlements?.map((s: any) => (
+                            <tr key={s.shopId} className="hover:bg-gray-50/50 transition-all">
+                              <td className="px-8 py-5 font-bold text-black">{s.brandName}</td>
+                              <td className="px-8 py-5 text-gray-500">₹{s.totalAmount.toLocaleString()}</td>
+                              <td className="px-8 py-5 text-red-500 font-bold">-₹{s.platformFee.toLocaleString()}</td>
+                              <td className="px-8 py-5 text-[#0056b3] font-bold">₹{s.partnerPayout.toLocaleString()}</td>
+                              <td className="px-8 py-5 text-right">
+                                <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-[0.5625rem] font-bold uppercase tracking-widest border border-amber-100">
+                                  Pending Cycle
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="px-8 py-10 text-center text-gray-400 font-bold text-[10px] uppercase tracking-widest">
+                              No settlements pending in current cycle
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
               <div>
                 <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Transaction Audit Log</h3>
-                <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                  <table className="w-full text-left text-[0.6875rem]">
-                    <thead className="bg-black text-white">
-                      <tr>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Booking ID</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Total</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest text-[#0056b3]">Profit</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest text-emerald-400">Payout</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Timer</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {stats?.auditLog?.map((log: any) => (
-                        <tr key={log.bookingId} className={`hover:bg-gray-50/50 transition-all ${log.isFrozen ? 'bg-red-50/30' : ''}`}>
-                          <td className="px-8 py-5 font-mono text-gray-400">{log.bookingId}</td>
-                          <td className="px-8 py-5 font-bold text-black">{log.partnerName}</td>
-                          <td className="px-8 py-5 text-gray-500 font-bold">₹{log.totalPaid.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-[#0056b3] font-bold">₹{log.adminProfit.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-emerald-600 font-bold">₹{log.finalPayoutAmt.toLocaleString()}</td>
-                          <td className="px-8 py-5">
-                            <span className={`px-2 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest ${log.timerStatus === 'Settled' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                              {log.timerStatus}
-                            </span>
-                          </td>
-                          <td className="px-8 py-5 text-right">
-                            <button onClick={() => handleFreezePayout(log.shopId, log.bookingId, log.isFrozen)} className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${log.isFrozen ? 'bg-red-500 text-white border-red-500' : 'border-red-100 text-red-500 hover:bg-red-50'}`}>
-                              {log.isFrozen ? 'Unfreeze' : 'Freeze'}
-                            </button>
-                          </td>
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[58vh] scroll-smooth divide-y divide-gray-50">
+                    <table className="w-full text-left text-[0.6875rem] border-collapse relative">
+                      <thead className="sticky top-0 z-20 bg-black text-white shadow-xs">
+                        <tr>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Booking ID</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Total</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest text-[#0056b3]">Profit</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest text-emerald-400">Payout</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Timer</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {stats?.auditLog?.length > 0 ? (
+                          stats?.auditLog?.map((log: any) => (
+                            <tr key={log.bookingId} className={`hover:bg-gray-50/50 transition-all ${log.isFrozen ? 'bg-red-50/30' : ''}`}>
+                              <td className="px-8 py-5 font-mono text-gray-400">{log.bookingId}</td>
+                              <td className="px-8 py-5 font-bold text-black">{log.partnerName}</td>
+                              <td className="px-8 py-5 text-gray-500 font-bold">₹{log.totalPaid.toLocaleString()}</td>
+                              <td className="px-8 py-5 text-[#0056b3] font-bold">₹{log.adminProfit.toLocaleString()}</td>
+                              <td className="px-8 py-5 text-emerald-600 font-bold">₹{log.finalPayoutAmt.toLocaleString()}</td>
+                              <td className="px-8 py-5">
+                                <span className={`px-2 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest ${log.timerStatus === 'Settled' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                  {log.timerStatus}
+                                </span>
+                              </td>
+                              <td className="px-8 py-5 text-right">
+                                <button onClick={() => handleFreezePayout(log.shopId, log.bookingId, log.isFrozen)} className={`px-4 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest border transition-all ${log.isFrozen ? 'bg-red-500 text-white border-red-500' : 'border-red-100 text-red-500 hover:bg-red-50'}`}>
+                                  {log.isFrozen ? 'Unfreeze' : 'Freeze'}
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={7} className="px-8 py-10 text-center text-gray-400 font-bold text-[10px] uppercase tracking-widest">
+                              No transaction audit records found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
