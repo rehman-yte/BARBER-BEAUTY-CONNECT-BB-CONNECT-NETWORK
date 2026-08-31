@@ -261,10 +261,11 @@ const ManageLiveShops: React.FC = () => {
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Querying Active Shop Registries...</p>
           </div>
         ) : filteredLiveShops.length > 0 ? (
-          <div className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[11px] font-sans border-collapse">
-                <thead className="bg-gray-50 border-b border-gray-100">
+          <div className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col">
+            {/* Scrollable Table Viewport */}
+            <div className="overflow-x-auto overflow-y-auto max-h-[62vh] sm:max-h-[68vh] scroll-smooth divide-y divide-gray-100">
+              <table className="w-full text-left text-[11px] font-sans border-collapse relative">
+                <thead className="sticky top-0 z-20 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200/80 shadow-xs">
                   <tr>
                     <th className="px-8 py-5 text-gray-400 font-bold uppercase tracking-widest text-[9px]">Platform Partner</th>
                     <th className="px-8 py-5 text-gray-400 font-bold uppercase tracking-widest text-[9px]">Contact No</th>
