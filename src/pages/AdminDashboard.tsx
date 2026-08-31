@@ -44,6 +44,7 @@ const AdminDashboard: React.FC = () => {
   const [allRatings, setAllRatings] = useState<any[]>([]);
   const [selectedPartnerForFeedback, setSelectedPartnerForFeedback] = useState<any>(null);
   const [feedbackSearchQuery, setFeedbackSearchQuery] = useState('');
+  const [partnerPayoutSearchQuery, setPartnerPayoutSearchQuery] = useState('');
   const [editingPartner, setEditingPartner] = useState<any>(null);
 
   const formatFeedbackDate = (rawDate: any): string => {
@@ -288,21 +289,30 @@ const AdminDashboard: React.FC = () => {
         const shopBookings = allBookings.filter(b => {
           const rawStatus = String(b.status || '').toLowerCase().trim();
           const isCancelled = ['cancelled', 'cancelled by customer', 'rejected', 'failed', 'failed_timeout', 'timed_out', 'timeout', 'expired', 'refunded', 'cancelled_refunded'].includes(rawStatus);
-          return (b.shopId === shop.id || b.partnerId === shop.id) && !isCancelled && (
-            ['payment_held', 'settlement_due', 'pending_settlement', 'accepted', 'confirmed', 'completed'].includes(rawStatus)
+          const isShopMatch = (b.shopId && b.shopId === shop.id) || 
+                              (b.partnerId && b.partnerId === shop.id) ||
+                              (shop.brandName && (b.shopName === shop.brandName || b.partnerName === shop.brandName));
+          return isShopMatch && !isCancelled && (
+            ['payment_held', 'settlement_due', 'pending_settlement', 'accepted', 'confirmed', 'completed', 'active', 'in_progress'].includes(rawStatus) ||
+            String(b.paymentStatus || b.payment_status || '').toLowerCase() === 'paid'
           );
         });
         shopBookings.forEach((b: any) => {
           shopTotal += parseFloat(b.price || b.amount || 0);
         });
 
+        const registeredUpi = shop.upiId || shop.upi_id || shop.upi || shop.payoutUpi || 'unregistered@upi';
+
         if (shopTotal > 0) {
           settlements.push({
             shopId: shop.id,
             brandName: shop.brandName || shop.brand_name || 'Partner Salon',
+            ownerName: shop.ownerName || shop.owner_name || 'Partner',
+            upiId: registeredUpi,
             totalAmount: shopTotal,
-            platformFee: (shopTotal * configFee) / 100,
-            partnerPayout: shopTotal - ((shopTotal * configFee) / 100)
+            platformFee: (shopTotal * 0.05),
+            partnerPayout: shopTotal - (shopTotal * 0.05),
+            bookings: shopBookings
           });
         }
       });
@@ -1380,7 +1390,7 @@ const AdminDashboard: React.FC = () => {
 
         {currentView === 'partner_payment_hub' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mb-12 flex justify-between items-end">
+            <div className="mb-8 flex justify-between items-end">
               <div>
                 <h2 className="text-3xl font-serif font-bold text-black">PARTNER PAYMENT HUB</h2>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Account AI 12-Hour 5% Commission & Settlement Registry</p>
@@ -1389,7 +1399,7 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Rolling Window & Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-black text-white p-8 rounded-[2.5rem] relative overflow-hidden">
                 <div className="absolute top-4 right-4 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-bbBlue rounded-full animate-pulse"></span>
@@ -1411,96 +1421,187 @@ const AdminDashboard: React.FC = () => {
               <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Total Net Pending Cycle</p>
                 <p className="text-4xl font-serif font-bold text-bbBlue">
-                  ₹{stats?.settlements?.reduce((sum: number, s: any) => sum + (s.totalAmount * 0.95), 0).toLocaleString() || 0}
+                  ₹{stats?.settlements?.reduce((sum: number, s: any) => sum + (s.partnerPayout || s.totalAmount * 0.95), 0).toLocaleString() || 0}
                 </p>
                 <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase tracking-widest">All outstanding partner balances</p>
               </div>
             </div>
 
+            {/* Search Bar for Partner Settlement Registry */}
+            <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col md:flex-row items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-[#0056b3]/10 text-[#0056b3] flex items-center justify-center font-bold text-lg shrink-0">
+                🔍
+              </div>
+              <div className="flex-1 w-full">
+                <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Search Partner Salon, Owner, or Registered UPI ID</label>
+                <input 
+                  type="text" 
+                  value={partnerPayoutSearchQuery}
+                  onChange={(e) => setPartnerPayoutSearchQuery(e.target.value)}
+                  placeholder="TYPE SALON NAME, OWNER NAME, OR UPI ID..."
+                  className="w-full bg-gray-50 border border-gray-100 px-5 py-3 rounded-xl text-[12px] font-bold outline-none focus:border-bbBlue transition-all text-black"
+                />
+              </div>
+              {partnerPayoutSearchQuery && (
+                <button 
+                  onClick={() => setPartnerPayoutSearchQuery('')}
+                  className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[10px] font-bold uppercase tracking-widest shrink-0"
+                >
+                  Clear Search
+                </button>
+              )}
+            </div>
+
             {/* Partner Settlement List */}
             <div>
-              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Partner Settlement Registry</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Partner Settlement Registry</h3>
+                <span className="text-[9px] font-bold text-[#0056b3] bg-[#0056b3]/10 px-3 py-1 rounded-full uppercase tracking-wider">
+                  Total Partners: {stats?.allPartners?.length || 0}
+                </span>
+              </div>
               <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                <table className="w-full text-left text-[0.6875rem]">
-                  <thead className="bg-[#0056b3] text-white">
-                    <tr>
-                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner Shop</th>
-                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Registered UPI ID</th>
-                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Gross 12h Vol</th>
-                      <th className="px-8 py-4 font-bold uppercase tracking-widest">5% Fee Deduction</th>
-                      <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout Release</th>
-                      <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Operational Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {stats?.allPartners?.map((p: any) => {
-                      // Calculate gross volume from completed/eligible bookings
-                      const partnerBookings = stats?.auditLog?.filter((l: any) => l.shopId === p.id && (l.status === 'payment_held' || l.status === 'settlement_due' || l.status === 'Confirmed' || l.status === 'Accepted'));
-                      const grossAmount = partnerBookings?.reduce((sum: number, b: any) => sum + b.totalPaid, 0) || 0;
-                      const commission = grossAmount * 0.05;
-                      const netPayout = grossAmount - commission;
-                      const registeredUpi = p.upiId || p.upi_id || 'unregistered@upi';
+                <div className="max-h-[500px] overflow-y-auto overflow-x-auto">
+                  <table className="w-full text-left text-[0.6875rem]">
+                    <thead className="bg-[#0056b3] text-white sticky top-0 z-10 shadow-xs">
+                      <tr>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner Shop</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Registered UPI ID</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Gross 12h Vol</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">5% Fee Deduction</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout Release</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Operational Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {stats?.allPartners?.filter((p: any) => {
+                        if (!partnerPayoutSearchQuery || partnerPayoutSearchQuery.trim() === '') return true;
+                        const q = partnerPayoutSearchQuery.trim().toLowerCase();
+                        const brand = (p.brandName || p.brand_name || '').toLowerCase();
+                        const owner = (p.ownerName || p.owner_name || '').toLowerCase();
+                        const upi = (p.upiId || p.upi_id || p.upi || p.payoutUpi || '').toLowerCase();
+                        return brand.includes(q) || owner.includes(q) || upi.includes(q);
+                      }).map((p: any) => {
+                        // Look up calculated settlement info or compute dynamically
+                        const matchingSettlement = stats?.settlements?.find((s: any) => s.shopId === p.id);
+                        
+                        const partnerBookings = matchingSettlement?.bookings || stats?.auditLog?.filter((l: any) => {
+                          const isShopMatch = (l.shopId && l.shopId === p.id) || 
+                                              (p.brandName && (l.partnerName === p.brandName || l.partnerName === p.brand_name));
+                          const isNotCancelled = !['cancelled', 'cancelled by customer', 'rejected', 'failed', 'failed_timeout', 'timed_out', 'timeout', 'expired', 'refunded', 'cancelled_refunded'].includes(String(l.status || '').toLowerCase().trim());
+                          return isShopMatch && isNotCancelled;
+                        }) || [];
 
-                      if (grossAmount === 0) return null;
+                        const grossAmount = matchingSettlement?.totalAmount !== undefined ? matchingSettlement.totalAmount : (partnerBookings.reduce((sum: number, b: any) => sum + (b.totalPaid || parseFloat(b.price || b.amount || 0)), 0));
+                        const commission = matchingSettlement?.platformFee !== undefined ? matchingSettlement.platformFee : (grossAmount * 0.05);
+                        const netPayout = matchingSettlement?.partnerPayout !== undefined ? matchingSettlement.partnerPayout : (grossAmount - commission);
+                        const registeredUpi = p.upiId || p.upi_id || p.upi || p.payoutUpi || matchingSettlement?.upiId || 'unregistered@upi';
 
-                      return (
-                        <tr key={p.id} className="hover:bg-gray-50/50 transition-all">
-                          <td className="px-8 py-5 font-bold text-black">{p.brandName || p.brand_name}</td>
-                          <td className="px-8 py-5 font-mono text-bbBlue">{registeredUpi}</td>
-                          <td className="px-8 py-5 text-gray-500 font-bold">₹{grossAmount.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-red-500 font-bold">-₹{commission.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-emerald-600 font-bold">₹{netPayout.toLocaleString()}</td>
-                          <td className="px-8 py-5 text-right">
-                            <button 
-                              onClick={async () => {
-                                try {
-                                  // 1. Release settlement logs in Firestore
-                                  await setDoc(doc(db, 'partner_settlements', p.id + '_' + Date.now()), {
-                                    partnerId: p.id,
-                                    partnerName: p.brandName || p.brand_name,
-                                    upiId: registeredUpi,
-                                    grossAmount,
-                                    commission,
-                                    netPayout,
-                                    releasedAt: new Date().toISOString()
-                                  });
+                        return (
+                          <tr key={p.id} className="hover:bg-gray-50/50 transition-all">
+                            <td className="px-8 py-5">
+                              <span className="font-bold text-black block">{p.brandName || p.brand_name || 'Partner Salon'}</span>
+                              <span className="text-[9px] text-gray-400 block font-normal">Owner: {p.ownerName || p.owner_name || 'Partner'}</span>
+                              <span className="text-[8px] font-mono text-gray-400 block">{p.id}</span>
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-bbBlue font-bold text-[11px]">{registeredUpi}</span>
+                                {registeredUpi !== 'unregistered@upi' && (
+                                  <button 
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(registeredUpi);
+                                      showToast(`Copied UPI ID: ${registeredUpi}`);
+                                    }}
+                                    title="Copy UPI ID"
+                                    className="p-1 text-gray-400 hover:text-bbBlue transition-colors rounded"
+                                  >
+                                    📋
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-8 py-5 text-gray-600 font-bold text-sm">
+                              ₹{grossAmount.toLocaleString()}
+                            </td>
+                            <td className="px-8 py-5 text-red-500 font-bold text-sm">
+                              -₹{commission.toLocaleString()}
+                            </td>
+                            <td className="px-8 py-5 text-emerald-600 font-bold text-sm">
+                              ₹{netPayout.toLocaleString()}
+                            </td>
+                            <td className="px-8 py-5 text-right">
+                              {netPayout > 0 ? (
+                                <button 
+                                  onClick={async () => {
+                                    if (!window.confirm(`Release 12h Settlement of ₹${netPayout.toLocaleString()} to ${p.brandName || p.brand_name} at UPI: ${registeredUpi}?`)) return;
 
-                                  // 2. Trigger localized message insert into partner's bell notification stream
-                                  await addDoc(collection(db, 'notifications'), {
-                                    message: `Settlement payout of ₹${netPayout.toLocaleString()} released to your registered UPI ID ${registeredUpi} after 5% platform commission deduction.`,
-                                    target: p.id, // direct partner target
-                                    timestamp: new Date().toISOString(),
-                                    createdAt: Timestamp.now(),
-                                    type: 'GLOBAL BROADCAST'
-                                  });
+                                    try {
+                                      showToast(`Releasing ₹${netPayout.toLocaleString()} settlement...`);
 
-                                  // 3. Mark the partner's bookings as Settled (or 'completed')
-                                  for (const b of partnerBookings) {
-                                    await updateBookingStatus(b.bookingId, 'completed');
-                                  }
+                                      // 1. Release settlement logs in Firestore
+                                      await setDoc(doc(db, 'partner_settlements', p.id + '_' + Date.now()), {
+                                        partnerId: p.id,
+                                        partnerName: p.brandName || p.brand_name,
+                                        upiId: registeredUpi,
+                                        grossAmount,
+                                        commission,
+                                        netPayout,
+                                        releasedAt: new Date().toISOString(),
+                                        cycle: '12h_rolling'
+                                      });
 
-                                  showToast(`Released ₹${netPayout.toLocaleString()} to ${p.brandName}! Notification triggered.`);
-                                  fetchStats();
-                                } catch (err) {
-                                  console.error(err);
-                                  alert("Failed to release partner settlement");
-                                }
-                              }}
-                              className="px-6 py-2 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest bg-black text-white hover:bg-emerald-600 transition-all font-sans"
-                            >
-                              Release & Notify
-                            </button>
+                                      // 2. Trigger localized message insert into partner's bell notification stream
+                                      await addDoc(collection(db, 'notifications'), {
+                                        message: `Accountant AI: Settlement payout of ₹${netPayout.toLocaleString()} has been released to your registered UPI ID (${registeredUpi}) after 5% platform commission deduction.`,
+                                        target: p.id,
+                                        timestamp: new Date().toISOString(),
+                                        createdAt: Timestamp.now(),
+                                        type: 'SETTLEMENT DISPATCH'
+                                      });
+
+                                      // 3. Mark the partner's bookings as Settled / completed
+                                      for (const b of partnerBookings) {
+                                        const bId = b.bookingId || b.id;
+                                        if (bId) {
+                                          try {
+                                            await updateBookingStatus(bId, 'completed');
+                                          } catch (upErr) {
+                                            console.debug("Booking update status skipped:", upErr);
+                                          }
+                                        }
+                                      }
+
+                                      showToast(`✓ Released ₹${netPayout.toLocaleString()} to ${p.brandName || p.brand_name}! Notification dispatched.`);
+                                      fetchStats();
+                                    } catch (err) {
+                                      console.error(err);
+                                      alert("Failed to release partner settlement");
+                                    }
+                                  }}
+                                  className="px-6 py-2.5 rounded-xl text-[0.5625rem] font-bold uppercase tracking-widest bg-black text-white hover:bg-emerald-600 transition-all font-sans shadow-sm active:scale-95"
+                                >
+                                  Release & Notify
+                                </button>
+                              ) : (
+                                <span className="bg-gray-100 text-gray-500 px-3 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider inline-block">
+                                  ✓ Up to date (₹0 Due)
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(!stats?.allPartners || stats.allPartners.length === 0) && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-12 text-gray-300 font-bold uppercase">
+                            No registered partner shops found in network.
                           </td>
                         </tr>
-                      );
-                    }).filter(Boolean)}
-                    {(!stats?.allPartners || stats.allPartners.length === 0) && (
-                      <tr>
-                        <td colSpan={6} className="text-center py-10 text-gray-300 font-bold uppercase">No active settlements in current 12h cycle</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </motion.div>
