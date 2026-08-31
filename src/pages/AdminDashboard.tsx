@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, setDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 import { 
@@ -113,15 +113,51 @@ const AdminDashboard: React.FC = () => {
 
     fetchStats();
     
-    // Live Sync: Refresh stats every 10 seconds (local is fast)
-    const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
+    // Genuine Real-Time Firestore listeners for automatic instant sync
+    let unsubPartners = () => {};
+    let unsubBookings = () => {};
+    let unsubQueue = () => {};
+    let unsubConfig = () => {};
+
+    try {
+      unsubPartners = onSnapshot(collection(db, 'partners'), () => {
+        fetchStats();
+      }, (err) => console.debug("Partners sync fallback:", err));
+
+      unsubBookings = onSnapshot(collection(db, 'bookings'), () => {
+        fetchStats();
+      }, (err) => console.debug("Bookings sync fallback:", err));
+
+      unsubQueue = onSnapshot(collection(db, 'verification_queue'), () => {
+        fetchStats();
+      }, (err) => console.debug("Queue sync fallback:", err));
+
+      unsubConfig = onSnapshot(doc(db, 'settings', 'global_config'), (snap) => {
+        if (snap.exists() && snap.data().platformFee !== undefined) {
+          setFee(Number(snap.data().platformFee));
+        }
+        fetchStats();
+      }, (err) => console.debug("Config sync fallback:", err));
+    } catch (subErr) {
+      console.debug("Real-time listener setup error handled:", subErr);
+    }
+
+    // Live Sync Polling fallback every 8 seconds
+    const interval = setInterval(fetchStats, 8000);
+
+    return () => {
+      unsubPartners();
+      unsubBookings();
+      unsubQueue();
+      unsubConfig();
+      clearInterval(interval);
+    };
   }, [user, navigate]);
 
   const fetchStats = async () => {
     try {
-      let data = [];
-      let allBookings = [];
+      let data: any[] = [];
+      let allBookings: any[] = [];
       let config = { 
         platformFee: 10, 
         broadcasts: [] as any[],
@@ -139,7 +175,6 @@ const AdminDashboard: React.FC = () => {
         console.debug("Firestore access restricted, activating preview bypass mode...", firestoreErr);
       }
 
-      // data already contains combined real + mock shops with persistence overrides from getShops()
       const mergedPartners = data;
       const pendingVerifications = await getPendingPartners();
       
@@ -176,24 +211,54 @@ const AdminDashboard: React.FC = () => {
         const serviceName = b.serviceName || b.service || 'Grooming Service';
         const bookingDate = b.date || b.bookingDate || (b.createdAt ? new Date(b.createdAt).toDateString() : 'Today');
         const timeSlot = b.time || b.slot || b.timeSlot || 'Scheduled';
+        
+        const rawStatus = String(b.status || '').toLowerCase().trim();
+        const rawPaymentStatus = String(b.paymentStatus || b.payment_status || '').toLowerCase().trim();
+        const rawRefundStatus = String(b.refundStatus || b.refund_status || '').toLowerCase().trim();
+
+        const isCancelledOrFailed = [
+          'cancelled', 'cancelled by customer', 'rejected', 'failed', 
+          'failed_timeout', 'timed_out', 'timeout', 'expired', 'refunded', 
+          'cancelled_refunded'
+        ].includes(rawStatus) || rawRefundStatus === 'processed' || rawRefundStatus === 'initiated' || rawPaymentStatus === 'failed';
+
+        const isCompleted = ['completed', 'settled', 'finished'].includes(rawStatus);
+
         const cancelReason = b.cancelReason || b.statusReason || b.message || (
-          ['rejected', 'Rejected'].includes(b.status) ? 'Partner Rejected Request' :
-          ['timed_out', 'Timed Out', 'timeout', 'Expired'].includes(b.status) ? 'Partner Acceptance Timed Out' :
-          ['Cancelled', 'cancelled', 'Cancelled by Customer'].includes(b.status) ? 'Booking Cancelled' :
-          ['Pending', 'pending', 'unconfirmed', 'Unconfirmed'].includes(b.status) ? 'Slot Not Confirmed by Partner' :
-          ['refund_requested'].includes(b.status) ? 'Customer Requested Refund' :
+          ['rejected'].includes(rawStatus) ? 'Partner Rejected Request' :
+          ['timed_out', 'timeout', 'expired', 'failed_timeout'].includes(rawStatus) ? 'Partner Acceptance Timed Out' :
+          ['cancelled', 'cancelled by customer'].includes(rawStatus) ? 'Booking Cancelled by Customer' :
+          ['refunded', 'cancelled_refunded'].includes(rawStatus) ? 'Refund Processed' :
+          ['pending', 'unconfirmed'].includes(rawStatus) ? 'Slot Pending Confirmation' :
           'Unconfirmed / Cancelled Slot'
         );
 
-        const isActive = ['Accepted', 'Confirmed', 'payment_held', 'settlement_due'].includes(b.status);
-        if (isActive) activeBookingsCount++;
-
-        if (b.status !== 'Cancelled' && b.status !== 'rejected') {
-          adminCommission += fee;
+        // 1. Active Bookings: genuinely ongoing or active slots
+        const isActive = !isCancelledOrFailed && !isCompleted && (
+          ['accepted', 'confirmed', 'payment_held', 'settlement_due', 'pending_settlement', 'pending', 'waiting', 'unconfirmed', 'in_progress', 'active'].includes(rawStatus) ||
+          rawPaymentStatus === 'paid' || rawPaymentStatus === 'prepaid'
+        );
+        if (isActive) {
+          activeBookingsCount++;
         }
 
-        if (b.status === 'payment_held' || b.status === 'settlement_due') {
+        // 2. Escrow: Genuine held funds for pending/active slots awaiting settlement/completion
+        const isEscrow = !isCancelledOrFailed && !isCompleted && (
+          ['payment_held', 'settlement_due', 'pending_settlement', 'pending', 'accepted', 'confirmed'].includes(rawStatus) ||
+          rawPaymentStatus === 'paid' || rawPaymentStatus === 'prepaid'
+        );
+        if (isEscrow) {
           totalEscrow += price;
+        }
+
+        // 3. Genuine Admin Profit: ONLY from non-cancelled, genuine paid / confirmed / completed bookings
+        const isProfitEarned = !isCancelledOrFailed && (
+          isCompleted || 
+          ['accepted', 'confirmed', 'settlement_due', 'pending_settlement'].includes(rawStatus) ||
+          rawPaymentStatus === 'paid' || rawPaymentStatus === 'prepaid'
+        );
+        if (isProfitEarned && price > 0) {
+          adminCommission += fee;
         }
 
         auditLog.push({
@@ -210,18 +275,24 @@ const AdminDashboard: React.FC = () => {
           totalPaid: price,
           adminProfit: fee,
           finalPayoutAmt: payout,
-          timerStatus: b.status === 'payment_held' ? 'Held (Escrow)' : (b.status === 'settlement_due' ? 'Settlement Due' : 'Settled'),
+          timerStatus: isCompleted ? 'Settled' : (b.status === 'payment_held' ? 'Held (Escrow)' : (['settlement_due', 'pending_settlement'].includes(rawStatus) ? 'Settlement Due' : 'Active')),
           isFrozen: b.isFrozen || false,
           shopId: b.shopId || b.partnerId,
           status: b.status || 'Pending',
-          paymentStatus: b.paymentStatus || 'success',
+          paymentStatus: b.paymentStatus || b.payment_status || (rawPaymentStatus || 'success'),
           rawBooking: b
         });
       });
 
       mergedPartners.forEach((shop: any) => {
         let shopTotal = 0;
-        const shopBookings = allBookings.filter(b => (b.shopId === shop.id || b.partnerId === shop.id) && (b.status === 'payment_held' || b.status === 'settlement_due'));
+        const shopBookings = allBookings.filter(b => {
+          const rawStatus = String(b.status || '').toLowerCase().trim();
+          const isCancelled = ['cancelled', 'cancelled by customer', 'rejected', 'failed', 'failed_timeout', 'timed_out', 'timeout', 'expired', 'refunded', 'cancelled_refunded'].includes(rawStatus);
+          return (b.shopId === shop.id || b.partnerId === shop.id) && !isCancelled && (
+            ['payment_held', 'settlement_due', 'pending_settlement', 'accepted', 'confirmed', 'completed'].includes(rawStatus)
+          );
+        });
         shopBookings.forEach((b: any) => {
           shopTotal += parseFloat(b.price || b.amount || 0);
         });
@@ -229,7 +300,7 @@ const AdminDashboard: React.FC = () => {
         if (shopTotal > 0) {
           settlements.push({
             shopId: shop.id,
-            brandName: shop.brandName || shop.brand_name,
+            brandName: shop.brandName || shop.brand_name || 'Partner Salon',
             totalAmount: shopTotal,
             platformFee: (shopTotal * configFee) / 100,
             partnerPayout: shopTotal - ((shopTotal * configFee) / 100)
@@ -237,11 +308,13 @@ const AdminDashboard: React.FC = () => {
         }
       });
 
+      const roundedAdminProfit = Math.round(adminCommission * 100) / 100;
+
       const newStats = {
         totalPartners,
         activeBookingsCount,
         totalEscrow,
-        adminCommission,
+        adminCommission: roundedAdminProfit,
         pendingVerifications,
         allPartners: mergedPartners,
         settlements,
