@@ -291,7 +291,6 @@ const Navbar: React.FC = () => {
                         { label: "📈 Revenue Ledger", path: "/admin/dashboard?view=ledger", icon: "💸" },
                         { label: "📢 Global Broadcast", path: "/admin/dashboard?view=broadcast", icon: "📢" },
                         { label: "💬 Feedback Hub", path: "/admin/dashboard?view=feedback", icon: "💬" },
-                        { label: "💸 Customer Refund Panel", path: "/admin/dashboard?view=manual_refund", icon: "💸" },
                         { label: "🏦 Partner Payment Hub", path: "/admin/dashboard?view=partner_payment_hub", icon: "🏦" }
                       ];
                       return (
