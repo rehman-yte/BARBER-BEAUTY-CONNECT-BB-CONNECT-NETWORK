@@ -1,5 +1,5 @@
 /* UNIFIED AUTHENTICATION & ROUTING SYSTEM v4.0 */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import Navbar from "./components/Navbar";
@@ -22,8 +22,11 @@ import AdminDropship from "./pages/AdminDropship";
 import ShopPage from "./pages/ShopPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import MyShopping from "./pages/MyShopping";
+import MaintenancePage from "./pages/MaintenancePage";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { subscribeToSettings } from './services/logic_engine';
+import { PersistenceService } from './services/PersistenceService';
 
 // --- 404 Component ---
 const NotFound: React.FC = () => (
@@ -130,6 +133,10 @@ const AppRoutes: React.FC = () => {
       <Route path="/admin/dropship" element={<ProtectedRoute allowedRole="admin"><AdminDropship /></ProtectedRoute>} />
       <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
       
+      {/* PROTOCOL & MAINTENANCE */}
+      <Route path="/maintenance" element={<MaintenancePage />} />
+      <Route path="/protocol" element={<MaintenancePage />} />
+
       {/* FALLBACKS */}
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<Navigate to="/404" replace />} />
@@ -138,6 +145,40 @@ const AppRoutes: React.FC = () => {
 };
 
 const LayoutWrapper: React.FC = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(() => {
+    return PersistenceService.load('system_maintenance') || false;
+  });
+
+  useEffect(() => {
+    const unsubscribe = subscribeToSettings((settings) => {
+      if (settings && settings.maintenanceMode !== undefined) {
+        setIsMaintenanceMode(!!settings.maintenanceMode);
+        PersistenceService.save('system_maintenance', !!settings.maintenanceMode);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const isAdmin = user?.role === 'admin' || (user?.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com';
+  const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname === '/admin-dashboard';
+  const isAuthRoute = location.pathname === '/auth';
+
+  // GLOBAL MAINTENANCE MODE INTERCEPTION:
+  // When active, blocks all website traffic (customers, partners, public visitors)
+  // Displays "Website is under maintenance, please wait some time."
+  // Retains access only for Administrator to manage and turn the switch back OFF.
+  if (isMaintenanceMode) {
+    if (isAdmin && isAdminRoute) {
+      // Allow admin into dashboard
+    } else if (!user && isAuthRoute) {
+      // Allow admin access attempt
+    } else {
+      return <MaintenancePage />;
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-x-hidden w-full">
       <Navbar />

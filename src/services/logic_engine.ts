@@ -599,12 +599,32 @@ export const getSettings = async (): Promise<any> => {
 export const updateSettings = async (updates: any) => {
   try {
     const docRef = doc(db, 'settings', 'global');
-    await updateDoc(docRef, updates);
+    await setDoc(docRef, updates, { merge: true });
+    
+    // Also mirror to global_config for multi-version resilience
+    try {
+      const configRef = doc(db, 'settings', 'global_config');
+      await setDoc(configRef, updates, { merge: true });
+    } catch (_) {}
+
     return true;
   } catch (err) {
     console.error('Firestore updateSettings failure:', err);
     throw err;
   }
+};
+
+export const subscribeToSettings = (callback: (settings: any) => void) => {
+  const docRef = doc(db, 'settings', 'global');
+  return onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data());
+    } else {
+      callback({});
+    }
+  }, (err) => {
+    console.debug('Settings subscription fallback:', err);
+  });
 };
 
 export const sendNotification = async (message: string, target: 'all' | 'customers' | 'partners' = 'all') => {

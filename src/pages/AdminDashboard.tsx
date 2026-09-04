@@ -158,17 +158,22 @@ const AdminDashboard: React.FC = () => {
     try {
       let data: any[] = [];
       let allBookings: any[] = [];
-      let config = { 
+      let config: any = { 
         platformFee: 10, 
         broadcasts: [] as any[],
         heroTitle: 'BB Grooming Excellence',
-        heroSubtitle: 'Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.'
+        heroSubtitle: 'Connect with verified grooming and beauty professionals. Seamless booking, secure payments, and premium service delivery.',
+        maintenanceMode: false
       };
 
       try {
         data = await getShops();
         allBookings = await getBookings();
         config = await getSettings();
+        if (config && config.maintenanceMode !== undefined) {
+          setIsMaintenanceMode(!!config.maintenanceMode);
+          PersistenceService.save('system_maintenance', !!config.maintenanceMode);
+        }
         const ratingsData = await getRatings();
         setAllRatings(ratingsData);
       } catch (firestoreErr) {
@@ -477,8 +482,12 @@ const AdminDashboard: React.FC = () => {
     const next = !isMaintenanceMode;
     setIsMaintenanceMode(next);
     PersistenceService.save('system_maintenance', next);
-    await updateSettings({ maintenanceMode: next });
-    alert(`Maintenance Mode: ${next ? 'ENABLED' : 'DISABLED'}`);
+    try {
+      await updateSettings({ maintenanceMode: next });
+    } catch (err) {
+      console.error("Failed to update maintenance settings:", err);
+    }
+    showToast(next ? 'Global Maintenance Mode: ON (All traffic redirected to maintenance page)' : 'Global Maintenance Mode: OFF (Platform live and open)');
   };
 
   const handleFreezePayout = async (shopId: string, bookingId: string, currentFrozen: boolean) => {
