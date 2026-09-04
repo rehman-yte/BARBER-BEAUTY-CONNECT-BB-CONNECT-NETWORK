@@ -25,6 +25,73 @@ export const INITIAL_SHOPS = [
       { name: 'Head Massage', price: 200 }
     ],
     bookings: []
+  },
+  {
+    id: 'shop2',
+    brandName: 'Glamour Queen Studio',
+    ownerName: 'Priya Sharma',
+    category: 'Beauty Parlour',
+    isVerified: true,
+    isApproved: true,
+    isActive: true,
+    status: 'Active',
+    onboardedAt: new Date().toISOString(),
+    upiId: 'priya@upi',
+    shopImages: ['https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=600'],
+    workers: [
+      { name: 'Simran', image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop' }
+    ],
+    services: [
+      { name: 'Bridal Makeup', price: 2500 },
+      { name: 'Facial Glow', price: 1200 },
+      { name: 'Hair Spa', price: 800 }
+    ],
+    bookings: []
+  },
+  {
+    id: 'shop3',
+    brandName: 'Verve Unisex Salon & Studio',
+    ownerName: 'Kabir & Meera',
+    category: 'Unisex Salon',
+    isVerified: true,
+    isApproved: true,
+    isActive: true,
+    status: 'Active',
+    onboardedAt: new Date().toISOString(),
+    upiId: 'verve@upi',
+    shopImages: ['https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&q=80&w=600'],
+    workers: [
+      { name: 'Rohan', image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop' },
+      { name: 'Ananya', image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop' }
+    ],
+    services: [
+      { name: 'Global Hair Color', price: 2200 },
+      { name: 'Keratin Treatment', price: 3500 },
+      { name: 'Designer Cut & Style', price: 750 }
+    ],
+    bookings: []
+  },
+  {
+    id: 'shop4',
+    brandName: 'Aura Holistic Spa Corners',
+    ownerName: 'Sanjay Dutt',
+    category: 'Spa Corners',
+    isVerified: true,
+    isApproved: true,
+    isActive: true,
+    status: 'Active',
+    onboardedAt: new Date().toISOString(),
+    upiId: 'auraspa@upi',
+    shopImages: ['https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=600'],
+    workers: [
+      { name: 'Dev', image: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&h=150&fit=crop' }
+    ],
+    services: [
+      { name: 'Swedish Body Massage', price: 1800 },
+      { name: 'Aroma Therapy', price: 2100 },
+      { name: 'Herbal Detox Foot Spa', price: 900 }
+    ],
+    bookings: []
   }
 ];
 

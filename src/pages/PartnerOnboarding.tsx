@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { addShop } from '../services/logic_engine';
 import { useAuth } from '../context/AuthContext';
-import { Check, MapPin, Camera, User, ShoppingBag } from 'lucide-react';
+import { Check, MapPin, Camera, User, ShoppingBag, Sparkles, Flower2 } from 'lucide-react';
 
 const PartnerOnboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -22,7 +22,7 @@ const PartnerOnboarding: React.FC = () => {
     brandName: '',
     mobileNumber: user?.email || '', // Set default if available
     manualAddress: '',
-    category: 'Barber' as 'Barber' | 'Beauty Parlour',
+    category: 'Barber' as 'Barber' | 'Beauty Parlour' | 'Unisex Salon' | 'Spa Corners',
     workerCount: 1,
     upiId: '',
     lat: null as number | null,
@@ -194,7 +194,7 @@ const PartnerOnboarding: React.FC = () => {
         brandName: '',
         mobileNumber: '',
         manualAddress: '',
-        category: 'Barber' as 'Barber' | 'Beauty Parlour',
+        category: 'Barber' as 'Barber' | 'Beauty Parlour' | 'Unisex Salon' | 'Spa Corners',
         workerCount: 1,
         upiId: '',
         lat: null,
@@ -408,17 +408,19 @@ const PartnerOnboarding: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-[1.5rem]">
                     {[
                       { id: 'Barber', label: 'BARBER STUDIO', icon: <ShoppingBag size={24} />, desc: 'Hair, Grooming & Shave Essentials' },
-                      { id: 'Beauty Parlour', label: 'BEAUTY PARLOUR', icon: <Camera size={24} />, desc: 'Skin, Makeup & Holistic Beauty' }
+                      { id: 'Beauty Parlour', label: 'BEAUTY PARLOUR', icon: <Camera size={24} />, desc: 'Skin, Makeup & Holistic Beauty' },
+                      { id: 'Unisex Salon', label: 'UNISEX SALON', icon: <Sparkles size={24} />, desc: 'All-Gender Hair Styling & Premium Grooming' },
+                      { id: 'Spa Corners', label: 'SPA CORNERS', icon: <Flower2 size={24} />, desc: 'Relaxation, Massage & Wellness Retreat' }
                     ].map(cat => (
                       <button
                         key={cat.id}
                         type="button"
                         onClick={() => setFormData({ ...formData, category: cat.id as any })}
-                        className={`p-[3rem] rounded-[3rem] border-2 transition-all flex flex-col items-center text-center gap-[1.5rem] group relative overflow-hidden ${
-                          formData.category === cat.id ? 'border-bbBlue bg-bbBlue/5' : 'border-gray-50 hover:border-gray-200 bg-white'
+                        className={`p-[2.5rem] md:p-[3rem] rounded-[3rem] border-2 transition-all flex flex-col items-center text-center gap-[1.25rem] group relative overflow-hidden ${
+                          formData.category === cat.id ? 'border-bbBlue bg-bbBlue/5 shadow-md' : 'border-gray-50 hover:border-gray-200 bg-white'
                         }`}
                       >
-                        <div className={`p-[1.5rem] rounded-2xl transition-all ${
+                        <div className={`p-[1.25rem] md:p-[1.5rem] rounded-2xl transition-all ${
                           formData.category === cat.id ? 'bg-bbBlue text-white shadow-xl shadow-bbBlue/20' : 'bg-gray-50 text-gray-300 group-hover:bg-gray-100'
                         }`}>
                           {cat.icon}

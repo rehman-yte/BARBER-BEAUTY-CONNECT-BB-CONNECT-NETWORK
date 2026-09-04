@@ -244,6 +244,8 @@ const ManageLiveShops: React.FC = () => {
               <option value="All">All Categories</option>
               <option value="Barber">Barber</option>
               <option value="Beauty Parlour">Beauty Parlour</option>
+              <option value="Unisex Salon">Unisex Salon</option>
+              <option value="Spa Corners">Spa Corners</option>
             </select>
           </div>
         </div>
@@ -415,6 +417,8 @@ const ManageLiveShops: React.FC = () => {
                 >
                   <option value="Barber">Barber</option>
                   <option value="Beauty Parlour">Beauty Parlour</option>
+                  <option value="Unisex Salon">Unisex Salon</option>
+                  <option value="Spa Corners">Spa Corners</option>
                 </select>
               </div>
 

@@ -9,7 +9,7 @@ import { PersistenceService, StorageManager } from '../services/PersistenceServi
 const ExplorePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [filter, setFilter] = useState<'Barber' | 'Beauty Parlour'>('Barber');
+  const [filter, setFilter] = useState<'Barber' | 'Beauty Parlour' | 'Unisex Salon' | 'Spa Corners'>('Barber');
   const [allApprovedShops, setAllApprovedShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [broadcast, setBroadcast] = useState<any>(null);
@@ -51,7 +51,22 @@ const ExplorePage: React.FC = () => {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  const filteredShops = allApprovedShops.filter(s => s.category === filter);
+  const filteredShops = allApprovedShops.filter(s => {
+    const cat = (s.category || '').toLowerCase().trim();
+    if (filter === 'Barber') {
+      return cat === 'barber' || cat.includes('barber');
+    }
+    if (filter === 'Beauty Parlour') {
+      return cat === 'beauty parlour' || cat === 'beauty' || cat.includes('beauty');
+    }
+    if (filter === 'Unisex Salon') {
+      return cat === 'unisex salon' || cat === 'unisex' || cat.includes('unisex');
+    }
+    if (filter === 'Spa Corners') {
+      return cat === 'spa corners' || cat === 'spa corner' || cat === 'spa' || cat.includes('spa');
+    }
+    return s.category === filter;
+  });
 
   return (
     <div className="pt-[8rem] pb-[5rem] bg-white min-h-screen">
@@ -87,22 +102,38 @@ const ExplorePage: React.FC = () => {
         </header>
 
         {/* Category Tabs */}
-        <div className="flex gap-[1rem] mb-[3rem] border-b border-gray-100 pb-[1rem] overflow-x-auto scrollbar-hide">
+        <div className="flex gap-[0.75rem] md:gap-[1rem] mb-[3rem] border-b border-gray-100 pb-[1rem] overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setFilter('Barber')}
-            className={`px-[2rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
-              filter === 'Barber' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue'
+            className={`px-[1.75rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
+              filter === 'Barber' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue bg-gray-50/50'
             }`}
           >
             Barber Shops Near You
           </button>
           <button
             onClick={() => setFilter('Beauty Parlour')}
-            className={`px-[2rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
-              filter === 'Beauty Parlour' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue'
+            className={`px-[1.75rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
+              filter === 'Beauty Parlour' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue bg-gray-50/50'
             }`}
           >
             Beauty Parlours Near You
+          </button>
+          <button
+            onClick={() => setFilter('Unisex Salon')}
+            className={`px-[1.75rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
+              filter === 'Unisex Salon' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue bg-gray-50/50'
+            }`}
+          >
+            Unisex Salons Near You
+          </button>
+          <button
+            onClick={() => setFilter('Spa Corners')}
+            className={`px-[1.75rem] py-[0.75rem] text-[0.625rem] font-bold uppercase tracking-widest rounded-full transition-all whitespace-nowrap ${
+              filter === 'Spa Corners' ? 'bg-bbBlue text-white shadow-lg shadow-bbBlue/20' : 'text-gray-400 hover:text-bbBlue bg-gray-50/50'
+            }`}
+          >
+            Spa Corners Near You
           </button>
         </div>
 
