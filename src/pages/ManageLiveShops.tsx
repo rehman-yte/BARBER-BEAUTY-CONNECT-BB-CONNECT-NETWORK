@@ -17,9 +17,10 @@ import {
   Clock, 
   User, 
   X, 
-  CheckCircle,
-  XCircle,
-  Activity
+  CheckCircle, 
+  XCircle, 
+  Activity,
+  RotateCcw
 } from 'lucide-react';
 
 const ManageLiveShops: React.FC = () => {
@@ -34,6 +35,7 @@ const ManageLiveShops: React.FC = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState<'All' | 'Online' | 'Offline' | 'Suspended'>('All');
   
   // Modal states
   const [editingPartner, setEditingPartner] = useState<any>(null);
@@ -60,13 +62,13 @@ const ManageLiveShops: React.FC = () => {
       const allShops = await getShops();
       const allBookings = await getBookings();
       
-      // Filter partners where status is Approved/approved
-      const approvedOnly = allShops.filter((p: any) => {
+      // Filter partners where status is Approved, Suspended, or adminApproved
+      const approvedOrSuspended = allShops.filter((p: any) => {
         const status = String(p.status || '').toLowerCase();
-        return status === 'approved' || p.adminApproved === true;
+        return status === 'approved' || status === 'suspended' || p.adminApproved === true || p.isSuspended === true;
       });
 
-      setPartners(approvedOnly);
+      setPartners(approvedOrSuspended);
       setBookings(allBookings);
     } catch (err: any) {
       console.error('Error fetching admin live shop data:', err);
@@ -101,9 +103,7 @@ const ManageLiveShops: React.FC = () => {
     if (!editingPartner) return;
     if (!editBrandName.trim()) {
       setError('Brand Name cannot be blank.');
-      return;
     }
-
     try {
       setError('');
       await updateShop(editingPartner.id, {
@@ -127,23 +127,54 @@ const ManageLiveShops: React.FC = () => {
   };
 
   const handleSuspendShop = async (partnerId: string, brandName: string) => {
-    const doubleConfirm = window.confirm(`CRITICAL SECURITY ACTION:\nAre you sure you want to permanently SUSPEND "${brandName}"?\nThis removes them from the approved network permanently.`);
+    const doubleConfirm = window.confirm(`SUSPEND PARTNER:\nAre you sure you want to SUSPEND "${brandName}"?\nTheir dashboard will be locked and frozen, and they will not be able to perform any actions until restored.`);
     if (!doubleConfirm) return;
 
     try {
       setError('');
-      // Suspend permanently
+      // Mark as suspended
       await updateShop(partnerId, {
         status: 'suspended',
         adminApproved: false,
-        isActive: false
+        isActive: false,
+        isSuspended: true
       });
 
-      // Remove from list
-      setPartners(prev => prev.filter(p => p.id !== partnerId));
-      showToast(`Partner "${brandName}" successfully suspended and banned.`);
+      // Update state without removing from list so it can be restored
+      setPartners(prev => prev.map(p => 
+        p.id === partnerId 
+          ? { ...p, status: 'suspended', adminApproved: false, isActive: false, isSuspended: true } 
+          : p
+      ));
+      showToast(`Partner "${brandName}" has been suspended. Dashboard is now frozen.`);
     } catch (err: any) {
       setError('Suspension command rejected by database.');
+    }
+  };
+
+  const handleRestoreShop = async (partnerId: string, brandName: string) => {
+    const confirmRestore = window.confirm(`RESTORE PARTNER:\nAre you sure you want to RESTORE "${brandName}"?\nThis re-activates their account and unfreezes their dashboard.`);
+    if (!confirmRestore) return;
+
+    try {
+      setError('');
+      // Restore back to approved & active
+      await updateShop(partnerId, {
+        status: 'approved',
+        adminApproved: true,
+        isActive: true,
+        isSuspended: false
+      });
+
+      // Update local state
+      setPartners(prev => prev.map(p => 
+        p.id === partnerId 
+          ? { ...p, status: 'approved', adminApproved: true, isActive: true, isSuspended: false } 
+          : p
+      ));
+      showToast(`Partner "${brandName}" successfully restored to Active status!`);
+    } catch (err: any) {
+      setError('Failed to restore shop. Database command rejected.');
     }
   };
 
@@ -179,14 +210,27 @@ const ManageLiveShops: React.FC = () => {
   };
   const weekDays = getNext7Days();
 
-  // Query filter
+  // Query & Status filter
   const filteredLiveShops = partners.filter((p: any) => {
     const brand = String(p.brandName || p.brand_name || '').toLowerCase();
     const owner = String(p.ownerName || p.owner_name || '').toLowerCase();
     const queryMatch = brand.includes(searchQuery.toLowerCase()) || owner.includes(searchQuery.toLowerCase());
     
-    if (selectedCategory === 'All') return queryMatch;
-    return queryMatch && p.category === selectedCategory;
+    const categoryMatch = selectedCategory === 'All' || p.category === selectedCategory;
+
+    const isSuspended = p.status === 'suspended' || p.isSuspended === true;
+    const isOnline = p.isActive !== false && !isSuspended;
+
+    let statusMatch = true;
+    if (selectedStatus === 'Online') {
+      statusMatch = isOnline && !isSuspended;
+    } else if (selectedStatus === 'Offline') {
+      statusMatch = !isOnline && !isSuspended;
+    } else if (selectedStatus === 'Suspended') {
+      statusMatch = isSuspended;
+    }
+
+    return queryMatch && categoryMatch && statusMatch;
   });
 
   return (
@@ -247,6 +291,17 @@ const ManageLiveShops: React.FC = () => {
               <option value="Unisex Salon">Unisex Salon</option>
               <option value="Spa Corners">Spa Corners</option>
             </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as any)}
+              className="bg-white border border-gray-200 px-6 py-3 rounded-full text-[10px] font-black uppercase outline-none focus:border-[#0056b3] shadow-sm cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Online">Active / Online</option>
+              <option value="Offline">Offline</option>
+              <option value="Suspended">Suspended (Locked)</option>
+            </select>
           </div>
         </div>
 
@@ -278,7 +333,8 @@ const ManageLiveShops: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredLiveShops.map((partner: any) => {
-                    const isOnline = partner.isActive !== false;
+                    const isSuspended = partner.status === 'suspended' || partner.isSuspended === true;
+                    const isOnline = partner.isActive !== false && !isSuspended;
                     return (
                       <tr key={partner.id} className="hover:bg-gray-50/50 transition-all">
                         {/* Partner brand & ID */}
@@ -309,14 +365,23 @@ const ManageLiveShops: React.FC = () => {
                         {/* Live Status indicator */}
                         <td className="px-8 py-6">
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
-                              <span className={`font-black uppercase text-[10px] tracking-wide ${isOnline ? 'text-emerald-600' : 'text-red-500'}`}>
-                                {isOnline ? 'Online (Explore Page)' : 'Offline (Hidden)'}
-                              </span>
-                            </div>
+                            {isSuspended ? (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                                <span className="font-black uppercase text-[10px] tracking-wide text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-md">
+                                  SUSPENDED
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+                                <span className={`font-black uppercase text-[10px] tracking-wide ${isOnline ? 'text-emerald-600' : 'text-red-500'}`}>
+                                  {isOnline ? 'Online (Explore Page)' : 'Offline (Hidden)'}
+                                </span>
+                              </div>
+                            )}
                             <span className="text-[8px] text-gray-400 uppercase tracking-widest font-bold">
-                              {partner.status === 'approved' || partner.adminApproved ? 'VERIFIED PARTNER' : 'UNVERIFIED'}
+                              {isSuspended ? 'DASHBOARD FROZEN' : (partner.status === 'approved' || partner.adminApproved ? 'VERIFIED PARTNER' : 'UNVERIFIED')}
                             </span>
                           </div>
                         </td>
@@ -324,42 +389,54 @@ const ManageLiveShops: React.FC = () => {
                         {/* Actions buttons row */}
                         <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-2 flex-wrap">
-                            {/* Toggle view slots */}
-                            <button 
-                              onClick={() => setViewingSlotsPartner(partner)}
-                              className="px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1.5"
-                            >
-                              <Calendar className="w-3 h-3 text-[#0056b3]" /> Slots
-                            </button>
+                            {isSuspended ? (
+                              /* RESTORE BUTTON FOR SUSPENDED SHOPS */
+                              <button 
+                                onClick={() => handleRestoreShop(partner.id, partner.brandName || partner.brand_name)}
+                                className="px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all flex items-center gap-1.5 shadow-sm"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-emerald-600" /> Restore Shop
+                              </button>
+                            ) : (
+                              <>
+                                {/* Toggle view slots */}
+                                <button 
+                                  onClick={() => setViewingSlotsPartner(partner)}
+                                  className="px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1.5"
+                                >
+                                  <Calendar className="w-3 h-3 text-[#0056b3]" /> Slots
+                                </button>
 
-                            {/* Toggle active status offline/online */}
-                            <button 
-                              onClick={() => handleToggleActive(partner.id, isOnline)}
-                              className={`px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 ${
-                                isOnline 
-                                  ? 'border-orange-100 text-orange-600 bg-orange-50/50 hover:bg-orange-50' 
-                                  : 'border-emerald-100 text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50'
-                              }`}
-                            >
-                              <Activity className="w-3 h-3" />
-                              {isOnline ? 'Set Offline' : 'Set Online'}
-                            </button>
+                                {/* Toggle active status offline/online */}
+                                <button 
+                                  onClick={() => handleToggleActive(partner.id, isOnline)}
+                                  className={`px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 ${
+                                    isOnline 
+                                      ? 'border-orange-100 text-orange-600 bg-orange-50/50 hover:bg-orange-50' 
+                                      : 'border-emerald-100 text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  <Activity className="w-3 h-3" />
+                                  {isOnline ? 'Set Offline' : 'Set Online'}
+                                </button>
 
-                            {/* Edit brand details */}
-                            <button 
-                              onClick={() => handleOpenEdit(partner)}
-                              className="px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-blue-100 text-[#0056b3] bg-blue-50/30 hover:bg-blue-50 transition-all flex items-center gap-1.5"
-                            >
-                              <Edit3 className="w-3 h-3" /> Edit
-                            </button>
+                                {/* Edit brand details */}
+                                <button 
+                                  onClick={() => handleOpenEdit(partner)}
+                                  className="px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-blue-100 text-[#0056b3] bg-blue-50/30 hover:bg-blue-50 transition-all flex items-center gap-1.5"
+                                >
+                                  <Edit3 className="w-3 h-3" /> Edit
+                                </button>
 
-                            {/* Suspend brand detail */}
-                            <button 
-                              onClick={() => handleSuspendShop(partner.id, partner.brandName || partner.brand_name)}
-                              className="px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-red-100 text-red-600 bg-red-50/30 hover:bg-red-50 transition-all flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3 h-3" /> Suspend
-                            </button>
+                                {/* Suspend brand detail */}
+                                <button 
+                                  onClick={() => handleSuspendShop(partner.id, partner.brandName || partner.brand_name)}
+                                  className="px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-red-100 text-red-600 bg-red-50/30 hover:bg-red-50 transition-all flex items-center gap-1.5"
+                                >
+                                  <Trash2 className="w-3 h-3" /> Suspend
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

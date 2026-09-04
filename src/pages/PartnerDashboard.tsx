@@ -435,6 +435,7 @@ const PartnerDashboard: React.FC = () => {
   }
 
   const isPending = shopData?.status === 'pending';
+  const isSuspended = shopData?.status === 'suspended' || shopData?.isSuspended === true;
   
   // Stats Calculation
   // We use current Date in both ISO and Locale formats to capture all potential booking styles
@@ -706,8 +707,31 @@ const PartnerDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] text-[#111827]">
+      {/* SUSPENDED NOTIFICATION BANNER */}
+      {isSuspended && (
+        <div className="bg-red-600 text-white px-6 py-3.5 flex items-center justify-between gap-3 relative z-30 shadow-md">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="shrink-0 text-white animate-bounce" />
+            <div>
+              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-white leading-tight">
+                ACCOUNT SUSPENDED BY BB NETWORK ADMIN: ALL DASHBOARD ACTIONS FROZEN
+              </p>
+              <p className="text-[0.5625rem] text-red-100 font-bold uppercase tracking-wider mt-0.5">
+                Your shop operations are locked. You cannot accept bookings, modify services, or alter shop status until restored by admin.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={logout}
+            className="px-4 py-1.5 bg-black/40 hover:bg-black/60 text-white text-[9px] font-black uppercase tracking-widest rounded-full transition-all shrink-0"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+
       {/* PENDING NOTIFICATION BANNER (UBER TYPE) */}
-      {isPending && (
+      {!isSuspended && isPending && (
         <div className="bg-[#FFC000] px-6 py-3 flex items-center gap-3 relative overflow-hidden">
           <motion.div 
             animate={{ opacity: [0.5, 1, 0.5] }}
@@ -722,7 +746,35 @@ const PartnerDashboard: React.FC = () => {
       )}
 
       {/* DASHBOARD CONTENT */}
-      <main className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6">
+      <main className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6 relative">
+        {/* SUSPENDED FREEZE OVERLAY: PREVENTS ALL ACTIONS */}
+        {isSuspended && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-[3px] z-20 rounded-[2.5rem] flex flex-col items-center justify-start pt-16 sm:pt-24 text-center px-4 pointer-events-auto select-none">
+            <div className="bg-white border-2 border-red-500/30 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full flex flex-col items-center">
+              <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 mb-4 border border-red-100 shadow-inner">
+                <Lock size={32} />
+              </div>
+              <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-[9px] font-black uppercase tracking-widest mb-3">
+                Action Blocked
+              </span>
+              <h3 className="text-xl font-serif font-black text-black uppercase tracking-tight mb-2">
+                Dashboard Frozen
+              </h3>
+              <p className="text-xs text-gray-600 font-medium leading-relaxed mb-6">
+                Your salon account has been suspended by administration. You can view your dashboard, but all operations (accepting bookings, changing live status, editing services, requesting payouts) are completely locked.
+              </p>
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3.5 w-full text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-6">
+                Status: Suspended by Admin Control Hub
+              </div>
+              <button 
+                onClick={logout}
+                className="w-full py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
+              >
+                <LogOut size={14} /> Exit & Logout
+              </button>
+            </div>
+          </div>
+        )}
         
         {/* LIVE STATUS BAR (RELOCATED FROM HEADER) */}
         <div className="bg-white px-4 sm:px-8 py-4 sm:py-6 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
