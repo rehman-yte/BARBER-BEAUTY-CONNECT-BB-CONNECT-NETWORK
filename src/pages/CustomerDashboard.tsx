@@ -1340,9 +1340,9 @@ const CustomerDashboard: React.FC = () => {
         </div>
 
         {/* 3. LISTING AREA (LINEAR SINGLE-ROW ARCHITECTURE) */}
-        <div className="w-full bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
+        <div className="w-full bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm flex flex-col">
           {/* Table Header Row (Desktop Only) */}
-          <div className="hidden md:grid grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-4 p-6 bg-gray-50/50 border-b border-gray-100 text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest">
+          <div className="hidden md:grid grid-cols-[1.2fr_2fr_1fr_2fr_1.5fr] gap-4 p-6 bg-gray-50/50 border-b border-gray-100 text-[0.5625rem] font-bold text-gray-400 uppercase tracking-widest shrink-0">
             <div>ID Token</div>
             <div>Service / Studio Partner</div>
             <div>Amount Paid</div>
@@ -1359,7 +1359,7 @@ const CustomerDashboard: React.FC = () => {
                 </p>
               </div>
             ) : filteredBookings.length > 0 ? (
-              <div className="divide-y divide-gray-100/70">
+              <div className="divide-y divide-gray-100/70 max-h-[460px] sm:max-h-[520px] md:max-h-[580px] overflow-y-auto overscroll-contain">
                 {filteredBookings.map((booking) => {
                   const failedOrRejected = isFailedBooking(booking);
                   const isApproved = isBookingApproved(booking) || booking.partner_approved === true || booking.partnerApproved === true;
@@ -1515,6 +1515,17 @@ const CustomerDashboard: React.FC = () => {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Container Scroll Indicator Footer */}
+          {!loading && filteredBookings.length > 0 && (
+            <div className="px-6 py-3 bg-gray-50/70 border-t border-gray-100 text-[0.5625rem] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between shrink-0">
+              <span className="font-mono">Total {filteredBookings.length} {filteredBookings.length === 1 ? 'record' : 'records'}</span>
+              <span className="flex items-center gap-1.5 text-gray-400">
+                <span className="text-[0.6875rem]">↕</span>
+                <span>Scroll vertically</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
