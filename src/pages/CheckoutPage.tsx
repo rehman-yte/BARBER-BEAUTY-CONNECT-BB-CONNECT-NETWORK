@@ -744,8 +744,9 @@ const CheckoutPage: React.FC = () => {
       // Set created order doc ID for standard manual/fallback flow
       setCreatedOrderDocId(orderDocRef.id);
 
-      // Initialize Razorpay integration passing the generated document ID and complete cost matrix
-      initializeRazorpayProductPayment(orderDocRef.id, productOrderPayload.totalAmount);
+      // Note: Frontend payment button is set to invisible with COMMING SOON active for Premium Essentials.
+      // Retain initializeRazorpayProductPayment intact for future activation when gateway is live.
+      // initializeRazorpayProductPayment(orderDocRef.id, productOrderPayload.totalAmount);
       
     } catch (error) {
       console.error("Critical product checkout order placement pipeline failure:", error);
@@ -1011,20 +1012,41 @@ const CheckoutPage: React.FC = () => {
                 >
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-100">
                     <div>
-                      <h3 className="text-2xl font-serif font-bold text-charcoal">Direct UPI Checkout</h3>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Metro-Style Instant Intent Flow</p>
+                      <h3 className="text-2xl font-serif font-bold text-charcoal">
+                        {!isSlotBooking ? "Premium Essentials Checkout" : "Direct UPI Checkout"}
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                        {!isSlotBooking ? "Product Logistics & Order Verification" : "Metro-Style Instant Intent Flow"}
+                      </p>
                     </div>
                     {/* Countdown Timer */}
-                    <div className="flex items-center gap-3 bg-red-50 text-red-600 px-4 py-2.5 rounded-2xl border border-red-100/50">
-                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                      <div className="text-right">
-                        <span className="text-[8px] font-extrabold uppercase tracking-widest block opacity-75">SESSION TIMEOUT</span>
-                        <span className="text-sm font-mono font-bold tracking-tight">{formatTime(timeLeft)}</span>
+                    {isSlotBooking && (
+                      <div className="flex items-center gap-3 bg-red-50 text-red-600 px-4 py-2.5 rounded-2xl border border-red-100/50">
+                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                        <div className="text-right">
+                          <span className="text-[8px] font-extrabold uppercase tracking-widest block opacity-75">SESSION TIMEOUT</span>
+                          <span className="text-sm font-mono font-bold tracking-tight">{formatTime(timeLeft)}</span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  {isWaitingPayment ? (
+                  {/* COMMING SOON Announcement Banner prominently shown above payment buttons for Premium Essentials */}
+                  {!isSlotBooking && (
+                    <div className="w-full py-8 px-6 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-2 border-dashed border-amber-400/40 rounded-[2rem] text-center shadow-sm">
+                      <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-amber-500 text-white font-mono font-black text-xs sm:text-sm tracking-widest uppercase mb-3 shadow-md shadow-amber-500/20">
+                        <span>COMMING SOON</span>
+                      </div>
+                      <h4 className="text-xl sm:text-2xl font-serif font-black text-charcoal tracking-tight">
+                        Payment Gateway Coming Soon
+                      </h4>
+                      <p className="text-xs text-gray-500 font-medium max-w-md mx-auto mt-2 leading-relaxed">
+                        Online payment gateway integration for Premium Essentials shop products is currently in progress. Direct online checkout for products will be live very soon!
+                      </p>
+                    </div>
+                  )}
+
+                  {isWaitingPayment && isSlotBooking ? (
                     /* Elegant physical payment verification UTR inputs form block */
                     <div className="bg-charcoal text-white p-8 rounded-[2rem] border border-gray-850 flex flex-col justify-start text-left space-y-6 shadow-2xl relative overflow-hidden font-sans">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-bbBlue/10 rounded-full blur-3xl" />
@@ -1105,7 +1127,7 @@ const CheckoutPage: React.FC = () => {
                     </div>
                   ) : (
                     /* Three prominent Metro-Style branded buttons */
-                    <div className="space-y-4">
+                    <div className={!isSlotBooking ? "invisible h-0 overflow-hidden pointer-events-none select-none" : "space-y-4"}>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 pl-1 font-sans">Select Payment Method</p>
                       
                       {/* 1. BB CONNECT WALLET PAYMENT OPTION (Dedicated Container) */}
