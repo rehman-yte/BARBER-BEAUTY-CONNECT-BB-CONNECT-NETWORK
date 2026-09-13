@@ -52,21 +52,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
+  // STRICT ADMIN PERMANENT LOCK DIRECTIVE
+  if (allowedRole === 'admin' || location.pathname.startsWith('/admin') || location.pathname === '/admin-dashboard') {
+    return <Navigate to="/" replace />;
+  }
+
   const isAllowed = !allowedRole || 
     (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
 
   if (allowedRole && !isAllowed) {
-    if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (user.role === 'admin') return <Navigate to="/customer/explore" replace />;
     if (user.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
     if (user.role === 'customer') return <Navigate to="/customer/explore" replace />;
-  }
-
-  // STRICT ADMIN EMAIL REINFORCEMENT
-  if (allowedRole === 'admin') {
-    const isOfficialAdmin = user.role === 'admin' && (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com';
-    if (!isOfficialAdmin) {
-      return <Navigate to="/auth" replace />;
-    }
   }
 
   const isOnboardingPath = location.pathname === '/partner/signup' || location.pathname === '/onboarding';
@@ -95,14 +92,13 @@ const AppRoutes: React.FC = () => {
       {/* UNIFIED AUTH PAGE */}
       <Route path="/auth" element={
         user ? <Navigate to={
-          user.role === 'admin' ? "/admin/dashboard" :
           user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/partner/signup") : 
           "/customer/explore"
         } replace /> : <AuthPage />
       } />
       
       {/* REDIRECTS FOR LEGACY PATHS */}
-      <Route path="/admin-login" element={<Navigate to="/auth" replace />} />
+      <Route path="/admin-login" element={<Navigate to="/" replace />} />
       <Route path="/partner-auth" element={<Navigate to="/auth" replace />} />
       <Route path="/partner-signin" element={<Navigate to="/auth" replace />} />
       
@@ -127,11 +123,12 @@ const AppRoutes: React.FC = () => {
       <Route path="/partner/dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       <Route path="/partner-dashboard" element={<Navigate to="/partner/dashboard" replace />} />
       
-      {/* ADMIN PORTAL */}
-      <Route path="/admin/dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
-      <Route path="/admin/manage-live-shops" element={<ProtectedRoute allowedRole="admin"><ManageLiveShops /></ProtectedRoute>} />
-      <Route path="/admin/dropship" element={<ProtectedRoute allowedRole="admin"><AdminDropship /></ProtectedRoute>} />
-      <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+      {/* ADMIN PORTAL - PERMANENTLY LOCKED */}
+      <Route path="/admin/dashboard" element={<Navigate to="/" replace />} />
+      <Route path="/admin/manage-live-shops" element={<Navigate to="/" replace />} />
+      <Route path="/admin/dropship" element={<Navigate to="/" replace />} />
+      <Route path="/admin-dashboard" element={<Navigate to="/" replace />} />
+      <Route path="/admin/*" element={<Navigate to="/" replace />} />
       
       {/* PROTOCOL & MAINTENANCE */}
       <Route path="/maintenance" element={<MaintenancePage />} />

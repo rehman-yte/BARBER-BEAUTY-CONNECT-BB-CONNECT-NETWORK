@@ -152,8 +152,10 @@ export const getApprovedPartners = async (category?: string): Promise<any[]> => 
       const rawShopImgs = data.shopImages || data.brandImages || [];
       const rawWorkerImgs = data.workerImages || data.staffImages || [];
       return { 
-        id: docSnapshot.id, 
         ...data,
+        id: docSnapshot.id, 
+        uid: data.uid || docSnapshot.id,
+        partnerId: data.uid || data.partnerId || docSnapshot.id,
         brandName: data.brand_name || data.brandName,
         ownerName: data.owner_name || data.ownerName,
         mobile: data.mobile_number || data.mobile,
@@ -326,8 +328,10 @@ export const getShopById = async (id: string): Promise<any> => {
     const rawWorkerImgs = data.workerImages || data.staffImages || [];
 
     return {
-      id: docSnap.id,
       ...data,
+      id: docSnap.id,
+      uid: data.uid || docSnap.id,
+      partnerId: data.uid || data.partnerId || docSnap.id,
       services: normalizedServices,
       brandName: data.brand_name || data.brandName || 'Partner Salon',
       ownerName: data.owner_name || data.ownerName || 'Master Professional',

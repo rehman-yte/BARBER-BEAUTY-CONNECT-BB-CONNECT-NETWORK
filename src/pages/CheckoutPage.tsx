@@ -29,7 +29,9 @@ const CheckoutPage: React.FC = () => {
   
   const isSlotBooking = cart.some(item => 
     (item.category && String(item.category).toLowerCase().includes('service')) || 
-    (item.name && String(item.name).includes('(Booking)'))
+    (item.name && String(item.name).includes('(Booking)')) ||
+    (item.category && String(item.category).toLowerCase().includes('booking')) ||
+    (item as any).type === 'booking'
   );
 
   const [feePercent, setFeePercent] = useState<number>(10);
@@ -306,11 +308,16 @@ const CheckoutPage: React.FC = () => {
 
         if (isSlotBooking) {
           for (const item of cart) {
-            if (
+            const isBookingItem = 
               (item.category && String(item.category).toLowerCase().includes('service')) || 
               (item.name && String(item.name).includes('(Booking)')) || 
-              item.type === 'booking'
-            ) {
+              (item.category && String(item.category).toLowerCase().includes('booking')) ||
+              (item as any).type === 'booking';
+
+            if (isBookingItem) {
+              const targetPartnerId = (item as any).partnerId || (item as any).shopId || '';
+              const targetShopId = (item as any).shopId || (item as any).partnerId || targetPartnerId;
+
               const bookingDocData = sanitizePayload({
                 customer_id: user?.uid || '',
                 customerId: user?.uid || '',
@@ -319,14 +326,14 @@ const CheckoutPage: React.FC = () => {
                 routing_strategy: "instant_split_gateway",
                 admin_fee_ratio: 0.05,
                 partner_settlement_ratio: 0.95,
-                partnerId: item.shopId || item.partnerId || '',
-                shopId: item.shopId || item.partnerId || '',
-                shopName: item.shopName || 'Partner Salon',
-                service: item.serviceName || item.name || 'Grooming Service',
-                serviceName: item.serviceName || item.name || 'Grooming Service',
+                partnerId: targetPartnerId,
+                shopId: targetShopId,
+                shopName: (item as any).shopName || 'Partner Salon',
+                service: (item as any).serviceName || item.name || 'Grooming Service',
+                serviceName: (item as any).serviceName || item.name || 'Grooming Service',
                 price: Number(item.price) || 0,
-                date: item.date || new Date().toDateString(),
-                time: item.time || '10:00',
+                date: (item as any).date || new Date().toDateString(),
+                time: (item as any).time || '10:00',
                 status: 'pending', // lowercase pending status
                 bookingStatus: 'pending',
                 paymentStatus: 'unpaid',
@@ -338,6 +345,7 @@ const CheckoutPage: React.FC = () => {
               finalBookingIds.push(bookingRef.id);
             }
           }
+          setCreatedBookingDocIds(finalBookingIds);
         }
       } catch (dbErr: any) {
         console.error("Firestore initialization warning:", dbErr);
@@ -410,6 +418,16 @@ const CheckoutPage: React.FC = () => {
               }
             } else {
               // GUARANTEE AND FORCE FIRESTORE DATA ENTRY ON SUCCESS FOR THE LOGGED-IN CUSTOMER SYSTEM-WIDE
+              const bookingItem = cart.find(item => 
+                (item.category && String(item.category).toLowerCase().includes('service')) || 
+                (item.name && String(item.name).includes('(Booking)')) || 
+                (item.category && String(item.category).toLowerCase().includes('booking')) ||
+                (item as any).type === 'booking'
+              ) || cart[0];
+
+              const targetPartnerId = (bookingItem as any)?.partnerId || (bookingItem as any)?.shopId || '';
+              const targetShopId = (bookingItem as any)?.shopId || (bookingItem as any)?.partnerId || targetPartnerId;
+
               const immediateVerifiedBookingData = sanitizePayload({
                 customer_id: user?.uid || '',
                 customerId: user?.uid || '',
@@ -418,14 +436,14 @@ const CheckoutPage: React.FC = () => {
                 routing_strategy: "instant_split_gateway",
                 admin_fee_ratio: 0.05,
                 partner_settlement_ratio: 0.95,
-                partnerId: cart[0]?.shopId || cart[0]?.partnerId || '',
-                shopId: cart[0]?.shopId || cart[0]?.partnerId || '',
-                shopName: cart[0]?.shopName || 'Partner Salon',
-                service: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
-                serviceName: cart[0]?.serviceName || cart[0]?.name || 'Grooming Service',
-                price: Number(cart[0]?.price) || finalTotal || 0,
-                date: cart[0]?.date || new Date().toDateString(),
-                time: cart[0]?.time || '10:00',
+                partnerId: targetPartnerId,
+                shopId: targetShopId,
+                shopName: (bookingItem as any)?.shopName || 'Partner Salon',
+                service: (bookingItem as any)?.serviceName || (bookingItem as any)?.name || 'Grooming Service',
+                serviceName: (bookingItem as any)?.serviceName || (bookingItem as any)?.name || 'Grooming Service',
+                price: Number((bookingItem as any)?.price) || finalTotal || 0,
+                date: (bookingItem as any)?.date || new Date().toDateString(),
+                time: (bookingItem as any)?.time || '10:00',
                 status: 'pending',
                 bookingStatus: 'pending',
                 paymentStatus: 'SUCCESS',
@@ -557,6 +575,49 @@ const CheckoutPage: React.FC = () => {
             transactionId: utrNumber.trim()
           });
           await updateDoc(doc(db, 'bookings', bId), updateBookingPayload);
+        }
+      } else if (isSlotBooking) {
+        for (const item of cart) {
+          const isBookingItem = 
+            (item.category && String(item.category).toLowerCase().includes('service')) || 
+            (item.name && String(item.name).includes('(Booking)')) || 
+            (item.category && String(item.category).toLowerCase().includes('booking')) ||
+            (item as any).type === 'booking';
+
+          if (isBookingItem) {
+            const targetPartnerId = (item as any).partnerId || (item as any).shopId || '';
+            const targetShopId = (item as any).shopId || (item as any).partnerId || targetPartnerId;
+
+            const bookingDocData = sanitizePayload({
+              customer_id: user?.uid || '',
+              customerId: user?.uid || '',
+              customerName: formData.fullName || user?.name || user?.displayName || 'Customer Booking',
+              payment_type: "prepaid",
+              routing_strategy: "instant_split_gateway",
+              admin_fee_ratio: 0.05,
+              partner_settlement_ratio: 0.95,
+              partnerId: targetPartnerId,
+              shopId: targetShopId,
+              shopName: (item as any).shopName || 'Partner Salon',
+              service: (item as any).serviceName || item.name || 'Grooming Service',
+              serviceName: (item as any).serviceName || item.name || 'Grooming Service',
+              price: Number(item.price) || 0,
+              date: (item as any).date || new Date().toDateString(),
+              time: (item as any).time || '10:00',
+              status: 'pending',
+              bookingStatus: 'pending',
+              paymentStatus: 'SUCCESS',
+              payment_status: 'paid',
+              paymentMethod: 'UPI_MANUAL_VERIFICATION',
+              partner_accepted: false,
+              partner_rejected: false,
+              timestamp: serverTimestamp(),
+              createdAt: serverTimestamp(),
+              heldAt: serverTimestamp(),
+              transactionId: utrNumber.trim()
+            });
+            await addDoc(collection(db, 'bookings'), bookingDocData);
+          }
         }
       }
 

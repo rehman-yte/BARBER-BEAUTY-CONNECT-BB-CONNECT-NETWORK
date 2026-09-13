@@ -263,7 +263,7 @@ export class WalletService {
           routing_strategy: 'instant_split_gateway',
           admin_fee_ratio: 0.05,
           partner_settlement_ratio: 0.95,
-          partnerId: item.shopId || item.partnerId || '',
+          partnerId: item.partnerId || item.shopId || '',
           shopId: item.shopId || item.partnerId || '',
           shopName: item.shopName || item.partnerBrandName || 'Partner Studio',
           partnerBrandName: item.shopName || item.partnerBrandName || 'Partner Studio',

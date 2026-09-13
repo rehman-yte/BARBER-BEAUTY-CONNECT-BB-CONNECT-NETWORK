@@ -181,15 +181,20 @@ const ShopDetail: React.FC = () => {
       ? selectedService.price 
       : (parseInt(String(selectedService.price || 0).replace(/[^0-9]/g, '')) || 299);
 
+    // Determine specific partner UID/ID
+    const targetPartnerId = shopData.uid || shopData.partnerId || shopData.userId || shopData.id || id;
+    const targetShopId = shopData.id || id || targetPartnerId;
+
     // Add booking details to cart and redirect to unified payment page
     clearCart();
     addToCart({
-      id: `booking-${id}-${selectedSlot}-${selectedDate.getTime()}`,
+      id: `booking-${targetPartnerId}-${selectedSlot}-${selectedDate.getTime()}`,
       name: `${selectedService.name} (Booking)`,
       price: parsedPrice,
       image: shopData.shopImages?.[0] || shopData.brandImages?.[0] || '',
       category: 'Booking',
-      shopId: id,
+      partnerId: targetPartnerId,
+      shopId: targetShopId,
       shopName: shopData.brandName || 'Partner Salon',
       date: selectedDate.toDateString(),
       time: selectedSlot,
@@ -205,13 +210,15 @@ const ShopDetail: React.FC = () => {
       return;
     }
 
+    const targetPartnerId = shopData.uid || shopData.partnerId || shopData.userId || shopData.id || id;
+    const targetShopId = shopData.id || id || targetPartnerId;
     const transactionId = `ABND-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     
     const abandonPayload = {
       customerId: user.uid,
       customerName: user.name,
-      partnerId: id,
-      shopId: id,
+      partnerId: targetPartnerId,
+      shopId: targetShopId,
       shopName: shopData.brandName || shopData.name,
       service: selectedService.name,
       serviceName: selectedService.name,
