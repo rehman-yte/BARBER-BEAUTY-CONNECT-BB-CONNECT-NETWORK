@@ -19,7 +19,6 @@ import {
   getRatings
 } from '../services/logic_engine';
 import { PersistenceService, StorageManager } from '../services/PersistenceService';
-import { AdminComplaintsHub } from '../components/AdminComplaintsHub';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -80,7 +79,7 @@ const AdminDashboard: React.FC = () => {
   };
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(PersistenceService.load('system_maintenance') || false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings' | 'partner_payment_hub' | 'complaints';
+  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings' | 'partner_payment_hub';
   const navigate = useNavigate();
 
   const setCurrentView = (view: string) => {
@@ -559,23 +558,10 @@ const AdminDashboard: React.FC = () => {
                 >
                   <span className="text-sm">📦</span> MANAGE INVENTORY / DROPSHIP
                 </button>
-                <button 
-                  onClick={() => {
-                    setShowToolsDropdown(false);
-                    setCurrentView('complaints');
-                  }}
-                  className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase text-red-600 hover:bg-red-50 transition-all border-t border-gray-50"
-                >
-                  <span className="text-sm">🚨</span> SUPPORT & COMPLAINTS HUB
-                </button>
               </div>
             )}
           </div>
         </div>
-
-        {currentView === 'complaints' && (
-          <AdminComplaintsHub />
-        )}
 
         {currentView === 'overview' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -1637,7 +1623,6 @@ const AdminDashboard: React.FC = () => {
       >
         {[
           { id: 'overview', label: 'Dashboard' },
-          { id: 'complaints', label: 'Complaints' },
           { id: 'verification', label: 'Vetting', badge: stats?.pendingVerifications?.length },
           { id: 'shops', label: 'shops' },
           { id: 'ledger', label: 'ledger' },

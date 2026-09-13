@@ -112,42 +112,6 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "price"]
-    },
-    "SupportComplaint": {
-      "title": "SupportComplaint",
-      "description": "User raised complaints categorized for Customers and Partners",
-      "type": "object",
-      "properties": {
-        "complaintId": { "type": "string" },
-        "userId": { "type": "string" },
-        "userEmail": { "type": "string" },
-        "userName": { "type": "string" },
-        "userRole": { "type": "string", "enum": ["customer", "partner"] },
-        "category": { "type": "string", "enum": ["customer", "partner"] },
-        "issueType": { "type": "string" },
-        "subject": { "type": "string" },
-        "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
-        "adminReply": { "type": "string" },
-        "repliedAt": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "userRole", "category", "description", "status"]
-    },
-    "ChatMessage": {
-      "title": "ChatMessage",
-      "description": "Chat bot conversation message for persistent support thread",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "sender": { "type": "string", "enum": ["user", "ai", "admin"] },
-        "text": { "type": "string" },
-        "timestamp": { "type": "number" },
-        "isComplaint": { "type": "boolean" },
-        "complaintId": { "type": "string" }
-      },
-      "required": ["sender", "text", "timestamp"]
     }
   },
   "firestore": {
@@ -186,14 +150,6 @@
     "/live_marketplace/{productId}": {
       "schema": "MarketplaceProduct",
       "description": "Admin dropship products catalog entries"
-    },
-    "/support_complaints/{complaintId}": {
-      "schema": "SupportComplaint",
-      "description": "Customer and Partner complaints submitted to Admin"
-    },
-    "/support_chats/{userId}/messages/{messageId}": {
-      "schema": "ChatMessage",
-      "description": "Permanent AI chatbot conversation history and admin reply thread"
     }
   }
 }

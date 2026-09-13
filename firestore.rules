@@ -184,23 +184,5 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
-
-    // -------------------------------------------------------------------------
-    // 11. SUPPORT COMPLAINTS & AI CHATBOT PERSISTENCE
-    // -------------------------------------------------------------------------
-
-    match /support_complaints/{complaintId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin() || isSignedIn();
-    }
-
-    match /support_chats/{userId} {
-      allow read, write: if isSignedIn();
-      
-      match /messages/{messageId} {
-        allow read, write: if isSignedIn();
-      }
-    }
   }
 }

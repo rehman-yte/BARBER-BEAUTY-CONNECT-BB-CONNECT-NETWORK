@@ -23,7 +23,6 @@ import ShopPage from "./pages/ShopPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import MyShopping from "./pages/MyShopping";
 import MaintenancePage from "./pages/MaintenancePage";
-import { AIChatBot } from "./components/AIChatBot";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { subscribeToSettings } from './services/logic_engine';
@@ -188,7 +187,6 @@ const LayoutWrapper: React.FC = () => {
         <AppRoutes />
       </main>
       <Footer />
-      <AIChatBot />
     </div>
   );
 };
