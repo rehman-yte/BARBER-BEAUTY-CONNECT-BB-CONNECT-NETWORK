@@ -175,7 +175,7 @@ const Navbar: React.FC = () => {
               Terminal
             </Link>
           )}
-          {isLoggedIn && user.role === 'admin' && (
+          {isLoggedIn && (user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com') && (
             <Link to="/admin/dashboard" className={`text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.05em] sm:tracking-[0.2em] whitespace-nowrap ${location.pathname.startsWith('/admin') ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>
               Admin
             </Link>
@@ -265,24 +265,48 @@ const Navbar: React.FC = () => {
                     {/* Dynamic Role Links */}
                     {user.role === 'customer' && (
                       <>
-                        <Link to="/customer-dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDropdown(false);
+                            navigate('/customer-dashboard');
+                          }} 
+                          className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                        >
                           <span className="opacity-50">📊</span> My Dashboard
-                        </Link>
-                        <Link to="/my-shopping" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDropdown(false);
+                            navigate('/my-shopping');
+                          }} 
+                          className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                        >
                           <span className="opacity-50">🛍️</span> My Shopping
-                        </Link>
+                        </button>
                       </>
                     )}
 
                     {user.role === 'partner' && user.onboardingComplete && (
                       <>
-                        <Link to="/partner/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all">
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDropdown(false);
+                            navigate('/partner/dashboard');
+                          }} 
+                          className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                        >
                           <span className="opacity-50">💼</span> Partner Terminal
-                        </Link>
+                        </button>
                       </>
                     )}
 
-                    {user.role === 'admin' && (() => {
+                    {(user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com') && (() => {
                       const adminDropdownOptions = [
                         { label: "👑 Admin Control", path: "/admin/dashboard", icon: "🔐" },
                         { label: "✂️ Control Shops", path: "/admin/manage-live-shops", icon: "🛠️" },
@@ -296,14 +320,18 @@ const Navbar: React.FC = () => {
                       return (
                         <>
                           {adminDropdownOptions.map((option, idx) => (
-                            <Link 
+                            <button 
                               key={idx}
-                              to={option.path} 
-                              onClick={() => setShowDropdown(false)} 
-                              className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDropdown(false);
+                                navigate(option.path);
+                              }} 
+                              className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
                             >
                               <span className="opacity-50">{option.icon}</span> {option.label.toUpperCase()}
-                            </Link>
+                            </button>
                           ))}
                         </>
                       );

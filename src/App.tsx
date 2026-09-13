@@ -52,18 +52,22 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
     return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
-  // STRICT ADMIN PERMANENT LOCK DIRECTIVE
-  if (allowedRole === 'admin' || location.pathname.startsWith('/admin') || location.pathname === '/admin-dashboard') {
-    return <Navigate to="/" replace />;
-  }
+  const isAdminUser = user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com';
 
   const isAllowed = !allowedRole || 
-    (Array.isArray(allowedRole) ? allowedRole.includes(user.role!) : user.role === allowedRole);
+    (Array.isArray(allowedRole) 
+      ? (allowedRole.includes(user.role!) || (isAdminUser && allowedRole.includes('admin'))) 
+      : (user.role === allowedRole || (isAdminUser && allowedRole === 'admin')));
 
   if (allowedRole && !isAllowed) {
-    if (user.role === 'admin') return <Navigate to="/customer/explore" replace />;
+    if (isAdminUser) return <Navigate to="/admin/dashboard" replace />;
     if (user.role === 'partner') return <Navigate to="/partner/dashboard" replace />;
     if (user.role === 'customer') return <Navigate to="/customer/explore" replace />;
+  }
+
+  // STRICT ADMIN ROUTE PROTECTION
+  if (allowedRole === 'admin' && !isAdminUser) {
+    return <Navigate to="/auth" replace />;
   }
 
   const isOnboardingPath = location.pathname === '/partner/signup' || location.pathname === '/onboarding';
@@ -92,13 +96,14 @@ const AppRoutes: React.FC = () => {
       {/* UNIFIED AUTH PAGE */}
       <Route path="/auth" element={
         user ? <Navigate to={
+          (user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com') ? "/admin/dashboard" :
           user.role === 'partner' ? (user.onboardingComplete ? "/partner/dashboard" : "/partner/signup") : 
           "/customer/explore"
         } replace /> : <AuthPage />
       } />
       
       {/* REDIRECTS FOR LEGACY PATHS */}
-      <Route path="/admin-login" element={<Navigate to="/" replace />} />
+      <Route path="/admin-login" element={<Navigate to="/auth" replace />} />
       <Route path="/partner-auth" element={<Navigate to="/auth" replace />} />
       <Route path="/partner-signin" element={<Navigate to="/auth" replace />} />
       
