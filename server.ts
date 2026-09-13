@@ -801,6 +801,123 @@ Do NOT include any extra text, markdown wrap, or commentary. Only return raw JSO
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // AI CUSTOMER & PARTNER ASSISTANT CHATBOT ENDPOINT (GEMINI 3.8 FLASH)
+  // ---------------------------------------------------------------------------
+  app.post('/api/ai/support-chat', async (req, res) => {
+    try {
+      const { message, history = [], user = {}, language = 'auto' } = req.body;
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      const userName = user?.name || 'Valued Member';
+      const userRole = user?.role || 'customer';
+      const userEmail = user?.email || 'N/A';
+
+      const systemInstruction = `You are "BB Connect AI Assistant", the official intelligent customer and partner support bot for Barber & Beauty Connect (BB Connect Network).
+Current User Talking:
+- Name: ${userName}
+- Role: ${userRole === 'partner' ? 'Studio Partner (Salon / Barber Business)' : 'Customer / Client'}
+- Email: ${userEmail}
+
+PLATFORM KNOWLEDGE BASE:
+1. APPOINTMENTS & SLOT BOOKING:
+   - Customers explore verified barbers and beauty parlours in their area.
+   - Customers select salon services, preferred worker, and time slot.
+   - 5-Minute Escrow Security: When payment is made, funds are held in escrow. Partner has 5 minutes to accept the booking.
+   - If accepted: Slot is confirmed, customer receives token ID and details.
+   - If not accepted within 5 minutes or rejected: The system automatically initiates a 100% instant refund back to customer wallet or payment source.
+2. PREMIUM ESSENTIALS (MARKETPLACE / PRODUCTS):
+   - Users can purchase authentic grooming and styling tools in the "Shop" tab (/shop).
+   - Checkout (/checkout) is seamless. Track packages under "My Shopping" (/my-shopping).
+3. PAYMENTS, WALLET & ESCROW:
+   - 100% protected through Razorpay and BB Escrow.
+   - Refunds are instant upon booking cancellation or timeout.
+   - Customer Wallet holds balance that can be used for bookings.
+4. PARTNERS (SALONS & BARBERS):
+   - Partner Terminal (/partner/dashboard) enables managing worker roster, rate list, and live bookings.
+   - Revenue and payouts are tracked through the partner ledger.
+5. GRIEVANCE & COMPLAINT FILING:
+   - If the user has an unresolved issue, payment glitch, booking dispute, or partner complaint, you should assure them that they can raise an Official Complaint right from this chat using the "Raise Complaint" feature.
+   - Explain that complaints are sent directly to the BB Connect Admin Panel (categorized into Customer or Partner), where the Admin will personally review and send an official reply that will appear right here in their chat.
+6. LANGUAGE & TONE RULES:
+   - You MUST be fully bilingual. You can speak fluently in Hindi (हिंदी / Hinglish) and English. Match the language used by the user.
+   - Maintain a respectful, welcoming, clear, and reassuring tone.
+   - Avoid generic AI disclaimers. Give direct, concrete answers regarding the BB Connect platform.`;
+
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const { GoogleGenAI } = await import('@google/genai');
+          const ai = new GoogleGenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+            httpOptions: {
+              headers: { 'User-Agent': 'aistudio-build' }
+            }
+          });
+
+          const contents: any[] = [];
+          if (Array.isArray(history) && history.length > 0) {
+            history.slice(-6).forEach((h: any) => {
+              if (h.sender === 'user' && h.text) {
+                contents.push({ role: 'user', parts: [{ text: h.text }] });
+              } else if ((h.sender === 'ai' || h.sender === 'model') && h.text) {
+                contents.push({ role: 'model', parts: [{ text: h.text }] });
+              }
+            });
+          }
+
+          contents.push({ role: 'user', parts: [{ text: message }] });
+
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: contents,
+            config: {
+              systemInstruction: systemInstruction,
+              temperature: 0.7,
+            }
+          });
+
+          const replyText = response.text || '';
+          if (replyText) {
+            return res.json({
+              success: true,
+              reply: replyText,
+              source: 'gemini-3.8-flash'
+            });
+          }
+        } catch (aiErr: any) {
+          console.warn('[AI Support Chat API] Gemini call error:', aiErr.message);
+        }
+      }
+
+      // Context-aware fallback response in Hindi/English
+      const q = message.toLowerCase();
+      let fallback = '';
+      if (q.includes('slot') || q.includes('book') || q.includes('appointment')) {
+        fallback = `Namaste ${userName}! Slot booking ke liye aap shop choose karke service aur worker select karein. Booking amount 5-minute escrow protection me rehti hai. Agar partner 5 min me accept nahi karta to turant 100% auto-refund ho jata hai. Kisi issue ke liye aap "Raise Complaint" option use kar sakte hain.`;
+      } else if (q.includes('payment') || q.includes('refund') || q.includes('paisa') || q.includes('wallet')) {
+        fallback = `Namaste ${userName}! BB Connect par saari payments escrow safe hoti hain. Agar slot reject ya cancel hota hai, to paisa aapke wallet me turant refund ho jata hai. Agar koi payment deduction fas gaya hai to "Raise Complaint" karein, Admin turant check karega.`;
+      } else if (q.includes('product') || q.includes('shop') || q.includes('order') || q.includes('delivery')) {
+        fallback = `Namaste ${userName}! Aap Premium Essentials shop (/shop) se products order kar sakte hain aur unka status "My Shopping" (/my-shopping) me track kar sakte hain.`;
+      } else if (q.includes('complaint') || q.includes('shikayat') || q.includes('issue') || q.includes('problem')) {
+        fallback = `Ji ${userName}, aapki madad ke liye hum yahan hain. Aap chat ke upar diye gaye "🚨 Raise Complaint" button par click karke ticket submit karein. Admin team aapki complaint check karke direct isi chat me reply bhejegi!`;
+      } else {
+        fallback = `Namaste ${userName}! Main BB Connect AI Support Assistant hoon. Main slot booking, payment/refund status, product shopping, aur complaints me aapki madad kar sakta hoon. Aap mujhse Hindi ya English me koi bhi sawal pooch sakte hain!`;
+      }
+
+      return res.json({
+        success: true,
+        reply: fallback,
+        source: 'knowledge-engine'
+      });
+
+    } catch (err: any) {
+      console.error('[AI Support Chat API Global Error]:', err);
+      res.status(500).json({ error: 'Failed to generate response' });
+    }
+  });
+
   // PREVENT HTML FALLBACK FOR API: Any unmatched API route must return a 404 JSON response
   app.all('/api/*all', (req, res) => {
     console.warn(`[API 404 RESCUE] Unmatched API route requested: ${req.method} ${req.url}`);

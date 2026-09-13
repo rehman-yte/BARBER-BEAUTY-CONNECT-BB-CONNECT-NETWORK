@@ -309,6 +309,7 @@ const Navbar: React.FC = () => {
                     {(user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com') && (() => {
                       const adminDropdownOptions = [
                         { label: "👑 Admin Control", path: "/admin/dashboard", icon: "🔐" },
+                        { label: "🚨 Support & Complaints Hub", path: "/admin/dashboard?view=complaints", icon: "🎫" },
                         { label: "✂️ Control Shops", path: "/admin/manage-live-shops", icon: "🛠️" },
                         { label: "📦 Manage Inventory", path: "/admin/dropship", icon: "📦" },
                         { label: "🤝 Partner Vetting", path: "/admin/dashboard?view=verification", icon: "🛡️" },
