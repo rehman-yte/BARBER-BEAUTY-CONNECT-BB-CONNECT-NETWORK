@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check, Lock, Clock, AlertTriangle } from 'lucide-react';
+import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
 import { getSettings } from '../services/logic_engine';
 import { WalletService } from '../services/WalletService';
 
@@ -29,13 +29,8 @@ const CheckoutPage: React.FC = () => {
   
   const isSlotBooking = cart.some(item => 
     (item.category && String(item.category).toLowerCase().includes('service')) || 
-    (item.name && String(item.name).includes('(Booking)')) ||
-    item.type === 'booking' ||
-    item.category === 'Booking'
+    (item.name && String(item.name).includes('(Booking)'))
   );
-
-  // Restrictions strictly only for Premium Essentials physical products
-  const isPremiumEssentials = !isSlotBooking && cart.length > 0;
 
   const [feePercent, setFeePercent] = useState<number>(10);
   
@@ -154,11 +149,6 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handleWalletPayment = async () => {
-    if (isPremiumEssentials) {
-      setPaymentError("Coming Soon: Online payments and purchasing for Premium Essentials products are currently disabled.");
-      return;
-    }
-
     if (!user?.uid) {
       setPaymentError("Please login to proceed with wallet payment.");
       navigate("/login");
@@ -202,19 +192,11 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handlePayment = async (provider: 'GPay' | 'PhonePe' | 'Paytm') => {
-    if (isPremiumEssentials) {
-      setPaymentError("Coming Soon: Online payments and purchasing for Premium Essentials products are currently disabled.");
-      return;
-    }
     // Redirect through secure automatic Razorpay Gateway flows instead of manual UPI matching
     return handleRazorpayPayment(provider);
   };
 
   const handleRazorpayPayment = async (provider?: 'GPay' | 'PhonePe' | 'Paytm') => {
-    if (isPremiumEssentials) {
-      setPaymentError("Coming Soon: Online payments and purchasing for Premium Essentials products are currently disabled.");
-      return;
-    }
     setLoading(true);
     setPaymentError(null);
 
@@ -527,10 +509,6 @@ const CheckoutPage: React.FC = () => {
   };
 
   const submitUtrVerification = async () => {
-    if (isPremiumEssentials) {
-      setPaymentError("Coming Soon: Online payments and purchasing for Premium Essentials products are currently disabled.");
-      return;
-    }
     if (!utrNumber.trim()) {
       setPaymentError("Please provide a valid 12-digit UPI Transaction ID or UTR.");
       return;
@@ -599,10 +577,6 @@ const CheckoutPage: React.FC = () => {
   };
 
   const initializeRazorpayProductPayment = async (orderId: string, totalAmount: number) => {
-    if (isPremiumEssentials) {
-      setPaymentError("Coming Soon: Online payments and purchasing for Premium Essentials products are currently disabled.");
-      return;
-    }
     setLoading(true);
     setPaymentError(null);
 
@@ -720,10 +694,6 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handlePlaceProductOrder = async () => {
-    if (isPremiumEssentials) {
-      setPaymentError("Coming Soon: Online purchasing and payments for Premium Essentials products are currently disabled.");
-      return;
-    }
     if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
       setPaymentError("Name, WhatsApp Number, and Delivery Address are required.");
       return;
@@ -833,7 +803,7 @@ const CheckoutPage: React.FC = () => {
             : [
                 { id: 'cart', label: 'Cart', icon: ShieldCheck },
                 { id: 'shipping', label: 'Shipping', icon: Truck },
-                { id: 'payment', label: 'Payment (Coming Soon)', icon: Lock }
+                { id: 'payment', label: 'Payment', icon: CreditCard }
               ]
           ).map((s, idx, stepsArr) => {
             const Icon = s.icon;
@@ -875,31 +845,7 @@ const CheckoutPage: React.FC = () => {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-6"
                 >
-                  <h3 className="text-2xl font-serif font-bold text-charcoal mb-4">Review Your Selection</h3>
-
-                  {isPremiumEssentials && (
-                    <div className="p-4 sm:p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
-                          <Clock size={18} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-white px-2.5 py-0.5 rounded-full">
-                              COMING SOON
-                            </span>
-                            <span className="text-xs font-black text-amber-950 uppercase tracking-wider">
-                              Premium Essentials Purchases
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-amber-900/80 font-medium mt-1">
-                            Abhi filhal ke time koi bhi user product kharid nahi sakta. Checkout page par payment methods unclickable rahenge.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+                  <h3 className="text-2xl font-serif font-bold text-charcoal mb-8">Review Your Selection</h3>
                   {cart.map(item => (
                     <div key={item.id} className="flex items-center gap-6 p-6 bg-gray-50 rounded-3xl border border-gray-100">
                       <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0">
@@ -931,7 +877,7 @@ const CheckoutPage: React.FC = () => {
                       onClick={() => setStep(isSlotBooking ? 'payment' : 'shipping')}
                       className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl"
                     >
-                      {isSlotBooking ? "Confirm Booking & Pay" : "Proceed to Shipping (Coming Soon)"}
+                      {isSlotBooking ? "Confirm Booking & Pay" : "Proceed to Shipping"}
                     </button>
                   </div>
                 </motion.div>
@@ -985,29 +931,6 @@ const CheckoutPage: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      {isPremiumEssentials && (
-                        <div className="mb-6 p-4 sm:p-5 rounded-3xl bg-amber-500/10 border-2 border-amber-500/30 flex items-start sm:items-center justify-between gap-4 shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
-                              <Lock size={18} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-white px-2.5 py-0.5 rounded-full">
-                                  COMING SOON
-                                </span>
-                                <span className="text-xs font-black text-amber-950 uppercase tracking-wider">
-                                  Online Payments Disabled
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-amber-900/80 font-medium mt-1">
-                                Premium Essentials products ke liye online purchase aur payment currently unavailable hai. Koi bhi user payment nahi kar sakta.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
                       <div className="mb-4">
                         <span className="text-[0.625rem] font-black uppercase text-bbBlue bg-bbBlue/10 px-2.5 py-1 rounded-full tracking-wider">
                           NATIVE PRODUCT DISPATCH ONLY
@@ -1055,27 +978,23 @@ const CheckoutPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+                      <div className="pt-8 flex justify-between items-center">
                         <button onClick={() => setStep('cart')} className="flex items-center gap-2 text-[0.625rem] font-bold text-gray-400 uppercase tracking-widest hover:text-bbBlue transition-colors">
                           <ArrowLeft size={14} /> Back to Cart
                         </button>
-                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                          <button 
-                            type="button"
-                            disabled={true}
-                            className="w-full sm:w-auto bg-gray-200 text-gray-400 px-8 py-4 rounded-full font-black uppercase text-[0.7rem] tracking-widest cursor-not-allowed select-none flex items-center justify-center gap-2 border border-gray-300 opacity-80"
-                            title="Payments are disabled for Premium Essentials products"
-                          >
-                            <Lock size={14} /> COMING SOON — PAYMENT DISABLED
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setStep('payment')}
-                            className="text-[0.65rem] font-bold uppercase tracking-widest text-bbBlue hover:text-bbBlue-deep underline px-3 py-2 cursor-pointer"
-                          >
-                            View Payment Methods &rarr;
-                          </button>
-                        </div>
+                        <button 
+                          onClick={handlePlaceProductOrder}
+                          disabled={loading || !formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()}
+                          className="bg-black hover:bg-bbBlue text-white px-10 py-4 rounded-full font-black uppercase text-[0.7rem] tracking-widest transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer shadow-lg active:scale-95"
+                        >
+                          {loading ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> PLACING ORDER...
+                            </>
+                          ) : (
+                            'CONFIRM & PLACE ORDER ⚡'
+                          )}
+                        </button>
                       </div>
                     </>
                   )}
@@ -1090,28 +1009,6 @@ const CheckoutPage: React.FC = () => {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-8"
                 >
-                  {isPremiumEssentials && (
-                    <div className="p-6 sm:p-8 bg-gradient-to-br from-amber-50 via-orange-50/60 to-amber-100/50 border-2 border-amber-300 rounded-[2.5rem] text-center space-y-3 shadow-md relative overflow-hidden">
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.25em] shadow-md shadow-amber-500/20">
-                        <Clock size={14} /> COMING SOON
-                      </div>
-                      <h3 className="text-2xl sm:text-3xl font-serif font-black text-charcoal tracking-tight">
-                        Premium Essentials Checkout Is Coming Soon!
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 font-medium max-w-lg mx-auto leading-relaxed">
-                        Abhi filhal k time koi bhi user product kharid nahi sakta. Checkout page par likha hua hai <strong>Coming Soon</strong> and payment methods unclickable rahenge — only for Premium Essentials product kharidne ke liye.
-                      </p>
-                      <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
-                        <span className="px-3 py-1 bg-white border border-amber-300 rounded-xl text-[9px] font-mono font-bold text-amber-800 uppercase flex items-center gap-1.5 shadow-sm">
-                          <Lock size={11} /> Payment Methods Unclickable
-                        </span>
-                        <span className="px-3 py-1 bg-white border border-amber-300 rounded-xl text-[9px] font-mono font-bold text-amber-800 uppercase flex items-center gap-1.5 shadow-sm">
-                          <Clock size={11} /> Purchases Coming Soon
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-100">
                     <div>
                       <h3 className="text-2xl font-serif font-bold text-charcoal">Direct UPI Checkout</h3>
@@ -1127,32 +1024,6 @@ const CheckoutPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="relative">
-                    {isPremiumEssentials && (
-                      <div className="absolute inset-0 z-30 bg-white/80 backdrop-blur-[2px] rounded-[2.5rem] flex flex-col items-center justify-center p-6 sm:p-10 text-center border-2 border-dashed border-amber-400 select-none shadow-md">
-                        <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 mb-4 shadow-sm animate-pulse">
-                          <Lock size={28} />
-                        </div>
-                        <span className="px-4 py-1.5 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-3 shadow-sm">
-                          PAYMENT METHOD UNCLICKABLE • COMING SOON
-                        </span>
-                        <h4 className="text-xl sm:text-2xl font-serif font-black text-charcoal mb-2">
-                          Coming Soon: Payments Locked
-                        </h4>
-                        <p className="text-xs sm:text-sm font-medium text-gray-600 max-w-md leading-relaxed mb-6">
-                          Abhi filhal koi bhi user Premium Essentials products ke liye payment nahi kar sakta. Sabhi payment methods (Razorpay, GPay, PhonePe, Paytm, Wallet) unclickable hain.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => navigate('/shop')}
-                          className="px-8 py-3.5 bg-charcoal text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-bbBlue transition-all shadow-lg cursor-pointer"
-                        >
-                          Browse Products & Catalog
-                        </button>
-                      </div>
-                    )}
-
-                    <div className={isPremiumEssentials ? "pointer-events-none opacity-40 select-none filter grayscale-[30%]" : ""}>
                   {isWaitingPayment ? (
                     /* Elegant physical payment verification UTR inputs form block */
                     <div className="bg-charcoal text-white p-8 rounded-[2rem] border border-gray-850 flex flex-col justify-start text-left space-y-6 shadow-2xl relative overflow-hidden font-sans">
@@ -1195,7 +1066,6 @@ const CheckoutPage: React.FC = () => {
                             name="utrNumber" 
                             placeholder="e.g. 518392018374"
                             maxLength={12}
-                            disabled={isPremiumEssentials}
                             value={utrNumber}
                             onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, ''))}
                             className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-bbBlue placeholder-white/20 font-mono tracking-widest font-bold"
@@ -1208,7 +1078,6 @@ const CheckoutPage: React.FC = () => {
                             type="text" 
                             name="bankDetailsInput" 
                             placeholder="e.g. State Bank of India, HDFC Bank"
-                            disabled={isPremiumEssentials}
                             value={bankDetailsInput}
                             onChange={(e) => setBankDetailsInput(e.target.value)}
                             className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-bbBlue placeholder-white/20 uppercase text-xs font-bold"
@@ -1217,18 +1086,13 @@ const CheckoutPage: React.FC = () => {
 
                         <button 
                           onClick={submitUtrVerification}
-                          disabled={submittingVerification || isPremiumEssentials}
+                          disabled={submittingVerification}
                           className="w-full mt-4 bg-bbBlue hover:bg-blue-600 disabled:opacity-40 text-white py-5 rounded-2xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-lg shadow-bbBlue/20 transition-all font-sans"
                         >
                           {submittingVerification ? (
                             <>
                               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                               <span>Submitting Verification...</span>
-                            </>
-                          ) : isPremiumEssentials ? (
-                            <>
-                              <Lock size={18} />
-                              <span>Coming Soon — Payment Disabled</span>
                             </>
                           ) : (
                             <>
@@ -1248,7 +1112,7 @@ const CheckoutPage: React.FC = () => {
                       <div
                         id="checkout-wallet-container"
                         className={`p-6 rounded-[1.5rem] border-2 transition-all duration-200 ${
-                          !isPremiumEssentials && walletBalance >= finalTotal
+                          walletBalance >= finalTotal
                             ? "border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/30 hover:shadow-lg"
                             : "border-gray-200 bg-gray-50/70 opacity-75"
                         }`}
@@ -1256,18 +1120,14 @@ const CheckoutPage: React.FC = () => {
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                           <div className="flex items-center gap-4">
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg shadow-md shrink-0 ${
-                              !isPremiumEssentials && walletBalance >= finalTotal ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-gray-200 text-gray-400"
+                              walletBalance >= finalTotal ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-gray-200 text-gray-400"
                             }`}>
                               <Wallet size={22} />
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="text-xs font-black uppercase tracking-wider text-charcoal">Pay via BB Connect Wallet</p>
-                                {isPremiumEssentials ? (
-                                  <span className="text-[8px] font-black uppercase tracking-widest bg-amber-100 text-amber-800 py-0.5 px-2.5 rounded-full border border-amber-200">
-                                    COMING SOON
-                                  </span>
-                                ) : walletBalance >= finalTotal ? (
+                                {walletBalance >= finalTotal ? (
                                   <span className="text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 py-0.5 px-2.5 rounded-full border border-emerald-200">
                                     SUFFICIENT BALANCE
                                   </span>
@@ -1280,11 +1140,7 @@ const CheckoutPage: React.FC = () => {
                               <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">
                                 Available Balance: <strong className="text-charcoal font-mono font-black">₹{walletBalance.toFixed(0)}</strong>
                               </p>
-                              {isPremiumEssentials ? (
-                                <p className="text-[9px] text-amber-700 font-bold uppercase tracking-widest mt-0.5">
-                                  ● Payments disabled for Premium Essentials products
-                                </p>
-                              ) : walletBalance === 0 ? (
+                              {walletBalance === 0 ? (
                                 <p className="text-[9px] text-red-500 font-bold uppercase tracking-widest mt-0.5">
                                   ● Condition 1: Zero Balance — Must pay via Online Gateway
                                 </p>
@@ -1303,10 +1159,10 @@ const CheckoutPage: React.FC = () => {
                           <button
                             type="button"
                             id="pay-via-wallet-btn"
-                            disabled={isPremiumEssentials || walletBalance < finalTotal || loading}
+                            disabled={walletBalance < finalTotal || loading}
                             onClick={handleWalletPayment}
                             className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold uppercase text-[10px] tracking-widest transition-all shrink-0 flex items-center justify-center gap-2 ${
-                              !isPremiumEssentials && walletBalance >= finalTotal && !loading
+                              walletBalance >= finalTotal && !loading
                                 ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 cursor-pointer active:scale-95"
                                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
                             }`}
@@ -1315,10 +1171,6 @@ const CheckoutPage: React.FC = () => {
                               <>
                                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 PROCESSING...
-                              </>
-                            ) : isPremiumEssentials ? (
-                              <>
-                                <Lock size={14} /> COMING SOON
                               </>
                             ) : (
                               <>
@@ -1333,10 +1185,8 @@ const CheckoutPage: React.FC = () => {
                         {/* Razorpay Secure Gateway */}
                         <button 
                           onClick={handleRazorpayPayment}
-                          disabled={isPremiumEssentials || loading}
-                          className={`w-full flex items-center justify-between p-6 rounded-[1.5rem] border-2 border-bbBlue bg-blue-50/10 transition-all text-left duration-200 group ${
-                            isPremiumEssentials ? "cursor-not-allowed opacity-60" : "hover:bg-blue-50/30 hover:shadow-lg cursor-pointer"
-                          }`}
+                          disabled={loading}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border-2 border-bbBlue bg-blue-50/10 hover:bg-blue-50/30 hover:shadow-lg transition-all text-left duration-200 group cursor-pointer"
                         >
                           <div className="flex items-center gap-5">
                             <div className="w-12 h-12 rounded-2xl bg-bbBlue flex items-center justify-center font-serif font-black text-white text-lg shadow-md shadow-bbBlue/30">
@@ -1348,11 +1198,7 @@ const CheckoutPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-3 font-sans">
-                            {isPremiumEssentials ? (
-                              <span className="text-[8px] font-bold uppercase tracking-widest bg-amber-500 text-white py-1 px-3 rounded-full border border-amber-600">COMING SOON</span>
-                            ) : (
-                              <span className="text-[8px] font-bold uppercase tracking-widest bg-emerald-500 text-white py-1 px-3 rounded-full border border-emerald-600">RECOMMENDED</span>
-                            )}
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-emerald-500 text-white py-1 px-3 rounded-full border border-emerald-600">RECOMMENDED</span>
                             <Check className="text-bbBlue" size={18} />
                           </div>
                         </button>
@@ -1360,10 +1206,8 @@ const CheckoutPage: React.FC = () => {
                         {/* Google Pay */}
                         <button 
                           onClick={() => handlePayment('GPay')}
-                          disabled={isPremiumEssentials || loading}
-                          className={`w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white transition-all text-left duration-200 group ${
-                            isPremiumEssentials ? "cursor-not-allowed opacity-60" : "hover:border-blue-500 hover:shadow-lg cursor-pointer"
-                          }`}
+                          disabled={loading}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-blue-500 hover:shadow-lg transition-all text-left duration-200 group"
                         >
                           <div className="flex items-center gap-5">
                             <div className="w-12 h-12 rounded-2xl bg-[#eff3ff] flex items-center justify-center font-serif font-black text-blue-600 text-lg shadow-sm">
@@ -1375,9 +1219,7 @@ const CheckoutPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-[8px] font-bold uppercase tracking-widest bg-blue-50 text-blue-600 py-1 px-3 rounded-full border border-blue-100">
-                              {isPremiumEssentials ? "COMING SOON" : "GPAY LOCAL"}
-                            </span>
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-blue-50 text-blue-600 py-1 px-3 rounded-full border border-blue-100">GPAY LOCAL</span>
                             <Check className="text-gray-300 group-hover:text-blue-500 transition-colors" size={18} />
                           </div>
                         </button>
@@ -1385,10 +1227,8 @@ const CheckoutPage: React.FC = () => {
                         {/* PhonePe */}
                         <button 
                           onClick={() => handlePayment('PhonePe')}
-                          disabled={isPremiumEssentials || loading}
-                          className={`w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white transition-all text-left duration-200 group ${
-                            isPremiumEssentials ? "cursor-not-allowed opacity-60" : "hover:border-purple-500 hover:shadow-lg cursor-pointer"
-                          }`}
+                          disabled={loading}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-purple-500 hover:shadow-lg transition-all text-left duration-200 group"
                         >
                           <div className="flex items-center gap-5">
                             <div className="w-12 h-12 rounded-2xl bg-[#f4e8ff] flex items-center justify-center font-serif font-black text-purple-600 text-lg shadow-sm">
@@ -1400,9 +1240,7 @@ const CheckoutPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-[8px] font-bold uppercase tracking-widest bg-purple-50 text-purple-600 py-1 px-3 rounded-full border border-purple-100">
-                              {isPremiumEssentials ? "COMING SOON" : "PHONEPE"}
-                            </span>
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-purple-50 text-purple-600 py-1 px-3 rounded-full border border-purple-100">PHONEPE</span>
                             <Check className="text-gray-300 group-hover:text-purple-500 transition-colors" size={18} />
                           </div>
                         </button>
@@ -1410,10 +1248,8 @@ const CheckoutPage: React.FC = () => {
                         {/* Paytm */}
                         <button 
                           onClick={() => handlePayment('Paytm')}
-                          disabled={isPremiumEssentials || loading}
-                          className={`w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white transition-all text-left duration-200 group ${
-                            isPremiumEssentials ? "cursor-not-allowed opacity-60" : "hover:border-cyan-500 hover:shadow-lg cursor-pointer"
-                          }`}
+                          disabled={loading}
+                          className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border border-gray-100 bg-white hover:border-cyan-500 hover:shadow-lg transition-all text-left duration-200 group"
                         >
                           <div className="flex items-center gap-5">
                             <div className="w-12 h-12 rounded-2xl bg-[#e6f7ff] flex items-center justify-center font-serif font-black text-cyan-600 text-lg shadow-sm">
@@ -1425,9 +1261,7 @@ const CheckoutPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-[8px] font-bold uppercase tracking-widest bg-cyan-50 text-cyan-600 py-1 px-3 rounded-full border border-cyan-100">
-                              {isPremiumEssentials ? "COMING SOON" : "PAYTM HUB"}
-                            </span>
+                            <span className="text-[8px] font-bold uppercase tracking-widest bg-cyan-50 text-cyan-600 py-1 px-3 rounded-full border border-cyan-100">PAYTM HUB</span>
                             <Check className="text-gray-300 group-hover:text-cyan-500 transition-colors" size={18} />
                           </div>
                         </button>
@@ -1444,8 +1278,6 @@ const CheckoutPage: React.FC = () => {
                       </div>
                     </div>
                   )}
-                    </div>
-                  </div>
 
                   {paymentError && (
                     <motion.div 
@@ -1537,24 +1369,7 @@ const CheckoutPage: React.FC = () => {
           {step !== 'success' && (
             <div className="lg:col-span-4">
               <div className="bg-gray-50 rounded-[2.5rem] p-8 sticky top-24">
-                <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
-                  <h4 className="text-[0.625rem] font-bold text-charcoal uppercase tracking-[0.4em]">Order Summary</h4>
-                  {isPremiumEssentials && (
-                    <span className="text-[8px] font-black uppercase tracking-widest bg-amber-500 text-white px-2.5 py-0.5 rounded-full shadow-sm">
-                      COMING SOON
-                    </span>
-                  )}
-                </div>
-
-                {isPremiumEssentials && (
-                  <div className="mb-6 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-2.5 text-amber-900">
-                    <Lock size={15} className="text-amber-600 shrink-0" />
-                    <div>
-                      <span className="text-[9px] font-black uppercase tracking-wider text-amber-800 block">Online Purchase Disabled</span>
-                      <p className="text-[10px] text-amber-900/80 font-medium leading-tight">Payment methods unclickable for product orders</p>
-                    </div>
-                  </div>
-                )}
+                <h4 className="text-[0.625rem] font-bold text-charcoal uppercase tracking-[0.4em] mb-8 pb-4 border-b border-gray-200">Order Summary</h4>
                 <div className="space-y-4 mb-8">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Subtotal ({totalItems} items)</span>
