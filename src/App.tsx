@@ -123,12 +123,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/partner/dashboard" element={<ProtectedRoute allowedRole="partner"><PartnerDashboard /></ProtectedRoute>} />
       <Route path="/partner-dashboard" element={<Navigate to="/partner/dashboard" replace />} />
       
-      {/* ADMIN PORTAL - PERMANENTLY LOCKED */}
-      <Route path="/admin/dashboard" element={<Navigate to="/" replace />} />
-      <Route path="/admin/manage-live-shops" element={<Navigate to="/" replace />} />
-      <Route path="/admin/dropship" element={<Navigate to="/" replace />} />
-      <Route path="/admin-dashboard" element={<Navigate to="/" replace />} />
-      <Route path="/admin/*" element={<Navigate to="/" replace />} />
+      {/* ADMIN PORTAL */}
+      <Route path="/admin/dashboard" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/manage-live-shops" element={<ProtectedRoute allowedRole="admin"><ManageLiveShops /></ProtectedRoute>} />
+      <Route path="/admin/dropship" element={<ProtectedRoute allowedRole="admin"><AdminDropship /></ProtectedRoute>} />
+      <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
       
       {/* PROTOCOL & MAINTENANCE */}
       <Route path="/maintenance" element={<MaintenancePage />} />

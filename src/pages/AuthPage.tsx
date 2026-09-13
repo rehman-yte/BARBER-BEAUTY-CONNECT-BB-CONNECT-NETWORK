@@ -24,7 +24,7 @@ const AuthPage: React.FC = () => {
         const path = user.onboardingComplete ? '/partner/dashboard' : '/partner/signup';
         navigate(path, { replace: true });
       } else if (user.role === 'admin') {
-        navigate('/', { replace: true });
+        navigate('/admin/dashboard', { replace: true });
       }
     }
   }, [user, loading, navigate]);
@@ -48,6 +48,7 @@ const AuthPage: React.FC = () => {
   const roles: { id: Role; label: string; icon: string }[] = [
     { id: 'customer', label: 'Customer', icon: '👤' },
     { id: 'partner', label: 'Partner', icon: '💼' },
+    { id: 'admin', label: 'Admin', icon: '🔐' },
   ];
 
   return (

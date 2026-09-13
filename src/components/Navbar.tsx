@@ -175,6 +175,11 @@ const Navbar: React.FC = () => {
               Terminal
             </Link>
           )}
+          {isLoggedIn && user.role === 'admin' && (
+            <Link to="/admin/dashboard" className={`text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.05em] sm:tracking-[0.2em] whitespace-nowrap ${location.pathname.startsWith('/admin') ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>
+              Admin
+            </Link>
+          )}
           
           {isLoggedIn ? (
             <div className="flex items-center gap-1 sm:gap-2.5 md:gap-4 shrink-0">
@@ -277,11 +282,32 @@ const Navbar: React.FC = () => {
                       </>
                     )}
 
-                    {user.role === 'admin' && (
-                      <div className="px-5 py-3 text-[10px] font-bold uppercase text-gray-400 bg-gray-50/50 flex items-center gap-2">
-                        <span className="text-xs">🔒</span> Admin Portal Locked
-                      </div>
-                    )}
+                    {user.role === 'admin' && (() => {
+                      const adminDropdownOptions = [
+                        { label: "👑 Admin Control", path: "/admin/dashboard", icon: "🔐" },
+                        { label: "✂️ Control Shops", path: "/admin/manage-live-shops", icon: "🛠️" },
+                        { label: "📦 Manage Inventory", path: "/admin/dropship", icon: "📦" },
+                        { label: "🤝 Partner Vetting", path: "/admin/dashboard?view=verification", icon: "🛡️" },
+                        { label: "📈 Revenue Ledger", path: "/admin/dashboard?view=ledger", icon: "💸" },
+                        { label: "📢 Global Broadcast", path: "/admin/dashboard?view=broadcast", icon: "📢" },
+                        { label: "💬 Feedback Hub", path: "/admin/dashboard?view=feedback", icon: "💬" },
+                        { label: "🏦 Partner Payment Hub", path: "/admin/dashboard?view=partner_payment_hub", icon: "🏦" }
+                      ];
+                      return (
+                        <>
+                          {adminDropdownOptions.map((option, idx) => (
+                            <Link 
+                              key={idx}
+                              to={option.path} 
+                              onClick={() => setShowDropdown(false)} 
+                              className="flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all"
+                            >
+                              <span className="opacity-50">{option.icon}</span> {option.label.toUpperCase()}
+                            </Link>
+                          ))}
+                        </>
+                      );
+                    })()}
 
                     <div className="border-t border-gray-50 mt-1">
                       <button 
