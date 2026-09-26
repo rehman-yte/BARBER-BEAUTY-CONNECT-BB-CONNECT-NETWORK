@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { getBookings, updateShop, subscribeToNotifications } from '../services/logic_engine';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Compass, LayoutDashboard, Briefcase, ShieldCheck, Bell } from 'lucide-react';
 import officialLogo from './offical_logoBB.jpeg';
 
 const Navbar: React.FC = () => {
@@ -143,15 +143,16 @@ const Navbar: React.FC = () => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-[1000] bg-white/95 backdrop-blur-md border-b-2 border-black/10 h-[4.5rem] sm:h-[5rem] shadow-xs">
       <div className="w-full max-w-[1440px] mx-auto px-3 sm:px-6 md:px-[5%] h-full flex justify-between items-center gap-2">
-        <Link to="/" className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0 shrink select-none">
+        <Link to="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 shrink select-none">
           <img 
             src={officialLogo} 
             alt="BB Connect Network Logo" 
             className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 object-contain rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_#000000] group-hover:scale-105 transition-transform duration-300 bg-white shrink-0" 
           />
           <div className="flex flex-col items-start leading-tight min-w-0">
-            <span className="text-[0.75rem] xs:text-[0.85rem] sm:text-[1rem] lg:text-[1.05rem] font-serif font-black text-black tracking-tight truncate max-w-[130px] xs:max-w-[170px] sm:max-w-none uppercase">
-              BARBER &amp; BEAUTY CONNECT
+            <span className="text-[0.72rem] xs:text-[0.85rem] sm:text-[1rem] lg:text-[1.05rem] font-serif font-black text-black tracking-tight truncate max-w-[120px] xs:max-w-[170px] sm:max-w-none uppercase">
+              <span className="hidden xs:inline">BARBER &amp; BEAUTY CONNECT</span>
+              <span className="xs:hidden">BB CONNECT</span>
             </span>
             <span className="text-[0.4rem] sm:text-[0.5rem] font-mono font-bold text-blue-600 uppercase tracking-[0.1em] sm:tracking-[0.25em] mt-0.5 truncate">
               BB CONNECT NETWORK
@@ -159,31 +160,74 @@ const Navbar: React.FC = () => {
           </div>
         </Link>
 
-        <div className="flex items-center gap-2 xs:gap-3 sm:gap-4 md:gap-6 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-4 shrink-0">
           {(!isLoggedIn || user.role === 'customer' || user.role === 'admin') && (
-            <Link to="/customer/explore" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname === '/customer/explore' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
-              Explore
+            <Link 
+              to="/customer/explore" 
+              title="Explore Salons & Barbers"
+              className={`p-2 md:px-3 md:py-1.5 rounded-xl flex items-center gap-1.5 font-black uppercase tracking-wider transition-all ${
+                location.pathname === '/customer/explore' 
+                  ? 'text-blue-600 bg-blue-50 border-2 border-blue-600/30' 
+                  : 'text-black hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <Compass className="w-5 h-5 shrink-0" />
+              <span className="hidden md:inline text-xs">Explore</span>
             </Link>
           )}
+
           {isLoggedIn && user.role === 'customer' && (
-            <Link to="/customer-dashboard" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname === '/customer-dashboard' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
-              Dashboard
+            <Link 
+              to="/customer-dashboard" 
+              title="Customer Dashboard"
+              className={`p-2 md:px-3 md:py-1.5 rounded-xl flex items-center gap-1.5 font-black uppercase tracking-wider transition-all ${
+                location.pathname === '/customer-dashboard' 
+                  ? 'text-blue-600 bg-blue-50 border-2 border-blue-600/30' 
+                  : 'text-black hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <LayoutDashboard className="w-5 h-5 shrink-0" />
+              <span className="hidden md:inline text-xs">Dashboard</span>
             </Link>
           )}
+
           {isLoggedIn && user.role === 'partner' && user.onboardingComplete && (
-            <Link to="/partner/dashboard" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname === '/partner/dashboard' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
-              Terminal
+            <Link 
+              to="/partner/dashboard" 
+              title="Partner Terminal"
+              className={`p-2 md:px-3 md:py-1.5 rounded-xl flex items-center gap-1.5 font-black uppercase tracking-wider transition-all ${
+                location.pathname === '/partner/dashboard' 
+                  ? 'text-blue-600 bg-blue-50 border-2 border-blue-600/30' 
+                  : 'text-black hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <Briefcase className="w-5 h-5 shrink-0" />
+              <span className="hidden md:inline text-xs">Terminal</span>
             </Link>
           )}
+
           {isLoggedIn && (user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com') && (
-            <Link to="/admin/dashboard" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname.startsWith('/admin') ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
-              Admin
+            <Link 
+              to="/admin/dashboard" 
+              title="Master Admin Portal"
+              className={`p-2 md:px-3 md:py-1.5 rounded-xl flex items-center gap-1.5 font-black uppercase tracking-wider transition-all ${
+                location.pathname.startsWith('/admin') 
+                  ? 'text-blue-600 bg-blue-50 border-2 border-blue-600/30' 
+                  : 'text-black hover:text-blue-600 hover:bg-gray-100'
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5 shrink-0" />
+              <span className="hidden md:inline text-xs">Admin</span>
             </Link>
           )}
           
           {isLoggedIn ? (
-            <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 shrink-0">
-              <Link to="/checkout" className="relative p-2 text-black hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
+              <Link 
+                to="/checkout" 
+                title="Shopping Bag"
+                className="relative p-2 text-black hover:text-blue-600 hover:bg-gray-100 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+              >
                 <ShoppingBag className="w-5 h-5" />
                 {totalItems > 0 && (
                   <span className="absolute top-0.5 right-0.5 min-w-[1rem] h-4 bg-blue-600 text-white text-[10px] flex items-center justify-center rounded-full border border-black px-1 font-black">
@@ -200,11 +244,11 @@ const Navbar: React.FC = () => {
                     localStorage.setItem('bb_last_viewed_notifs', Date.now().toString());
                     setLastViewed(Date.now());
                   }} 
-                  className="relative p-2 text-black hover:text-blue-600 transition-colors flex items-center justify-center"
+                  title="Network Notifications"
+                  aria-label="Network Notifications"
+                  className="relative p-2 text-black hover:text-blue-600 hover:bg-gray-100 rounded-xl transition-colors flex items-center justify-center"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
+                  <Bell className="w-5 h-5" />
                   {hasUnread && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white animate-pulse"></span>}
                 </button>
                 <AnimatePresence>
