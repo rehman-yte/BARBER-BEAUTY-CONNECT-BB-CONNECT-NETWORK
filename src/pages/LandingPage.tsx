@@ -24,11 +24,16 @@ const LandingPage: React.FC = () => {
       {/* 4. PARTNER CTA SECTION */}
       <PartnerCTA />
 
-      {/* 5. TRUST STRIP (Subtle Gray Branding) */}
-      <div className="py-24 flex flex-wrap justify-center gap-12 lg:gap-24 grayscale opacity-10 select-none pointer-events-none">
-        {['VOGUE', 'GQ', 'GLAMOUR', 'FORBES', 'HYPEBEAST'].map(brand => (
-          <span key={brand} className="text-2xl font-bold tracking-tighter font-serif text-charcoal">{brand}</span>
-        ))}
+      {/* 5. TRUST STRIP (Clean Modern Typography) */}
+      <div className="py-14 md:py-16 bg-white flex flex-col items-center justify-center gap-4 border-b-2 border-black/10 select-none">
+        <span className="text-[11px] font-mono font-bold uppercase tracking-[0.3em] text-black/60">
+          VERIFIED STANDARDS IN ELITE GROOMING &amp; BEAUTY
+        </span>
+        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-14 opacity-40 font-serif font-black text-lg md:text-2xl text-black tracking-wider">
+          {['VOGUE', 'GQ', 'GLAMOUR', 'FORBES', 'HYPEBEAST'].map(brand => (
+            <span key={brand} className="transition-all">{brand}</span>
+          ))}
+        </div>
       </div>
     </div>
   );

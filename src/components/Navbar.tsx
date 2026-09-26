@@ -141,52 +141,52 @@ const Navbar: React.FC = () => {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-md border-b border-gray-100 h-[4.5rem] sm:h-[5rem] shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-[1000] bg-white/95 backdrop-blur-md border-b-2 border-black/10 h-[4.5rem] sm:h-[5rem] shadow-xs">
       <div className="w-full max-w-[1440px] mx-auto px-3 sm:px-6 md:px-[5%] h-full flex justify-between items-center gap-2">
         <Link to="/" className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0 shrink select-none">
           <img 
             src={officialLogo} 
             alt="BB Connect Network Logo" 
-            className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 object-contain rounded-xl border border-gray-100 shadow-xs group-hover:scale-105 transition-transform duration-300 bg-white shrink-0" 
+            className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 object-contain rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_#000000] group-hover:scale-105 transition-transform duration-300 bg-white shrink-0" 
           />
           <div className="flex flex-col items-start leading-tight min-w-0">
-            <span className="text-[0.72rem] xs:text-[0.82rem] sm:text-[0.95rem] lg:text-[1.02rem] font-serif font-bold text-black tracking-tight truncate max-w-[130px] xs:max-w-[170px] sm:max-w-none">
-              BARBER & BEAUTY CONNECT
+            <span className="text-[0.75rem] xs:text-[0.85rem] sm:text-[1rem] lg:text-[1.05rem] font-serif font-black text-black tracking-tight truncate max-w-[130px] xs:max-w-[170px] sm:max-w-none uppercase">
+              BARBER &amp; BEAUTY CONNECT
             </span>
-            <span className="text-[0.38rem] sm:text-[0.48rem] font-bold text-bbBlue uppercase tracking-[0.1em] sm:tracking-[0.25em] mt-0.5 truncate">
+            <span className="text-[0.4rem] sm:text-[0.5rem] font-mono font-bold text-blue-600 uppercase tracking-[0.1em] sm:tracking-[0.25em] mt-0.5 truncate">
               BB CONNECT NETWORK
             </span>
           </div>
         </Link>
 
-        <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0">
+        <div className="flex items-center gap-2 xs:gap-3 sm:gap-4 md:gap-6 shrink-0">
           {(!isLoggedIn || user.role === 'customer' || user.role === 'admin') && (
-            <Link to="/customer/explore" className={`text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.05em] sm:tracking-[0.2em] whitespace-nowrap ${location.pathname === '/customer/explore' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>
+            <Link to="/customer/explore" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname === '/customer/explore' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
               Explore
             </Link>
           )}
           {isLoggedIn && user.role === 'customer' && (
-            <Link to="/customer-dashboard" className={`text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.05em] sm:tracking-[0.2em] whitespace-nowrap ${location.pathname === '/customer-dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>
+            <Link to="/customer-dashboard" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname === '/customer-dashboard' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
               Dashboard
             </Link>
           )}
           {isLoggedIn && user.role === 'partner' && user.onboardingComplete && (
-            <Link to="/partner/dashboard" className={`text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.05em] sm:tracking-[0.2em] whitespace-nowrap ${location.pathname === '/partner/dashboard' ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>
+            <Link to="/partner/dashboard" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname === '/partner/dashboard' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
               Terminal
             </Link>
           )}
           {isLoggedIn && (user.role === 'admin' || (user.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com') && (
-            <Link to="/admin/dashboard" className={`text-[0.55rem] sm:text-[0.625rem] font-bold uppercase tracking-[0.05em] sm:tracking-[0.2em] whitespace-nowrap ${location.pathname.startsWith('/admin') ? 'text-bbBlue' : 'text-black hover:text-bbBlue'}`}>
+            <Link to="/admin/dashboard" className={`text-xs font-black uppercase tracking-wider whitespace-nowrap transition-colors ${location.pathname.startsWith('/admin') ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-black hover:text-blue-600'}`}>
               Admin
             </Link>
           )}
           
           {isLoggedIn ? (
-            <div className="flex items-center gap-1 sm:gap-2.5 md:gap-4 shrink-0">
-              <Link to="/checkout" className="relative p-1.5 sm:p-2 text-gray-400 hover:text-bbBlue flex items-center justify-center shrink-0">
-                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
+            <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 shrink-0">
+              <Link to="/checkout" className="relative p-2 text-black hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+                <ShoppingBag className="w-5 h-5" />
                 {totalItems > 0 && (
-                  <span className="absolute top-0.5 right-0.5 min-w-[0.875rem] h-3.5 sm:h-4 bg-bbBlue text-white text-[9px] sm:text-[10px] flex items-center justify-center rounded-full border border-white px-0.5 font-bold">
+                  <span className="absolute top-0.5 right-0.5 min-w-[1rem] h-4 bg-blue-600 text-white text-[10px] flex items-center justify-center rounded-full border border-black px-1 font-black">
                     {totalItems}
                   </span>
                 )}
@@ -200,12 +200,12 @@ const Navbar: React.FC = () => {
                     localStorage.setItem('bb_last_viewed_notifs', Date.now().toString());
                     setLastViewed(Date.now());
                   }} 
-                  className="relative p-1.5 sm:p-2 text-gray-400 hover:text-bbBlue transition-colors flex items-center justify-center"
+                  className="relative p-2 text-black hover:text-blue-600 transition-colors flex items-center justify-center"
                 >
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  {hasUnread && <span className="absolute top-1 right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+                  {hasUnread && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white animate-pulse"></span>}
                 </button>
                 <AnimatePresence>
                   {showNotifications && (
@@ -213,33 +213,33 @@ const Navbar: React.FC = () => {
                       initial={{ opacity: 0, y: 15, scale: 0.95 }} 
                       animate={{ opacity: 1, y: 0, scale: 1 }} 
                       exit={{ opacity: 0, y: 15, scale: 0.95 }} 
-                      className="absolute right-0 mt-3 w-72 sm:w-80 bg-white border border-gray-100 shadow-2xl rounded-3xl py-6 z-[1100] max-h-[28rem] overflow-hidden flex flex-col"
+                      className="absolute right-0 mt-3 w-72 sm:w-80 bg-white border-2 border-black shadow-[6px_6px_0px_0px_#000000] rounded-2xl py-5 z-[1100] max-h-[28rem] overflow-hidden flex flex-col"
                     >
-                      <div className="px-6 mb-4 flex justify-between items-center">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-black">Network Alerts</h3>
-                        {notifications.length > 0 && <button onClick={() => setClearedIds(notifications.map(n => n.id))} className="text-[8px] font-bold text-gray-300 hover:text-red-500 uppercase">Clear All</button>}
+                      <div className="px-6 mb-3 flex justify-between items-center border-b border-black/10 pb-2">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-black">Network Alerts</h3>
+                        {notifications.length > 0 && <button onClick={() => setClearedIds(notifications.map(n => n.id))} className="text-[10px] font-bold text-black/50 hover:text-red-500 uppercase">Clear All</button>}
                       </div>
-                      <div className="overflow-y-auto px-4 space-y-3 custom-scrollbar px-6">
+                      <div className="overflow-y-auto space-y-2.5 custom-scrollbar px-5">
                         {notifications.length > 0 ? (
                           notifications.map(n => (
-                            <div key={n.id} className="p-4 bg-gray-50 rounded-[1.5rem] border border-transparent hover:border-gray-100 transition-all group">
+                            <div key={n.id} className="p-3 bg-gray-50 rounded-xl border border-black/10 hover:border-black transition-all group">
                               <div className="flex justify-between items-start mb-1">
-                                <p className={`text-[7px] font-black uppercase tracking-widest ${n.type === 'GLOBAL BROADCAST' ? 'text-red-500' : 'text-bbBlue'}`}>
+                                <p className={`text-[9px] font-black uppercase tracking-wider ${n.type === 'GLOBAL BROADCAST' ? 'text-red-600' : 'text-blue-600'}`}>
                                   {n.type}
                                 </p>
-                                <span className="text-[7px] text-gray-300 font-bold uppercase">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <span className="text-[8px] text-black/50 font-bold uppercase">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
-                              <p className="text-[10px] font-bold text-black mb-0.5">{n.title || (n.type === 'GLOBAL BROADCAST' ? 'Admin Message' : 'Booking Alert')}</p>
-                              <p className="text-[10px] text-charcoal/70 leading-relaxed font-medium">{n.message}</p>
+                              <p className="text-xs font-bold text-black mb-0.5">{n.title || (n.type === 'GLOBAL BROADCAST' ? 'Admin Message' : 'Booking Alert')}</p>
+                              <p className="text-xs text-black/75 leading-relaxed font-medium">{n.message}</p>
                             </div>
                           ))
                         ) : (
-                          <div className="py-12 flex flex-col items-center justify-center text-center">
-                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-200">
-                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                          <div className="py-8 flex flex-col items-center justify-center text-center">
+                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mb-2 text-black/40">
+                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
                             </div>
-                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Inbox Zero</p>
-                            <p className="text-[8px] text-gray-200 uppercase mt-1">No pending network updates</p>
+                            <p className="text-xs font-black text-black uppercase tracking-wider">Inbox Zero</p>
+                            <p className="text-[10px] text-black/50 uppercase mt-0.5">No pending updates</p>
                           </div>
                         )}
                       </div>
@@ -249,17 +249,21 @@ const Navbar: React.FC = () => {
               </div>
 
               <div className="relative shrink-0" ref={dropdownRef}>
-                <button onClick={() => setShowDropdown(!showDropdown)} className="flex items-center gap-2 group"><div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden">{photoURL ? <img src={photoURL} className="w-full h-full object-cover" /> : <span className="text-gray-300 text-xs sm:text-sm">👤</span>}</div></button>
+                <button onClick={() => setShowDropdown(!showDropdown)} className="flex items-center gap-2 group">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 border-2 border-black flex items-center justify-center overflow-hidden shadow-[2px_2px_0px_0px_#000000]">
+                    {photoURL ? <img src={photoURL} className="w-full h-full object-cover" /> : <span className="text-black text-xs sm:text-sm font-bold">👤</span>}
+                  </div>
+                </button>
                 <AnimatePresence>{showDropdown && (
                   <motion.div 
                     initial={{ opacity: 0, y: 15 }} 
                     animate={{ opacity: 1, y: 0 }} 
                     exit={{ opacity: 0, y: 15 }} 
-                    className="absolute right-0 mt-3 w-60 sm:w-64 bg-white border border-gray-100 shadow-2xl rounded-2xl py-2 z-[1100] overflow-hidden"
+                    className="absolute right-0 mt-3 w-60 sm:w-64 bg-white border-2 border-black shadow-[6px_6px_0px_0px_#000000] rounded-2xl py-2 z-[1100] overflow-hidden"
                   >
-                    <div className="px-5 py-4 border-b border-gray-50 mb-1">
-                      <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mb-1">Signed in as</p>
-                      <p className="text-[10px] font-bold text-black truncate">{user.email}</p>
+                    <div className="px-5 py-3 border-b border-black/10 mb-1">
+                      <p className="text-[9px] font-bold text-black/50 uppercase tracking-wider mb-0.5">Signed in as</p>
+                      <p className="text-xs font-black text-black truncate">{user.email}</p>
                     </div>
 
                     {/* Dynamic Role Links */}
@@ -272,9 +276,9 @@ const Navbar: React.FC = () => {
                             setShowDropdown(false);
                             navigate('/customer-dashboard');
                           }} 
-                          className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                          className="w-full text-left flex items-center gap-3 px-5 py-2.5 text-xs font-bold uppercase text-black hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
                         >
-                          <span className="opacity-50">📊</span> My Dashboard
+                          <span className="opacity-70">📊</span> My Dashboard
                         </button>
                         <button 
                           type="button"
@@ -283,9 +287,9 @@ const Navbar: React.FC = () => {
                             setShowDropdown(false);
                             navigate('/my-shopping');
                           }} 
-                          className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                          className="w-full text-left flex items-center gap-3 px-5 py-2.5 text-xs font-bold uppercase text-black hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
                         >
-                          <span className="opacity-50">🛍️</span> My Shopping
+                          <span className="opacity-70">🛍️</span> My Shopping
                         </button>
                       </>
                     )}
@@ -299,9 +303,9 @@ const Navbar: React.FC = () => {
                             setShowDropdown(false);
                             navigate('/partner/dashboard');
                           }} 
-                          className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                          className="w-full text-left flex items-center gap-3 px-5 py-2.5 text-xs font-bold uppercase text-black hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
                         >
-                          <span className="opacity-50">💼</span> Partner Terminal
+                          <span className="opacity-70">💼</span> Partner Terminal
                         </button>
                       </>
                     )}
@@ -328,26 +332,26 @@ const Navbar: React.FC = () => {
                                 setShowDropdown(false);
                                 navigate(option.path);
                               }} 
-                              className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all cursor-pointer"
+                              className="w-full text-left flex items-center gap-3 px-5 py-2.5 text-xs font-bold uppercase text-black hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
                             >
-                              <span className="opacity-50">{option.icon}</span> {option.label.toUpperCase()}
+                              <span className="opacity-70">{option.icon}</span> {option.label.toUpperCase()}
                             </button>
                           ))}
                         </>
                       );
                     })()}
 
-                    <div className="border-t border-gray-50 mt-1">
+                    <div className="border-t border-black/10 mt-1 pt-1">
                       <button 
                         onClick={() => {
                           setShowDropdown(false);
                           fileInputRef.current?.click();
                         }} 
-                        className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase text-charcoal hover:bg-gray-50 hover:text-bbBlue transition-all"
+                        className="w-full text-left flex items-center gap-3 px-5 py-2.5 text-xs font-bold uppercase text-black hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       >
-                        <span className="opacity-50">📸</span> {isUploading ? 'Uploading...' : 'Update Profile Photo'}
+                        <span className="opacity-70">📸</span> {isUploading ? 'Uploading...' : 'Update Profile Photo'}
                       </button>
-                      <button onClick={handleLogout} className="w-full text-left px-5 py-4 text-[10px] font-bold uppercase text-red-500 hover:bg-red-50 transition-colors">
+                      <button onClick={handleLogout} className="w-full text-left px-5 py-3 text-xs font-bold uppercase text-red-600 hover:bg-red-50 transition-colors">
                         Logout Session
                       </button>
                     </div>
@@ -356,7 +360,9 @@ const Navbar: React.FC = () => {
               </div>
             </div>
           ) : (
-            <Link to="/auth" className="text-[0.55rem] sm:text-[0.625rem] font-bold text-white bg-black px-3.5 sm:px-6 py-2 sm:py-2.5 rounded-full uppercase tracking-wider hover:bg-gray-800 transition-all whitespace-nowrap shrink-0">Sign In</Link>
+            <Link to="/auth" className="text-xs font-black text-white bg-black hover:bg-blue-600 border-2 border-black px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl uppercase tracking-wider transition-all whitespace-nowrap shrink-0 shadow-[3px_3px_0px_0px_#0052FF] active:scale-95">
+              Sign In
+            </Link>
           )}
         </div>
       </div>

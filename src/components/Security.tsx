@@ -1,44 +1,60 @@
 
 import React from 'react';
+import { ShieldCheck, Lock, Zap, CheckCircle2 } from 'lucide-react';
 
 const Security: React.FC = () => {
   return (
-    <section className="py-[5rem] bg-white">
-      <div className="max-w-[1440px] mx-auto px-[5%]">
-        <div className="bg-gray-50 rounded-[3rem] p-8 md:p-16 border border-gray-100 flex flex-col md:flex-row items-center md:items-start gap-12 md:gap-24">
+    <section className="py-16 md:py-20 bg-white border-b-2 border-black/10">
+      <div className="max-w-[1440px] mx-auto px-5 sm:px-8 lg:px-12">
+        <div className="bg-white rounded-3xl p-8 md:p-14 border-3 border-black shadow-[8px_8px_0px_0px_#0052FF] flex flex-col md:flex-row items-center md:items-start gap-10 md:gap-16">
           
-          {/* Left Side: Icons (Narrow Column) */}
-          <div className="flex flex-row md:flex-col gap-8 md:gap-12 shrink-0">
-            <div className="flex flex-col items-center md:items-start gap-3 group">
-              <div className="w-14 h-14 bg-bbBlue/10 rounded-xl flex items-center justify-center text-bbBlue shadow-sm border border-bbBlue/5 group-hover:bg-bbBlue group-hover:text-white transition-all duration-300">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          {/* Left Side: Icons Strip */}
+          <div className="flex flex-row md:flex-col gap-6 md:gap-8 shrink-0">
+            <div className="flex flex-col items-center md:items-start gap-2 group">
+              <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center border-2 border-black shadow-[4px_4px_0px_0px_#0052FF] group-hover:bg-blue-600 transition-colors">
+                <ShieldCheck className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[0.625rem] font-bold text-charcoal uppercase tracking-widest">Verified</span>
+              <span className="text-xs font-mono font-black text-black uppercase tracking-wider">Verified</span>
             </div>
 
-            <div className="flex flex-col items-center md:items-start gap-3 group">
-              <div className="w-14 h-14 bg-bbBlue/10 rounded-xl flex items-center justify-center text-bbBlue shadow-sm border border-bbBlue/5 group-hover:bg-bbBlue group-hover:text-white transition-all duration-300">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <div className="flex flex-col items-center md:items-start gap-2 group">
+              <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center border-2 border-black shadow-[4px_4px_0px_0px_#0052FF] group-hover:bg-blue-600 transition-colors">
+                <Lock className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[0.625rem] font-bold text-charcoal uppercase tracking-widest">Encrypted</span>
+              <span className="text-xs font-mono font-black text-black uppercase tracking-wider">Encrypted</span>
             </div>
 
-            <div className="flex flex-col items-center md:items-start gap-3 group">
-              <div className="w-14 h-14 bg-bbBlue/10 rounded-xl flex items-center justify-center text-bbBlue shadow-sm border border-bbBlue/5 group-hover:bg-bbBlue group-hover:text-white transition-all duration-300">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <div className="flex flex-col items-center md:items-start gap-2 group">
+              <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center border-2 border-black shadow-[4px_4px_0px_0px_#0052FF] group-hover:bg-blue-600 transition-colors">
+                <Zap className="w-7 h-7 text-white" />
               </div>
-              <span className="text-[0.625rem] font-bold text-charcoal uppercase tracking-widest">Instant</span>
+              <span className="text-xs font-mono font-black text-black uppercase tracking-wider">Instant Hold</span>
             </div>
           </div>
 
           {/* Right Side: Text (Main Content) */}
           <div className="flex-1 text-center md:text-left">
-            <h2 className="text-3xl md:text-5xl font-serif font-bold text-bbBlue-deep uppercase tracking-tight mb-6 leading-tight">
-              Advanced <br className="hidden md:block" /> Protection Hub
+            <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-mono font-bold tracking-widest text-blue-600 uppercase mb-3">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              <span>PLATFORM INTEGRITY & ESCROW</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black text-black uppercase tracking-tight mb-4 leading-tight">
+              ADVANCED <br className="hidden md:block" />
+              <span className="text-blue-600">PROTECTION HUB</span>
             </h2>
-            <p className="text-[1rem] md:text-[1.125rem] text-gray-500 font-medium leading-relaxed max-w-2xl">
-              Encrypted data, verified professionals, and secure transactions—at the core of our platform. We ensure every interaction is protected by industry-leading security protocols.
+            <p className="text-base md:text-lg text-black/80 font-medium leading-relaxed max-w-2xl mb-6">
+              Zero risk, 100% transparent. When you book a slot, funds are held securely in the escrow vault. If a salon cannot fulfill your slot within 5 minutes, an instantaneous automated refund is issued back to your wallet.
             </p>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs font-bold text-black">
+              <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 text-blue-900">
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                <span>256-Bit Bank Grade Encryption</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 text-blue-900">
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                <span>Zero Deductions on Cancel</span>
+              </div>
+            </div>
           </div>
 
         </div>

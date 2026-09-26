@@ -111,48 +111,53 @@ const ProductShowcase: React.FC = () => {
   return (
     <section className="py-12 bg-white w-full relative">
       <div className="max-w-[1440px] mx-auto px-[5%]">
-        <div className="flex justify-between items-end mb-12">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-4">
           <div>
-            <p className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-[0.4em] mb-2">Network Inventory</p>
-            <h2 className="text-2xl md:text-3xl font-serif font-bold text-charcoal uppercase tracking-tight">
-              Premium Essentials
+            <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-blue-600 uppercase mb-2">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              <span>NETWORK INVENTORY</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tight">
+              CURATED ESSENTIALS
             </h2>
           </div>
           <button 
             onClick={() => handleProtectedNavigation('/shop')}
-            className="text-[0.625rem] font-bold text-bbBlue uppercase tracking-widest hover:text-bbBlue-deep transition-colors border-b border-bbBlue/20 pb-1"
+            className="px-5 py-2.5 bg-black hover:bg-blue-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-[3px_3px_0px_0px_#0052FF] active:scale-95"
           >
-            View All Products
+            View All Products →
           </button>
         </div>
 
         <div className="relative">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 pb-6">
             {products.slice(0, 4).map((product) => (
               <motion.div
                 key={product.id}
-                whileHover={{ y: -5 }}
-                className="w-full bg-white border border-gray-100 rounded-2xl md:rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl hover:shadow-bbBlue/5 transition-all group/card"
+                whileHover={{ y: -4 }}
+                className="w-full bg-white border-2 border-black rounded-2xl md:rounded-3xl overflow-hidden shadow-[4px_4px_0px_0px_#000000] hover:shadow-[6px_6px_0px_0px_#0052FF] transition-all group/card flex flex-col justify-between"
               >
-                <div className="relative h-32 md:h-64 overflow-hidden">
+                <div className="relative h-36 md:h-56 overflow-hidden bg-gray-100 border-b-2 border-black">
                   <img
                     src={product.image}
                     alt={product.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-2 left-2 md:top-4 md:left-4">
-                    <span className="bg-white/90 backdrop-blur-md px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[0.4rem] md:text-[0.5rem] font-bold text-charcoal uppercase tracking-widest shadow-sm">
+                  <div className="absolute top-2 left-2 md:top-3 md:left-3">
+                    <span className="bg-black text-white border border-white/20 px-2 py-0.5 md:px-2.5 md:py-1 rounded-md text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm">
                       {product.category}
                     </span>
                   </div>
                 </div>
-                <div className="p-3 md:p-6">
-                  <h3 className="text-[0.75rem] md:text-lg font-serif font-bold text-charcoal mb-0.5 md:mb-1 truncate">{product.name}</h3>
-                  <p className="text-bbBlue font-mono font-bold text-[0.625rem] md:text-sm mb-3 md:mb-4">{product.price}</p>
+                <div className="p-3 md:p-5 flex flex-col flex-1 justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm md:text-base font-bold text-black mb-1 truncate">{product.name}</h3>
+                    <p className="text-blue-600 font-mono font-black text-sm md:text-lg">{product.price}</p>
+                  </div>
                   <button 
                     onClick={() => setSelectedProduct(product)}
-                    className="w-full py-2 md:py-3 bg-gray-50 text-charcoal rounded-lg md:rounded-xl text-[0.5rem] md:text-[0.625rem] font-bold uppercase tracking-widest hover:bg-bbBlue hover:text-white transition-all"
+                    className="w-full py-2 md:py-2.5 bg-gray-100 hover:bg-blue-600 text-black hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-black/20"
                   >
                     View Details
                   </button>
@@ -176,66 +181,70 @@ const ProductShowcase: React.FC = () => {
             />
             
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-5xl bg-white rounded-[3rem] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-5xl bg-white rounded-3xl overflow-hidden shadow-[12px_12px_0px_0px_#0052FF] border-3 border-black flex flex-col md:flex-row max-h-[90vh]"
             >
               <button 
                 onClick={closeModal}
-                className="absolute top-6 right-6 z-10 p-3 bg-white/80 backdrop-blur-md rounded-full text-charcoal hover:bg-bbBlue hover:text-white transition-all shadow-lg"
+                className="absolute top-5 right-5 z-10 p-2.5 bg-black text-white rounded-xl hover:bg-blue-600 transition-colors shadow-md border border-white/20"
               >
                 <X size={20} />
               </button>
 
-              <div className="w-full md:w-1/2 h-64 md:h-auto relative">
+              <div className="w-full md:w-1/2 h-64 md:h-auto relative bg-gray-100 border-b-2 md:border-b-0 md:border-r-2 border-black">
                 <img 
                   src={selectedProduct.image} 
                   alt={selectedProduct.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute top-8 left-8">
-                  <span className="bg-bbBlue text-white px-4 py-1.5 rounded-full text-[0.625rem] font-bold uppercase tracking-[0.2em] shadow-lg">
+                <div className="absolute top-6 left-6">
+                  <span className="bg-black text-white px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg border border-white/20">
                     {selectedProduct.category}
                   </span>
                 </div>
               </div>
 
-              <div className="w-full md:w-1/2 p-8 md:p-12 overflow-y-auto">
-                <div className="mb-8">
-                  <h2 className="text-3xl md:text-4xl font-serif font-bold text-charcoal mb-2 leading-tight">
-                    {selectedProduct.name}
-                  </h2>
-                  <p className="text-2xl font-mono font-bold text-bbBlue">{selectedProduct.price}</p>
-                </div>
-
-                <div className="space-y-6 mb-10">
-                  <div>
-                    <h4 className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.3em] mb-3">Description</h4>
-                    <p className="text-gray-600 leading-relaxed text-sm md:text-base">
-                      {selectedProduct.description}
-                    </p>
+              <div className="w-full md:w-1/2 p-8 md:p-10 overflow-y-auto flex flex-col justify-between">
+                <div>
+                  <div className="mb-6">
+                    <h2 className="text-2xl md:text-3xl font-black text-black mb-2 uppercase tracking-tight">
+                      {selectedProduct.name}
+                    </h2>
+                    <p className="text-3xl font-mono font-black text-blue-600">{selectedProduct.price}</p>
                   </div>
 
-                  <div>
-                    <h4 className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-[0.3em] mb-3">Key Features</h4>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {selectedProduct.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center gap-2 text-[0.75rem] font-medium text-charcoal">
-                          <div className="w-1.5 h-1.5 rounded-full bg-bbBlue" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="space-y-6 mb-8">
+                    <div>
+                      <h4 className="text-xs font-mono font-bold text-black/60 uppercase tracking-widest mb-2">Description</h4>
+                      <p className="text-black/80 font-medium leading-relaxed text-sm md:text-base">
+                        {selectedProduct.description}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs font-mono font-bold text-black/60 uppercase tracking-widest mb-2">Key Specifications</h4>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {selectedProduct.features.map((feature, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-xs font-bold text-black">
+                            <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 mt-auto">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t-2 border-black/10">
                   <button 
                     onClick={handleAddToCart}
-                    className={`flex-1 py-4 rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${
-                      isAdded ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-bbBlue text-white shadow-bbBlue/20 hover:bg-blue-600'
+                    className={`flex-1 py-3.5 rounded-xl font-black uppercase text-xs tracking-wider transition-all flex items-center justify-center gap-2 border-2 border-black active:scale-[0.98] ${
+                      isAdded 
+                        ? 'bg-emerald-500 text-white shadow-md' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-[3px_3px_0px_0px_#000000]'
                     }`}
                   >
                     {isAdded ? (
@@ -261,15 +270,9 @@ const ProductShowcase: React.FC = () => {
                         navigate('/checkout');
                       }
                     }}
-                    className="flex-1 py-4 bg-black text-white rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] hover:bg-gray-800 transition-all active:scale-[0.98]"
+                    className="flex-1 py-3.5 bg-black hover:bg-zinc-800 text-white rounded-xl font-black uppercase text-xs tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_0px_#0052FF] active:scale-[0.98]"
                   >
                     Buy Now
-                  </button>
-                  <button 
-                    onClick={closeModal}
-                    className="flex-1 py-4 border border-gray-200 text-charcoal rounded-2xl font-bold uppercase text-[0.75rem] tracking-[0.3em] hover:bg-gray-50 transition-all active:scale-[0.98]"
-                  >
-                    Back to Shop
                   </button>
                 </div>
               </div>

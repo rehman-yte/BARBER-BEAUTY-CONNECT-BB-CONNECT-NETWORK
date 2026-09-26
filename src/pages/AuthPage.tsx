@@ -52,65 +52,81 @@ const AuthPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-[10rem] pb-[5rem] px-[5%] flex justify-center items-start">
+    <div className="min-h-screen bg-white pt-[7.5rem] sm:pt-[8.5rem] pb-16 px-4 flex justify-center items-start relative overflow-hidden">
+      {/* Background Micro Grid */}
+      <div 
+        aria-hidden="true" 
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(#0052FF_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.04]"
+      />
+      <div 
+        aria-hidden="true" 
+        className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-100/30 rounded-full blur-3xl"
+      />
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[28rem] bg-white border border-gray-100 p-[2rem] md:p-[2.5rem] rounded-[2.5rem] shadow-2xl shadow-charcoal/5"
+        transition={{ duration: 0.6 }}
+        className="w-full max-w-[28rem] bg-white border-3 border-black p-6 sm:p-8 rounded-3xl shadow-[10px_10px_0px_0px_#0052FF] relative z-10"
       >
-        <div className="text-center mb-8">
-          <h1 className="text-[1.75rem] font-serif font-bold text-charcoal mb-2 uppercase tracking-tight">Unified Access</h1>
-          <p className="text-[0.625rem] text-bbBlue font-bold uppercase tracking-[0.3em]">Select your portal below</p>
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-blue-600 uppercase mb-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span>SECURE GATEWAY</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-black uppercase tracking-tight">Unified Access</h1>
+          <p className="text-xs text-black/60 font-bold uppercase tracking-wider mt-1">Select your account portal</p>
         </div>
 
         {/* Role Toggles */}
-        <div className="flex bg-gray-50 p-1.5 rounded-2xl mb-8 border border-gray-100">
-          {roles.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => setRole(r.id)}
-              className={`flex-1 flex flex-col items-center py-3 rounded-xl transition-all duration-300 relative ${
-                role === r.id ? 'text-bbBlue' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              <span className="text-lg mb-1">{r.icon}</span>
-              <span className="text-[0.5625rem] font-bold uppercase tracking-widest">{r.label}</span>
-              {role === r.id && (
-                <motion.div 
-                  layoutId="activeRole"
-                  className="absolute inset-0 bg-white shadow-sm border border-gray-200/50 rounded-xl -z-10"
-                />
-              )}
-            </button>
-          ))}
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-6 border-2 border-black">
+          {roles.map((r) => {
+            const isSelected = role === r.id;
+            return (
+              <button
+                key={r.id}
+                onClick={() => setRole(r.id)}
+                className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all duration-200 relative ${
+                  isSelected ? 'text-white' : 'text-black/70 hover:text-black'
+                }`}
+              >
+                <span className="text-base mb-0.5">{r.icon}</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">{r.label}</span>
+                {isSelected && (
+                  <motion.div 
+                    layoutId="activeRole"
+                    className="absolute inset-0 bg-black rounded-xl -z-10 shadow-sm"
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {error && (
           <motion.div 
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-6 text-center"
+            className="p-3.5 bg-red-50 border-2 border-red-500 rounded-xl mb-5 text-center"
           >
-            <p className="text-[0.625rem] text-red-600 font-bold">{error}</p>
+            <p className="text-xs text-red-600 font-black">{error}</p>
           </motion.div>
         )}
 
-        <div className="space-y-6">
-          <div className={`p-6 rounded-[2rem] border text-center transition-colors ${
+        <div className="space-y-5">
+          <div className={`p-4 rounded-2xl border-2 text-center transition-colors ${
             role === 'admin' 
-              ? 'bg-amber-500/10 border-amber-500/20' 
-              : 'bg-bbBlue/5 border-bbBlue/10'
+              ? 'bg-amber-50 border-amber-500 text-amber-950' 
+              : 'bg-blue-50/70 border-blue-600/30 text-blue-950'
           }`}>
-            <p className={`text-[0.6875rem] font-medium leading-relaxed ${
-              role === 'admin' ? 'text-amber-800' : 'text-bbBlue'
-            }`}>
+            <p className="text-xs font-semibold leading-relaxed">
               {role === 'admin' ? (
                 <>
-                  <span className="font-bold block mb-1">🔐 Master Admin Security Protocol</span>
-                  Admin Portal access is strictly verified for authorized account: <span className="font-bold font-mono">haidartheworldking@gmail.com</span>
+                  <span className="font-black block mb-1">🔐 Master Admin Security Protocol</span>
+                  Admin Portal access is strictly verified for authorized account: <span className="font-black font-mono underline">haidartheworldking@gmail.com</span>
                 </>
               ) : (
-                'Google Account required for secure authentication. Choose your Google account to proceed.'
+                'Google Account verification is required for instant, zero-fraud authentication on BB Connect.'
               )}
             </p>
           </div>
@@ -118,23 +134,25 @@ const AuthPage: React.FC = () => {
           <button 
             onClick={handleGoogleAuth} 
             disabled={isSubmitting} 
-            className="w-full flex items-center justify-center gap-3 py-5 bg-black text-white rounded-3xl hover:bg-gray-900 transition-all group disabled:opacity-50 active:scale-95 shadow-xl shadow-black/20"
+            className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl border-2 border-black font-black uppercase text-xs sm:text-sm tracking-wider transition-all group disabled:opacity-50 active:scale-95 shadow-[4px_4px_0px_0px_#000000]"
           >
             {isSubmitting ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /></svg>
-                <span className="text-[0.875rem] font-bold tracking-widest uppercase">
-                  {role === 'admin' ? 'Verify Official Admin Google' : 'Continue with Google'}
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /></svg>
+                <span>
+                  {role === 'admin' ? 'Verify Official Admin' : 'Continue with Google'}
                 </span>
               </>
             )}
           </button>
         </div>
 
-        <div className="mt-8 text-center pt-4 opacity-30">
-          <p className="text-[0.5rem] font-bold text-gray-500 uppercase tracking-[0.5em]">BB Network Security Layer v5.1</p>
+        <div className="mt-6 text-center pt-3 border-t-2 border-black/10">
+          <p className="text-[10px] font-mono font-bold text-black/50 uppercase tracking-widest">
+            BB NETWORK PROTOCOL · 256-BIT ESCROW SECURITY
+          </p>
         </div>
       </motion.div>
     </div>
