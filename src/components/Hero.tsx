@@ -24,9 +24,10 @@ interface SlideImage {
 }
 
 const HERO_SLIDES: SlideImage[] = [
+  // 1. BARBER CRAFT
   {
-    id: 'slide_1',
-    url: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=1200",
+    id: 'barber_1',
+    url: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=1400",
     category: 'barber',
     title: "Master Fade & Razor Sculpting",
     tagline: "Precision beard architecture & hot towel ritual",
@@ -36,30 +37,42 @@ const HERO_SLIDES: SlideImage[] = [
     location: "Mayfair & Bandra West"
   },
   {
-    id: 'slide_2',
-    url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=1200",
-    category: 'parlour',
-    title: "Haute Esthétique Hair Rituals",
-    tagline: "French balayage, keratin glass & botanical scalp therapy",
-    badge: "TOP-RATED BEAUTY SANCTUARY",
-    price: "From ₹899",
-    rating: "4.99",
-    location: "Bespoke Suites · City Center"
-  },
-  {
-    id: 'slide_3',
-    url: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=1200",
+    id: 'barber_2',
+    url: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=1400",
     category: 'barber',
-    title: "Royal Straight-Razor Shave",
-    tagline: "Artisanal grooming club with traditional sandalwood balm",
+    title: "Artisanal Clipper & Scissor Styling",
+    tagline: "Custom taper fade & beard grooming",
     badge: "ROYAL GROOMING CLUB",
     price: "From ₹399",
     rating: "4.96",
     location: "Private Member Chambers"
   },
   {
-    id: 'slide_4',
-    url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&q=80&w=1200",
+    id: 'barber_3',
+    url: "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&q=80&w=1400",
+    category: 'barber',
+    title: "Traditional Straight-Razor Hot Towel",
+    tagline: "Classic grooming ritual with organic cedar balms",
+    badge: "MASTER BARBER SUITE",
+    price: "From ₹599",
+    rating: "4.99",
+    location: "Heritage Atelier"
+  },
+  // 2. BEAUTY PARLOUR & GLAMOUR
+  {
+    id: 'parlour_1',
+    url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=1400",
+    category: 'parlour',
+    title: "Haute Esthétique Hair Rituals",
+    tagline: "French balayage, keratin glass & botanical therapy",
+    badge: "TOP-RATED BEAUTY SANCTUARY",
+    price: "From ₹899",
+    rating: "4.99",
+    location: "Bespoke Suites · City Center"
+  },
+  {
+    id: 'parlour_2',
+    url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&q=80&w=1400",
     category: 'parlour',
     title: "Hydra-Glow Facial & Bridal Suite",
     tagline: "Cellular rejuvenation with organic floral extracts",
@@ -69,8 +82,43 @@ const HERO_SLIDES: SlideImage[] = [
     location: "Heritage Suites"
   },
   {
-    id: 'slide_5',
-    url: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=1200",
+    id: 'parlour_3',
+    url: "https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&q=80&w=1400",
+    category: 'parlour',
+    title: "Signature Blowout & Keratin Glaze",
+    tagline: "Silky volume and deep shine couture finish",
+    badge: "LUXURY HAIR STUDIO",
+    price: "From ₹799",
+    rating: "4.97",
+    location: "Downtown Atelier"
+  },
+  // 3. UNISEX SALON
+  {
+    id: 'unisex_1',
+    url: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&q=80&w=1400",
+    category: 'parlour',
+    title: "Contemporary Unisex Studio",
+    tagline: "Modern aesthetic styling, precision cut & global color",
+    badge: "PREMIUM UNISEX SALON",
+    price: "From ₹699",
+    rating: "4.98",
+    location: "Metro Boulevard"
+  },
+  {
+    id: 'unisex_2',
+    url: "https://images.unsplash.com/photo-1634449571010-02389ed0f9b0?auto=format&fit=crop&q=80&w=1400",
+    category: 'parlour',
+    title: "Avant-Garde Hair Architecture",
+    tagline: "Personalized hair sculpting and texture enhancement",
+    badge: "ELITE STYLIST LAB",
+    price: "From ₹999",
+    rating: "4.96",
+    location: "Fashion District"
+  },
+  // 4. SPA & WELLNESS
+  {
+    id: 'spa_1',
+    url: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=1400",
     category: 'spa',
     title: "Zen Deep-Tissue & Hydrotherapy",
     tagline: "Aromatic therapeutic healing in private treatment pods",
@@ -78,6 +126,28 @@ const HERO_SLIDES: SlideImage[] = [
     price: "From ₹1,299",
     rating: "4.97",
     location: "Sanctuary Chambers"
+  },
+  {
+    id: 'spa_2',
+    url: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&q=80&w=1400",
+    category: 'spa',
+    title: "Holistic Aromatherapy & Hot Stone",
+    tagline: "Ancient botanical oils with volcanic stone release",
+    badge: "ROYAL WELLNESS RETREAT",
+    price: "From ₹1,499",
+    rating: "4.99",
+    location: "Zenith Pavilions"
+  },
+  {
+    id: 'spa_3',
+    url: "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&q=80&w=1400",
+    category: 'spa',
+    title: "Ayurvedic Scalp & Head Rejuvenation",
+    tagline: "Warm herbal oil therapy for complete stress detox",
+    badge: "ORGANIC HEALING POD",
+    price: "From ₹899",
+    rating: "4.98",
+    location: "Tranquility Suites"
   }
 ];
 
@@ -320,99 +390,53 @@ const Hero: React.FC = () => {
 
         {/* =========================================================================
             RIGHT COLUMN (CSS selector 1: div:nth-of-type(3) > div:nth-of-type(2))
-            Invisible Container with Sliding Images Right Beside the Text Area
-            Lifted & shifted to the top right.
+            Full-Size Sliding Images (No restrictive container, clean unobstructed visuals)
             ========================================================================= */}
         <motion.div 
-          initial={{ opacity: 0, y: -15 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
-          className="lg:col-span-5 relative flex flex-col items-center lg:items-end w-full self-start lg:pt-1 bg-transparent border-0 shadow-none p-0"
+          className="lg:col-span-5 relative flex flex-col items-center lg:items-end w-full self-stretch bg-transparent border-0 shadow-none p-0"
         >
-          {/* Sliding Image Canvas (Directly floating, no outer card box) */}
-          <div className="relative w-full max-w-[500px] aspect-[4/3] sm:aspect-[16/11] lg:aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl bg-black border-2 border-black group select-none">
+          {/* Full-bleed Sliding Image Surface (Expanded, pure, unobstructed) */}
+          <div className="relative w-full h-[380px] sm:h-[460px] lg:h-full min-h-[380px] sm:min-h-[460px] lg:min-h-[520px] rounded-3xl overflow-hidden shadow-2xl bg-black border-2 border-black group select-none">
             
             <AnimatePresence mode="wait">
               <motion.img
                 key={activeSlide.id}
                 src={activeSlide.url}
                 alt={activeSlide.title}
-                initial={{ opacity: 0, scale: 1.06 }}
+                initial={{ opacity: 0, scale: 1.05 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
+                exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 className="w-full h-full object-cover object-center"
                 referrerPolicy="no-referrer"
               />
             </AnimatePresence>
 
-            {/* Subtle Gradient Overlays for High-Contrast Readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/30 pointer-events-none" />
-
-            {/* Top Floating Badges Over Image */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-none">
-              <span className="bg-black/85 text-white border border-white/20 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider backdrop-blur-md shadow-md">
-                {activeSlide.badge}
-              </span>
-              <span className="bg-blue-600 text-white border border-white/30 px-3 py-1 rounded-xl text-xs font-black tracking-wide shadow-md flex items-center gap-1">
-                <Star className="w-3.5 h-3.5 fill-white text-white" />
-                <span>{activeSlide.rating}</span>
-              </span>
-            </div>
-
-            {/* Bottom Floating Information Overlay */}
-            <div className="absolute bottom-0 inset-x-0 p-5 sm:p-6 z-20 text-white flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-                  {activeSlide.title}
-                </h3>
-                <span className="text-sm font-black text-blue-400 bg-black/60 px-2.5 py-0.5 rounded-lg border border-white/10 shrink-0">
-                  {activeSlide.price}
-                </span>
-              </div>
-
-              <p className="text-xs text-white/80 font-medium line-clamp-1">
-                {activeSlide.tagline}
-              </p>
-
-              <div className="flex items-center justify-between pt-3 mt-1 border-t border-white/20 text-xs">
-                <span className="flex items-center gap-1.5 text-white/80 font-medium">
-                  <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                  {activeSlide.location}
-                </span>
-
-                <button
-                  onClick={() => handleAction('/customer/explore')}
-                  className="inline-flex items-center gap-1 text-blue-300 hover:text-white font-black uppercase tracking-wider transition-colors"
-                >
-                  <span>Book Now</span>
-                  <ChevronRight className="w-4 h-4 text-blue-400" />
-                </button>
-              </div>
-            </div>
-
             {/* Manual Slide Navigation Arrows On Image Hover */}
             <button
               onClick={prevSlide}
               aria-label="Previous slide"
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 border border-white/20 shadow-lg"
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 border border-white/20 shadow-xl"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={nextSlide}
               aria-label="Next slide"
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 border border-white/20 shadow-lg"
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 border border-white/20 shadow-xl"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Minimalist Slider Pagination Dots Under Image */}
-          <div className="w-full max-w-[500px] mt-3 flex items-center justify-center px-1">
-            <div className="flex items-center gap-1.5">
+          {/* Minimalist Slider Pagination Dots Under Full Image */}
+          <div className="w-full mt-3 flex items-center justify-center px-1">
+            <div className="flex items-center gap-2">
               {HERO_SLIDES.map((_, idx) => (
                 <button
                   key={idx}
