@@ -390,76 +390,61 @@ const Hero: React.FC = () => {
 
         {/* =========================================================================
             RIGHT COLUMN (CSS selector 1: div:nth-of-type(3) > div:nth-of-type(2))
-            Corner-less, Borderless Organic Visual Blended Directly into White Canvas
+            Full Crisp Showcase - No Faded White Corners, Full Sharp Display
             ========================================================================= */}
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
-          className="lg:col-span-5 relative flex flex-col items-center justify-center w-full self-center bg-transparent border-0 shadow-none p-0 select-none"
+          className="lg:col-span-5 relative flex flex-col items-center justify-center w-full self-stretch bg-transparent border-0 shadow-none p-0 select-none"
         >
-          {/* Organic Borderless Showcase (No corners, soft feathered edges) */}
-          <div className="relative w-full max-w-[460px] sm:max-w-[500px] aspect-[4/3] sm:aspect-square flex items-center justify-center">
-            
-            {/* Subtle Electric Blue Ambient Aura */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.08)_0%,transparent_72%)] pointer-events-none" />
-
-            {/* Seamless Soft-Masked Image (Corners completely fade away into pure white) */}
-            <div className="relative w-full h-full [mask-image:radial-gradient(ellipse_at_center,black_48%,transparent_92%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_48%,transparent_92%)] flex items-center justify-center overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={activeSlide.id}
-                  src={activeSlide.url}
-                  alt={activeSlide.title}
-                  initial={{ opacity: 0, scale: 1.05 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-full h-full object-cover object-center"
-                  referrerPolicy="no-referrer"
-                />
-              </AnimatePresence>
-            </div>
-
-            {/* Floating Subtle Micro Verification Tag (Corner-less Floating Pill) */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full border border-black/10 shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex items-center gap-2 pointer-events-none">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-              <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-black">
-                {activeSlide.badge}
-              </span>
-            </div>
+          {/* Full Crisp Display (No white corners, no mask, full image visibility) */}
+          <div className="relative w-full h-[380px] sm:h-[460px] lg:h-full min-h-[380px] sm:min-h-[460px] lg:min-h-[540px] rounded-3xl overflow-hidden shadow-2xl bg-black border-2 border-black group">
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={activeSlide.id}
+                src={activeSlide.url}
+                alt={activeSlide.title}
+                initial={{ opacity: 0, scale: 1.04 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full h-full object-cover object-center"
+                referrerPolicy="no-referrer"
+              />
+            </AnimatePresence>
 
             {/* Floating Subtle Arrows for Manual Exploration */}
             <button
               onClick={prevSlide}
               aria-label="Previous image"
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-black hover:text-white text-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 shadow-md border border-black/10"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 shadow-lg border border-white/20"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={nextSlide}
               aria-label="Next image"
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-black hover:text-white text-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 shadow-md border border-black/10"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-30 shadow-lg border border-white/20"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Minimalist Slider Pagination Dots Under Seamless Visual */}
-          <div className="w-full mt-2 flex items-center justify-center px-1">
+          {/* Minimalist Slider Pagination Dots Under Full Image */}
+          <div className="w-full mt-3 flex items-center justify-center px-1">
             <div className="flex items-center gap-2">
               {HERO_SLIDES.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentSlideIndex(idx)}
                   aria-label={`Jump to slide ${idx + 1}`}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                  className={`h-2 rounded-full transition-all duration-300 ${
                     idx === currentSlideIndex 
-                      ? 'w-6 bg-blue-600 shadow-sm' 
-                      : 'w-1.5 bg-gray-300 hover:bg-gray-400'
+                      ? 'w-8 bg-blue-600 shadow-sm' 
+                      : 'w-2 bg-gray-300 hover:bg-gray-400'
                   }`}
                 />
               ))}
