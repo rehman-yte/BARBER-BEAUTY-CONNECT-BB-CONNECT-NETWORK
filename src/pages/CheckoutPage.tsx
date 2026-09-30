@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check } from 'lucide-react';
+import { CreditCard, Truck, ShieldCheck, CheckCircle2, ArrowLeft, Trash2, Plus, Minus, Wallet, Landmark, Smartphone, Check, Clock } from 'lucide-react';
 import { getSettings } from '../services/logic_engine';
 import { WalletService } from '../services/WalletService';
 
@@ -33,6 +33,14 @@ const CheckoutPage: React.FC = () => {
     (item.category && String(item.category).toLowerCase().includes('booking')) ||
     (item as any).type === 'booking'
   );
+
+  const [wasSlotBooking, setWasSlotBooking] = useState<boolean>(() => isSlotBooking);
+
+  useEffect(() => {
+    if (isSlotBooking) {
+      setWasSlotBooking(true);
+    }
+  }, [isSlotBooking]);
 
   const [feePercent, setFeePercent] = useState<number>(10);
   
@@ -463,8 +471,10 @@ const CheckoutPage: React.FC = () => {
             setStep('success');
             clearCart();
             
-            // EXECUTE IMMEDIATE ROUTER REDIRECT
-            navigate('/customer/dashboard');
+            // Allow customer to view the confirmation screen before redirecting to dashboard
+            setTimeout(() => {
+              navigate('/customer-dashboard');
+            }, 3200);
           } catch (verificationErr: any) {
             console.error("Payment status verification error:", verificationErr);
             setPaymentError(verificationErr.message || "Payment status updating failed. Please contact support.");
@@ -627,8 +637,10 @@ const CheckoutPage: React.FC = () => {
       setStep('success');
       clearCart();
 
-      // EXECUTE IMMEDIATE ROUTER REDIRECT
-      navigate('/customer/dashboard');
+      // Allow customer to view the confirmation screen before redirecting to dashboard
+      setTimeout(() => {
+        navigate('/customer-dashboard');
+      }, 3200);
     } catch (err: any) {
       console.error("Failed to commit verification data:", err);
       setPaymentError("Network error: Verification record submission failed. Please try again.");
@@ -710,7 +722,9 @@ const CheckoutPage: React.FC = () => {
             setStep('success');
             clearCart();
             
-            navigate('/customer/dashboard');
+            setTimeout(() => {
+              navigate('/customer-dashboard');
+            }, 3200);
           } catch (verificationErr: any) {
             console.error("Payment status verification error:", verificationErr);
             setPaymentError(verificationErr.message || "Payment status updating failed. Please contact support.");
@@ -1426,23 +1440,66 @@ const CheckoutPage: React.FC = () => {
                   key="success"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="py-20 text-center"
+                  className="py-16 text-center"
                 >
-                  <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-green-500/10">
-                    <CheckCircle2 size={48} />
-                  </div>
-                  <h2 className="text-4xl font-serif font-bold text-charcoal mb-4">Order Confirmed!</h2>
-                  <p className="text-gray-400 uppercase tracking-widest text-[0.625rem] mb-12 max-w-md mx-auto leading-relaxed">
-                    {isSlotBooking 
-                      ? "Your slot booking has been successfully confirmed. Please check your dashboard for details." 
-                      : "Your premium essentials are being prepared for dispatch. You will receive a tracking link via SMS shortly."}
-                  </p>
-                  <button 
-                    onClick={() => navigate('/customer-dashboard')}
-                    className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl"
-                  >
-                    View My Orders
-                  </button>
+                  {(wasSlotBooking || isSlotBooking) ? (
+                    <>
+                      <div className="w-24 h-24 bg-blue-50 text-bbBlue rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-500/10 relative">
+                        <Clock size={44} className="text-blue-600 animate-pulse" />
+                        <span className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center border-2 border-white shadow-xs">
+                          <Check size={14} />
+                        </span>
+                      </div>
+
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-blue-200">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                        Escrow Payment Secured
+                      </div>
+
+                      <h2 className="text-3xl sm:text-4xl font-serif font-bold text-charcoal mb-4">
+                        Slot Now in Processing!
+                      </h2>
+
+                      <p className="text-gray-500 text-xs sm:text-sm mb-6 max-w-md mx-auto leading-relaxed font-medium">
+                        Your slot booking request has been received and is now in processing. Salon partner will confirm your booking shortly. Your payment is safely held in escrow.
+                      </p>
+
+                      <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 max-w-sm mx-auto mb-8 text-left">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-gray-700 mb-1">
+                          <span>Booking Status:</span>
+                          <span className="text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-300 uppercase font-black text-[9px]">
+                            Waiting Confirmation
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-medium">
+                          Redirecting to your customer dashboard in a few seconds...
+                        </p>
+                      </div>
+
+                      <button 
+                        onClick={() => navigate('/customer-dashboard')}
+                        className="bg-bbBlue text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 mx-auto"
+                      >
+                        View My Bookings
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-green-500/10">
+                        <CheckCircle2 size={48} />
+                      </div>
+                      <h2 className="text-4xl font-serif font-bold text-charcoal mb-4">Order Confirmed!</h2>
+                      <p className="text-gray-400 uppercase tracking-widest text-[0.625rem] mb-12 max-w-md mx-auto leading-relaxed">
+                        Your premium essentials are being prepared for dispatch. You will receive a tracking link via SMS shortly.
+                      </p>
+                      <button 
+                        onClick={() => navigate('/customer-dashboard')}
+                        className="bg-charcoal text-white px-10 py-4 rounded-full font-bold uppercase text-[0.75rem] tracking-widest hover:bg-bbBlue transition-all shadow-xl"
+                      >
+                        View My Orders
+                      </button>
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
