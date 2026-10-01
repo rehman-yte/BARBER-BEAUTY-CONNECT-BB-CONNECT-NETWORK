@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, setDoc, collection, addDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, addDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 import { 
@@ -47,6 +47,7 @@ const AdminDashboard: React.FC = () => {
   const [feedbackSearchQuery, setFeedbackSearchQuery] = useState('');
   const [partnerPayoutSearchQuery, setPartnerPayoutSearchQuery] = useState('');
   const [editingPartner, setEditingPartner] = useState<any>(null);
+  const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
 
   const formatFeedbackDate = (rawDate: any): string => {
     if (!rawDate) return 'Recent Session';
@@ -119,6 +120,7 @@ const AdminDashboard: React.FC = () => {
     let unsubBookings = () => {};
     let unsubQueue = () => {};
     let unsubConfig = () => {};
+    let unsubPayouts = () => {};
 
     try {
       unsubPartners = onSnapshot(collection(db, 'partners'), () => {
@@ -132,6 +134,11 @@ const AdminDashboard: React.FC = () => {
       unsubQueue = onSnapshot(collection(db, 'verification_queue'), () => {
         fetchStats();
       }, (err) => console.debug("Queue sync fallback:", err));
+
+      unsubPayouts = onSnapshot(collection(db, 'payout_requests'), (snap) => {
+        const pr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setPayoutRequests(pr);
+      }, (err) => console.debug("Payout requests listener error:", err));
 
       unsubConfig = onSnapshot(doc(db, 'settings', 'global_config'), (snap) => {
         if (snap.exists() && snap.data().platformFee !== undefined) {
@@ -150,6 +157,7 @@ const AdminDashboard: React.FC = () => {
       unsubPartners();
       unsubBookings();
       unsubQueue();
+      unsubPayouts();
       unsubConfig();
       clearInterval(interval);
     };
@@ -1449,6 +1457,100 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase tracking-widest">All outstanding partner balances</p>
               </div>
             </div>
+
+            {/* Active Instant Payout Requests from Accountant AI Engine */}
+            {payoutRequests.filter((r: any) => r.status === 'pending_settlement' || r.status === 'pending').length > 0 && (
+              <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-[11px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping inline-block" />
+                    ⚡ Urgent Instant Payout Requests ({payoutRequests.filter((r: any) => r.status === 'pending_settlement' || r.status === 'pending').length})
+                  </h3>
+                  <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-1 rounded-full uppercase tracking-wider">
+                    Accountant AI Engine
+                  </span>
+                </div>
+                <div className="bg-white border-2 border-red-200 rounded-[2.5rem] overflow-hidden shadow-lg shadow-red-500/5">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[0.6875rem]">
+                      <thead className="bg-red-600 text-white shadow-xs">
+                        <tr>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner Salon</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Registered UPI ID</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Requested Net Amount</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest">Requested At</th>
+                          <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Settlement Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {payoutRequests
+                          .filter((r: any) => r.status === 'pending_settlement' || r.status === 'pending')
+                          .map((req: any) => (
+                            <tr key={req.id} className="hover:bg-red-50/30 transition-all">
+                              <td className="px-8 py-5">
+                                <span className="font-bold text-black block text-sm">{req.partnerName || 'Partner Salon'}</span>
+                                <span className="text-[8px] font-mono text-gray-400 block">{req.partnerId}</span>
+                              </td>
+                              <td className="px-8 py-5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-bbBlue font-bold text-[12px]">{req.upiId || 'Not registered'}</span>
+                                  {req.upiId && (
+                                    <button 
+                                      onClick={() => {
+                                        navigator.clipboard?.writeText(req.upiId);
+                                        showToast(`Copied UPI ID: ${req.upiId}`);
+                                      }}
+                                      title="Copy UPI ID"
+                                      className="p-1 text-gray-400 hover:text-bbBlue transition-colors rounded"
+                                    >
+                                      📋
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-8 py-5 font-bold text-emerald-600 text-base">
+                                ₹{Number(req.netSettlement || 0).toLocaleString()}
+                              </td>
+                              <td className="px-8 py-5 text-gray-500 text-[10px]">
+                                {req.createdAt ? new Date(req.createdAt).toLocaleString('en-IN') : 'Just now'}
+                              </td>
+                              <td className="px-8 py-5 text-right">
+                                <button
+                                  onClick={async () => {
+                                    if (!window.confirm(`Confirm payout release of ₹${Number(req.netSettlement || 0).toLocaleString()} to ${req.partnerName || 'Partner'} at UPI ${req.upiId}?`)) return;
+                                    try {
+                                      showToast("Updating settlement status...");
+                                      await updateDoc(doc(db, 'payout_requests', req.id), {
+                                        status: 'completed',
+                                        settledAt: new Date().toISOString()
+                                      });
+                                      await addDoc(collection(db, 'notifications'), {
+                                        type: 'PAYOUT_SETTLED',
+                                        title: 'Instant Payout Released',
+                                        message: `Accountant AI: Your instant payout request of ₹${Number(req.netSettlement || 0).toLocaleString()} has been processed and released to UPI: ${req.upiId || 'registered account'}.`,
+                                        partnerId: req.partnerId,
+                                        read: false,
+                                        timestamp: new Date().toISOString()
+                                      });
+                                      showToast("Instant payout marked as settled!");
+                                    } catch (err: any) {
+                                      console.error("Failed to settle payout request:", err);
+                                      alert("Error updating payout request: " + err.message);
+                                    }
+                                  }}
+                                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-md active:scale-95"
+                                >
+                                  Release & Settle
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Search Bar for Partner Settlement Registry */}
             <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col md:flex-row items-center gap-4 mb-6">

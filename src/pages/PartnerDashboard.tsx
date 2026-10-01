@@ -79,6 +79,80 @@ const EscrowTimer: React.FC<EscrowTimerProps> = ({ heldAt, onTimeout }) => {
   return <span className="font-mono text-[0.5625rem] text-red-500 font-bold animate-pulse">{timeLeft}</span>;
 };
 
+// Continuous Booking Bell Alarm Engine (Pure Web Audio API - Zero External Asset Dependency)
+class ContinuousBellAlarm {
+  private ctx: AudioContext | null = null;
+  private intervalId: any = null;
+  private isRinging: boolean = false;
+
+  public start() {
+    if (this.isRinging) return;
+    this.isRinging = true;
+
+    const playBellStrike = () => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContextClass) return;
+        if (!this.ctx || this.ctx.state === 'closed') {
+          this.ctx = new AudioContextClass();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+
+        const now = this.ctx.currentTime;
+        // Two-tone resonant chime: High bell strike followed by bright harmonic
+        const osc1 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0.4, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+        osc1.connect(gain1);
+        gain1.connect(this.ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.7);
+
+        const osc2 = this.ctx.createOscillator();
+        const gain2 = this.ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1320, now + 0.15);
+        gain2.gain.setValueAtTime(0.35, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+        osc2.connect(gain2);
+        gain2.connect(this.ctx.destination);
+        osc2.start(now + 0.15);
+        osc2.stop(now + 0.85);
+      } catch (e) {
+        console.warn("[Bell Alarm Engine] Audio waiting for user context:", e);
+      }
+    };
+
+    playBellStrike();
+    this.intervalId = setInterval(playBellStrike, 2000);
+  }
+
+  public stop() {
+    this.isRinging = false;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    if (this.ctx && this.ctx.state !== 'closed') {
+      try {
+        this.ctx.close();
+      } catch (e) {}
+      this.ctx = null;
+    }
+  }
+
+  public getStatus() {
+    return this.isRinging;
+  }
+}
+
+const bellAlarmInstance = new ContinuousBellAlarm();
+
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout, updateUser } = useAuth();
@@ -174,11 +248,27 @@ const PartnerDashboard: React.FC = () => {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isRequestingPayout, setIsRequestingPayout] = useState(false);
 
+  // Continuous Bell Alarm: Rings until partner responds (Accepts or Rejects the slot)
+  useEffect(() => {
+    const hasUnresolvedSlots = bookings.some((b: any) => b.status === 'payment_held' || b.status === 'pending');
+    if (hasUnresolvedSlots) {
+      bellAlarmInstance.start();
+    } else {
+      bellAlarmInstance.stop();
+    }
+
+    return () => {
+      bellAlarmInstance.stop();
+    };
+  }, [bookings]);
+
   useEffect(() => {
     const handleInteraction = () => {
       setHasInteracted(true);
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
+      const hasUnresolved = bookings.some((b: any) => b.status === 'payment_held' || b.status === 'pending');
+      if (hasUnresolved) {
+        bellAlarmInstance.start();
+      }
     };
     window.addEventListener('click', handleInteraction);
     window.addEventListener('touchstart', handleInteraction);
@@ -186,11 +276,13 @@ const PartnerDashboard: React.FC = () => {
       window.removeEventListener('click', handleInteraction);
       window.removeEventListener('touchstart', handleInteraction);
     };
-  }, []);
+  }, [bookings]);
 
   useEffect(() => {
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    audioRef.current.volume = 0.8;
+    try {
+      audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audioRef.current.volume = 0.8;
+    } catch (e) {}
   }, []);
 
   // Synchronous change check
@@ -511,42 +603,52 @@ const PartnerDashboard: React.FC = () => {
 
     setIsRequestingPayout(true);
     try {
+      const partnerName = shopData?.brandName || shopData?.brand_name || shopData?.ownerName || 'Partner Salon';
+      const upiId = shopData?.upiId || shopData?.upi_id || shopData?.upi || '';
+
       const eligibleBookings = bookings.filter((b: any) => b.status === 'completed' && !b.payoutRequested);
       
       if (eligibleBookings.length > 0) {
         for (const item of eligibleBookings) {
-          const bRef = doc(db, 'bookings', item.id);
-          await updateDoc(bRef, { payoutRequested: true });
-          
-          await setDoc(doc(db, 'payout_requests', item.id), {
-            partnerId: user.uid,
-            upiId: shopData?.upiId || '',
-            netSettlement: Number(item.amount || item.amountPaid || item.price || 0) * 0.95,
-            verificationStatus: shopData?.status || 'approved',
-            bookingId: item.id,
-            createdAt: new Date().toISOString(),
-            status: 'pending_settlement',
-            payoutType: 'instant'
-          });
+          try {
+            const bRef = doc(db, 'bookings', item.id);
+            await updateDoc(bRef, { payoutRequested: true, payoutRequestedAt: new Date().toISOString() });
+          } catch (e) {
+            console.warn("Booking flag update warning:", e);
+          }
         }
-        alert("Instant payout request submitted successfully!");
-      } else {
-        // Fallback for general request
-        const requestId = `instant_${user.uid}_${Date.now()}`;
-        await setDoc(doc(db, 'payout_requests', requestId), {
-          partnerId: user.uid,
-          upiId: shopData?.upiId || '',
-          netSettlement: walletBalance,
-          verificationStatus: shopData?.status || 'approved',
-          createdAt: new Date().toISOString(),
-          status: 'pending_settlement',
-          payoutType: 'instant'
-        });
-        alert("Instant payout request registered!");
       }
-    } catch (err) {
+
+      // Record in payout_requests collection for Admin Dashboard
+      const requestId = `instant_${user.uid}_${Date.now()}`;
+      await setDoc(doc(db, 'payout_requests', requestId), {
+        partnerId: user.uid,
+        partnerName: partnerName,
+        upiId: upiId,
+        netSettlement: walletBalance,
+        verificationStatus: shopData?.status || 'approved',
+        createdAt: new Date().toISOString(),
+        status: 'pending_settlement',
+        payoutType: 'instant'
+      });
+
+      // Dispatch real-time notification to Admin Panel
+      await addDoc(collection(db, 'notifications'), {
+        type: 'PAYOUT_REQUEST',
+        title: 'New Instant Payout Request',
+        message: `${partnerName} requested instant payout of ₹${walletBalance.toFixed(2)} to UPI: ${upiId || 'Not set'}`,
+        partnerId: user.uid,
+        partnerName: partnerName,
+        amount: walletBalance,
+        upiId: upiId,
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+
+      alert(`Instant payout request of ₹${walletBalance.toFixed(2)} submitted successfully to Admin!`);
+    } catch (err: any) {
       console.error("Instant payout request fail:", err);
-      alert("Failed to request instant payout. Please try again.");
+      alert(`Failed to request instant payout: ${err?.message || 'Please try again.'}`);
     } finally {
       setIsRequestingPayout(false);
     }
@@ -747,6 +849,33 @@ const PartnerDashboard: React.FC = () => {
 
       {/* DASHBOARD CONTENT */}
       <main className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-6 relative">
+        {/* Dynamic Alarm Beacon for Unresponded Bookings */}
+        {!isSuspended && bookings.some((b: any) => b.status === 'payment_held' || b.status === 'pending') && (
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border-2 border-red-400/40 animate-pulse">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
+                🔔
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-white">
+                  Incoming Customer Booking Request!
+                </p>
+                <p className="text-[11px] font-medium text-white/90">
+                  Bell is continuously ringing. Please respond by accepting or rejecting the slot below.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setActiveTab('bookings');
+              }}
+              className="px-5 py-2.5 bg-white text-red-600 rounded-xl font-bold uppercase text-[10px] tracking-wider hover:bg-gray-100 transition-colors shadow-md shrink-0 active:scale-95"
+            >
+              Respond to Slot ➔
+            </button>
+          </div>
+        )}
+
         {/* SUSPENDED FREEZE OVERLAY: PREVENTS ALL ACTIONS */}
         {isSuspended && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-[3px] z-20 rounded-[2.5rem] flex flex-col items-center justify-start pt-16 sm:pt-24 text-center px-4 pointer-events-auto select-none">
@@ -1314,6 +1443,7 @@ const PartnerDashboard: React.FC = () => {
                                         e.stopPropagation();
                                         const confirmAccept = window.confirm("Are you sure you want to ACCEPT this booking? This will confirm the slot permanently.");
                                         if (confirmAccept) {
+                                          bellAlarmInstance.stop();
                                           try {
                                             await updateDoc(doc(db, 'bookings', b.id), { 
                                               status: 'accepted', 
@@ -1333,6 +1463,7 @@ const PartnerDashboard: React.FC = () => {
                                         e.stopPropagation();
                                         const confirmReject = window.confirm("Are you sure you want to REJECT this booking? This will instantly trigger a full automatic refund.");
                                         if (confirmReject) {
+                                          bellAlarmInstance.stop();
                                           const originalStatus = b.status || 'payment_held';
                                           const originalRejectedAt = b.rejectedAt || null;
                                           try {

@@ -150,10 +150,18 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    // 8. PAYMENT VERIFICATION COLLECTION
+    // 8. PAYMENT VERIFICATION & PAYOUT REQUESTS COLLECTIONS
     // -------------------------------------------------------------------------
 
     match /Payment_Verification/{verificationId} {
+      allow read, write: if true;
+    }
+
+    match /payout_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    match /partner_settlements/{settlementId} {
       allow read, write: if true;
     }
 
