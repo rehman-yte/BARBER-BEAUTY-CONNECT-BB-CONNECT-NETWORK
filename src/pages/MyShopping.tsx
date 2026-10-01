@@ -21,6 +21,8 @@ interface Order {
   createdAt: any;
   items: any[];
   shippingAddress: any;
+  transactionType?: string;
+  type?: string;
 }
 
 const MyShopping: React.FC = () => {
@@ -43,7 +45,27 @@ const MyShopping: React.FC = () => {
         id: doc.id,
         ...doc.data()
       })) as Order[];
-      setOrders(ordersData);
+
+      // Strictly isolate product purchase orders only. Slot bookings belong exclusively to Customer Dashboard.
+      const productOnlyOrders = ordersData.filter(order => {
+        if (order.transactionType === 'SLOT_BOOKING') return false;
+        if (order.type === 'booking' || order.type === 'slot_booking') return false;
+        if (order.shippingAddress?.address && String(order.shippingAddress.address).includes('Direct Service Slot Booking')) return false;
+
+        if (order.items && Array.isArray(order.items)) {
+          const hasBookingItem = order.items.some((item: any) => 
+            (item.name && String(item.name).includes('(Booking)')) ||
+            (item.category && String(item.category).toLowerCase().includes('service')) ||
+            (item.category && String(item.category).toLowerCase().includes('booking')) ||
+            item.type === 'booking'
+          );
+          if (hasBookingItem) return false;
+        }
+
+        return true;
+      });
+
+      setOrders(productOnlyOrders);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching orders:", error);

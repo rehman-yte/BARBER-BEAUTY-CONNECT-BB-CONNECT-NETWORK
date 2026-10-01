@@ -286,33 +286,30 @@ const CheckoutPage: React.FC = () => {
       let finalBookingIds: string[] = [];
 
       try {
-        const orderData = {
-          customerId: user?.uid,
-          customerName: formData.fullName || user?.name || 'Customer Booking',
-          shippingAddress: isSlotBooking ? {
-            address: 'N/A - Direct Service Slot Booking (Bypassed)',
-            city: 'N/A',
-            pincode: 'N/A',
-            state: 'N/A'
-          } : {
-            address: formData.address,
-            city: formData.city,
-            pincode: formData.pincode,
-            state: formData.state
-          },
-          items: cart,
-          totalAmount: finalTotal,
-          platformFee: feeAmount,
-          status: 'PENDING_PAYMENT', // Unpaid booking initial order status
-          paymentStatus: 'unpaid',
-          paymentMethod: 'RAZORPAY_GATEWAY',
-          razorpayOrderId: clientGeneratedOrderId,
-          transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
-          createdAt: serverTimestamp()
-        };
+        if (!isSlotBooking) {
+          const orderData = {
+            customerId: user?.uid,
+            customerName: formData.fullName || user?.name || 'Customer Order',
+            shippingAddress: {
+              address: formData.address,
+              city: formData.city,
+              pincode: formData.pincode,
+              state: formData.state
+            },
+            items: cart,
+            totalAmount: finalTotal,
+            platformFee: feeAmount,
+            status: 'PENDING_PAYMENT',
+            paymentStatus: 'unpaid',
+            paymentMethod: 'RAZORPAY_GATEWAY',
+            razorpayOrderId: clientGeneratedOrderId,
+            transactionType: 'SHOPPING',
+            createdAt: serverTimestamp()
+          };
 
-        const orderRef = await addDoc(collection(db, 'orders'), orderData);
-        finalOrderId = orderRef.id;
+          const orderRef = await addDoc(collection(db, 'orders'), orderData);
+          finalOrderId = orderRef.id;
+        }
 
         if (isSlotBooking) {
           for (const item of cart) {

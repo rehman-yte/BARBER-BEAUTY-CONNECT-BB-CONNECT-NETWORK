@@ -233,22 +233,25 @@ export class WalletService {
 
     const generatedTxId = 'WALLET_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
 
-    // 2. Create Order Document
-    const orderRef = await addDoc(collection(db, 'orders'), {
-      customerId: customerId,
-      customerName: customerName,
-      items: cartItems,
-      totalAmount: totalToDeduct,
-      platformFee: platformFee,
-      status: 'payment_held',
-      orderStatus: 'confirmed',
-      paymentStatus: 'paid',
-      paymentMethod: 'BB_CONNECT_WALLET',
-      paymentMethodDetail: 'WALLET_BALANCE_DEBIT',
-      transactionId: generatedTxId,
-      transactionType: isSlotBooking ? 'SLOT_BOOKING' : 'SHOPPING',
-      createdAt: serverTimestamp()
-    });
+    // 2. Create Order Document ONLY for genuine physical product shopping (Slot bookings are stored strictly in bookings collection)
+    let orderRef: any = null;
+    if (!isSlotBooking) {
+      orderRef = await addDoc(collection(db, 'orders'), {
+        customerId: customerId,
+        customerName: customerName,
+        items: cartItems,
+        totalAmount: totalToDeduct,
+        platformFee: platformFee,
+        status: 'processing',
+        orderStatus: 'confirmed',
+        paymentStatus: 'paid',
+        paymentMethod: 'BB_CONNECT_WALLET',
+        paymentMethodDetail: 'WALLET_BALANCE_DEBIT',
+        transactionId: generatedTxId,
+        transactionType: 'SHOPPING',
+        createdAt: serverTimestamp()
+      });
+    }
 
     const finalBookingIds: string[] = [];
 
@@ -303,7 +306,7 @@ export class WalletService {
         ? `Booking Payment: ${cartItems[0]?.serviceName || cartItems[0]?.name || 'Service'} (${cartItems[0]?.shopName || 'Partner'})` 
         : `Order Payment for ${cartItems.length} items`,
       bookingId: finalBookingIds[0] || null,
-      orderId: orderRef.id,
+      orderId: orderRef?.id || null,
       transactionId: generatedTxId,
       createdAt: serverTimestamp()
     });
@@ -311,7 +314,7 @@ export class WalletService {
     return {
       success: true,
       bookingIds: finalBookingIds,
-      orderId: orderRef.id
+      orderId: orderRef?.id || null
     };
   }
 }
