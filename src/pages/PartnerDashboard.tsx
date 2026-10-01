@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -618,6 +618,77 @@ const PartnerDashboard: React.FC = () => {
     .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
   const feeDeductionRatio = (100 - platformFeeRate) / 100;
   const walletBalance = cumulativeGrossRevenue * feeDeductionRatio;
+
+  // Accountant AI Engine: Automatic 12-hour working time trigger
+  // Only accumulates when shop is LIVE (open). Closed/offline hours are strictly excluded.
+  const triggerAuto12hPayout = useCallback(async () => {
+    if (!user?.uid || walletBalance <= 0) return;
+    const lastAutoKey = `last_auto_payout_${user.uid}`;
+    const lastAuto = Number(localStorage.getItem(lastAutoKey) || 0);
+    // 1-hour cooldown
+    if (Date.now() - lastAuto < 3600000) return;
+
+    localStorage.setItem(lastAutoKey, String(Date.now()));
+    localStorage.setItem(`partner_working_seconds_${user.uid}`, '0');
+
+    try {
+      const partnerName = shopData?.brandName || shopData?.brand_name || shopData?.ownerName || 'Partner Salon';
+      const upiId = shopData?.upiId || shopData?.upi_id || shopData?.upi || '';
+      const requestId = `auto12h_${user.uid}_${Date.now()}`;
+
+      await setDoc(doc(db, 'Payment_Verification', requestId), {
+        type: 'PAYOUT_REQUEST',
+        requestId: requestId,
+        partnerId: user.uid,
+        partnerName: partnerName,
+        upiId: upiId,
+        netSettlement: walletBalance,
+        platformFeePercent: platformFeeRate,
+        verificationStatus: shopData?.status || 'approved',
+        createdAt: new Date().toISOString(),
+        status: 'pending_settlement',
+        payoutType: '12h_cycle'
+      });
+
+      await addDoc(collection(db, 'notifications'), {
+        type: 'PAYOUT_REQUEST',
+        title: '12h Working Shift Payout Triggered',
+        message: `Accountant AI: 12-hour active working shift completed for ${partnerName}. Settlement of ₹${walletBalance.toFixed(2)} automatically sent to Admin.`,
+        partnerId: user.uid,
+        partnerName: partnerName,
+        amount: walletBalance,
+        upiId: upiId,
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+    } catch (autoErr) {
+      console.warn("Auto 12h payout trigger notice:", autoErr);
+    }
+  }, [user?.uid, walletBalance, shopData, platformFeeRate]);
+
+  useEffect(() => {
+    if (!user?.uid || !isLive) return;
+
+    const timer = setInterval(() => {
+      const storageKey = `partner_working_seconds_${user.uid}`;
+      const currentSeconds = Number(localStorage.getItem(storageKey) || 0) + 10;
+      localStorage.setItem(storageKey, String(currentSeconds));
+
+      // 12 working hours = 43200 seconds
+      if (currentSeconds >= 43200 && walletBalance > 0) {
+        triggerAuto12hPayout();
+      }
+    }, 10000);
+
+    return () => clearInterval(timer);
+  }, [user?.uid, isLive, walletBalance, triggerAuto12hPayout]);
+
+  // Reset working timer when settlement occurs
+  useEffect(() => {
+    if (shopData?.lastSettledAt && user?.uid) {
+      localStorage.setItem(`partner_working_seconds_${user.uid}`, '0');
+    }
+  }, [shopData?.lastSettledAt, user?.uid]);
 
   const handleInstantPayoutRequest = async () => {
     if (!user?.uid) return;
