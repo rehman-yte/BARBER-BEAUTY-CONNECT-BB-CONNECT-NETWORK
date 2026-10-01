@@ -148,9 +148,26 @@
         "complaintId": { "type": "string" }
       },
       "required": ["sender", "text", "timestamp"]
+    },
+    "PayoutRequest": {
+      "title": "PayoutRequest",
+      "description": "Partner instant payout requests from Accountant AI Engine",
+      "type": "object",
+      "properties": {
+        "partnerId": { "type": "string" },
+        "partnerName": { "type": "string" },
+        "upiId": { "type": "string" },
+        "netSettlement": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
     }
   },
   "firestore": {
+    "/payout_requests/{requestId}": {
+      "schema": "PayoutRequest",
+      "description": "Partner instant payout requests"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "Unified user profiles"

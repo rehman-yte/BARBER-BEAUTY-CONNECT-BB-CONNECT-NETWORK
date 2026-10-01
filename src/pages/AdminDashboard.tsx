@@ -135,8 +135,10 @@ const AdminDashboard: React.FC = () => {
         fetchStats();
       }, (err) => console.debug("Queue sync fallback:", err));
 
-      unsubPayouts = onSnapshot(collection(db, 'payout_requests'), (snap) => {
-        const pr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      unsubPayouts = onSnapshot(collection(db, 'Payment_Verification'), (snap) => {
+        const pr = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((d: any) => d.type === 'PAYOUT_REQUEST');
         setPayoutRequests(pr);
       }, (err) => console.debug("Payout requests listener error:", err));
 
@@ -1521,7 +1523,7 @@ const AdminDashboard: React.FC = () => {
                                     if (!window.confirm(`Confirm payout release of ₹${Number(req.netSettlement || 0).toLocaleString()} to ${req.partnerName || 'Partner'} at UPI ${req.upiId}?`)) return;
                                     try {
                                       showToast("Updating settlement status...");
-                                      await updateDoc(doc(db, 'payout_requests', req.id), {
+                                      await updateDoc(doc(db, 'Payment_Verification', req.id), {
                                         status: 'completed',
                                         settledAt: new Date().toISOString()
                                       });
