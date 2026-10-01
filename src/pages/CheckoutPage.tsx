@@ -73,7 +73,8 @@ const CheckoutPage: React.FC = () => {
     };
   }, []);
 
-  const feeAmount = Math.round((totalPrice * feePercent) / 100);
+  // Product purchasing has zero platform fee. Fee only applies to slot bookings.
+  const feeAmount = isSlotBooking ? Math.round((totalPrice * feePercent) / 100) : 0;
   const finalTotal = totalPrice + feeAmount;
   
   const [step, setStep] = useState<'cart' | 'shipping' | 'payment' | 'processing' | 'success'>('cart');
@@ -1518,10 +1519,12 @@ const CheckoutPage: React.FC = () => {
                       <span className="text-green-500 font-bold uppercase text-[10px]">Free</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 font-medium">{isSlotBooking ? 'Service Fee' : 'Platform Fee'} ({feePercent}%)</span>
-                    <span className="font-mono font-bold">₹{feeAmount}</span>
-                  </div>
+                  {isSlotBooking && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 font-medium">Service Fee ({feePercent}%)</span>
+                      <span className="font-mono font-bold">₹{feeAmount}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="pt-6 border-t border-gray-200 flex justify-between items-end mb-8">
                   <span className="text-[0.625rem] font-bold text-charcoal uppercase tracking-widest">Total Amount</span>

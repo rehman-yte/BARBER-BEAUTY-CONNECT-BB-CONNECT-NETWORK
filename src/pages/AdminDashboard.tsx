@@ -318,14 +318,15 @@ const AdminDashboard: React.FC = () => {
         const registeredUpi = shop.upiId || shop.upi_id || shop.upi || shop.payoutUpi || 'unregistered@upi';
 
         if (shopTotal > 0) {
+          const currentFee = (shopTotal * (configFee / 100));
           settlements.push({
             shopId: shop.id,
             brandName: shop.brandName || shop.brand_name || 'Partner Salon',
             ownerName: shop.ownerName || shop.owner_name || 'Partner',
             upiId: registeredUpi,
             totalAmount: shopTotal,
-            platformFee: (shopTotal * 0.05),
-            partnerPayout: shopTotal - (shopTotal * 0.05),
+            platformFee: currentFee,
+            partnerPayout: shopTotal - currentFee,
             bookings: shopBookings
           });
         }
@@ -1445,14 +1446,14 @@ const AdminDashboard: React.FC = () => {
 
               <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Standard AI Commission</p>
-                <p className="text-4xl font-serif font-bold text-black">5.0%</p>
+                <p className="text-4xl font-serif font-bold text-black">{fee}%</p>
                 <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase tracking-widest">Calculated dynamically on gross volume</p>
               </div>
 
               <div className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Total Net Pending Cycle</p>
                 <p className="text-4xl font-serif font-bold text-bbBlue">
-                  ₹{stats?.settlements?.reduce((sum: number, s: any) => sum + (s.partnerPayout || s.totalAmount * 0.95), 0).toLocaleString() || 0}
+                  ₹{stats?.settlements?.reduce((sum: number, s: any) => sum + (s.partnerPayout || (s.totalAmount * (1 - fee / 100))), 0).toLocaleString() || 0}
                 </p>
                 <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase tracking-widest">All outstanding partner balances</p>
               </div>
@@ -1593,7 +1594,7 @@ const AdminDashboard: React.FC = () => {
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Partner Shop</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Registered UPI ID</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Gross 12h Vol</th>
-                        <th className="px-8 py-4 font-bold uppercase tracking-widest">5% Fee Deduction</th>
+                        <th className="px-8 py-4 font-bold uppercase tracking-widest">{fee}% Fee Deduction</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest">Net Payout Release</th>
                         <th className="px-8 py-4 font-bold uppercase tracking-widest text-right">Operational Action</th>
                       </tr>
@@ -1618,7 +1619,7 @@ const AdminDashboard: React.FC = () => {
                         }) || [];
 
                         const grossAmount = matchingSettlement?.totalAmount !== undefined ? matchingSettlement.totalAmount : (partnerBookings.reduce((sum: number, b: any) => sum + (b.totalPaid || parseFloat(b.price || b.amount || 0)), 0));
-                        const commission = matchingSettlement?.platformFee !== undefined ? matchingSettlement.platformFee : (grossAmount * 0.05);
+                        const commission = matchingSettlement?.platformFee !== undefined ? matchingSettlement.platformFee : (grossAmount * (fee / 100));
                         const netPayout = matchingSettlement?.partnerPayout !== undefined ? matchingSettlement.partnerPayout : (grossAmount - commission);
                         const registeredUpi = p.upiId || p.upi_id || p.upi || p.payoutUpi || matchingSettlement?.upiId || 'unregistered@upi';
 

@@ -170,6 +170,21 @@ const PartnerDashboard: React.FC = () => {
   const [todayEarnings, setTodayEarnings] = useState<number>(0);
   const [platformFee, setPlatformFee] = useState<number>(0);
   const [netWalletBalance, setNetWalletBalance] = useState<number>(0);
+  const [platformFeeRate, setPlatformFeeRate] = useState<number>(5);
+
+  // Sync real-time platform fee rate configured by Admin
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'global_config'), (snap) => {
+      if (snap.exists() && snap.data().platformFee !== undefined) {
+        const fee = Number(snap.data().platformFee);
+        if (!isNaN(fee) && fee >= 0 && fee <= 100) {
+          setPlatformFeeRate(fee);
+        }
+      }
+    }, (err) => console.warn("Fee config sync warning:", err));
+
+    return () => unsub();
+  }, []);
 
   const localClock = new Date();
   const formatStringA = localClock.toDateString(); // "Fri Jun 19 2026"
@@ -586,11 +601,12 @@ const PartnerDashboard: React.FC = () => {
     : "0.0";
   const starCount = Math.round(Number(avgRating));
   
-  // Accountant AI Engine Logic: Cumulative gross revenue minus 5% platform fee
+  // Accountant AI Engine Logic: Cumulative gross revenue minus dynamic platform fee configured by Admin
   const cumulativeGrossRevenue = bookings
     .filter(b => b.status === "completed")
     .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
-  const walletBalance = cumulativeGrossRevenue * 0.95;
+  const feeDeductionRatio = (100 - platformFeeRate) / 100;
+  const walletBalance = cumulativeGrossRevenue * feeDeductionRatio;
 
   const handleInstantPayoutRequest = async () => {
     if (!user?.uid) return;
@@ -598,7 +614,7 @@ const PartnerDashboard: React.FC = () => {
       alert("No withdrawable balance available for instant payout.");
       return;
     }
-    const confirmPayout = window.confirm(`Request instant payout of ₹${walletBalance.toFixed(2)}?`);
+    const confirmPayout = window.confirm(`Request instant payout of ₹${walletBalance.toFixed(2)} (after ${platformFeeRate}% platform fee)?`);
     if (!confirmPayout) return;
 
     setIsRequestingPayout(true);
@@ -626,6 +642,7 @@ const PartnerDashboard: React.FC = () => {
         partnerName: partnerName,
         upiId: upiId,
         netSettlement: walletBalance,
+        platformFeePercent: platformFeeRate,
         verificationStatus: shopData?.status || 'approved',
         createdAt: new Date().toISOString(),
         status: 'pending_settlement',
@@ -1066,7 +1083,7 @@ const PartnerDashboard: React.FC = () => {
                       <div className="space-y-1 mb-8">
                          <span className="text-[0.5rem] font-bold text-gray-400 uppercase tracking-widest">Wallet Balance</span>
                          <h4 className="text-[2.5rem] font-serif font-black tracking-tighter leading-none">₹{walletBalance.toFixed(2)}</h4>
-                         <p className="text-[0.5rem] text-gray-500 font-bold uppercase tracking-widest mt-1">Net after 5% Platform Fuel</p>
+                         <p className="text-[0.5rem] text-gray-500 font-bold uppercase tracking-widest mt-1">Net after {platformFeeRate}% Platform Fuel</p>
                       </div>
 
                       <div className="pt-6 border-t border-white/10 space-y-4">
