@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 import { 
@@ -1522,20 +1522,58 @@ const AdminDashboard: React.FC = () => {
                                   onClick={async () => {
                                     if (!window.confirm(`Confirm payout release of ₹${Number(req.netSettlement || 0).toLocaleString()} to ${req.partnerName || 'Partner'} at UPI ${req.upiId}?`)) return;
                                     try {
-                                      showToast("Updating settlement status...");
+                                      showToast("Releasing payout and resetting partner balance...");
+                                      const settledTimestamp = new Date().toISOString();
+
+                                      // 1. Mark request completed in Payment_Verification
                                       await updateDoc(doc(db, 'Payment_Verification', req.id), {
                                         status: 'completed',
-                                        settledAt: new Date().toISOString()
+                                        settledAt: settledTimestamp
                                       });
+
+                                      // 2. Mark all completed bookings for this partner as settled
+                                      try {
+                                        const bSnap = await getDocs(
+                                          query(collection(db, 'bookings'), where('partnerId', '==', req.partnerId))
+                                        );
+                                        const batchUpdates = bSnap.docs.map(async (bDoc) => {
+                                          const bData = bDoc.data();
+                                          if (bData.status === 'completed' || bData.status === 'payment_held' || bData.payoutRequested) {
+                                            await updateDoc(doc(db, 'bookings', bDoc.id), {
+                                              settled: true,
+                                              isSettled: true,
+                                              payoutStatus: 'settled',
+                                              settledAt: settledTimestamp
+                                            });
+                                          }
+                                        });
+                                        await Promise.all(batchUpdates);
+                                      } catch (bErr) {
+                                        console.warn("Bookings settlement flag update error:", bErr);
+                                      }
+
+                                      // 3. Reset partner's balance and update lastSettledAt in partners collection
+                                      try {
+                                        await updateDoc(doc(db, 'partners', req.partnerId), {
+                                          lastSettledAt: settledTimestamp,
+                                          walletBalance: 0
+                                        });
+                                      } catch (pErr) {
+                                        console.warn("Partner lastSettledAt update warning:", pErr);
+                                      }
+
+                                      // 4. Send high-priority notification to partner
                                       await addDoc(collection(db, 'notifications'), {
                                         type: 'PAYOUT_SETTLED',
                                         title: 'Instant Payout Released',
-                                        message: `Accountant AI: Your instant payout request of ₹${Number(req.netSettlement || 0).toLocaleString()} has been processed and released to UPI: ${req.upiId || 'registered account'}.`,
+                                        message: `Accountant AI: Your instant payout request of ₹${Number(req.netSettlement || 0).toLocaleString()} has been processed and released to UPI: ${req.upiId || 'registered account'}. Your current unsettled balance has been cleared to ₹0.`,
                                         partnerId: req.partnerId,
                                         read: false,
-                                        timestamp: new Date().toISOString()
+                                        timestamp: settledTimestamp
                                       });
-                                      showToast("Instant payout marked as settled!");
+
+                                      showToast("✓ Instant payout settled! Partner Accountant balance reset to ₹0.");
+                                      fetchStats();
                                     } catch (err: any) {
                                       console.error("Failed to settle payout request:", err);
                                       alert("Error updating payout request: " + err.message);
@@ -1688,16 +1726,32 @@ const AdminDashboard: React.FC = () => {
                                         type: 'SETTLEMENT DISPATCH'
                                       });
 
-                                      // 3. Mark the partner's bookings as Settled / completed
+                                      // 3. Mark the partner's bookings as Settled
+                                      const regSettledTime = new Date().toISOString();
                                       for (const b of partnerBookings) {
                                         const bId = b.bookingId || b.id;
                                         if (bId) {
                                           try {
-                                            await updateBookingStatus(bId, 'completed');
+                                            await updateDoc(doc(db, 'bookings', bId), {
+                                              settled: true,
+                                              isSettled: true,
+                                              payoutStatus: 'settled',
+                                              settledAt: regSettledTime
+                                            });
                                           } catch (upErr) {
                                             console.debug("Booking update status skipped:", upErr);
                                           }
                                         }
+                                      }
+
+                                      // 4. Update partner lastSettledAt and reset wallet
+                                      try {
+                                        await updateDoc(doc(db, 'partners', p.id), {
+                                          lastSettledAt: regSettledTime,
+                                          walletBalance: 0
+                                        });
+                                      } catch (upPErr) {
+                                        console.warn("Partner lastSettledAt update skipped:", upPErr);
                                       }
 
                                       showToast(`✓ Released ₹${netPayout.toLocaleString()} to ${p.brandName || p.brand_name}! Notification dispatched.`);

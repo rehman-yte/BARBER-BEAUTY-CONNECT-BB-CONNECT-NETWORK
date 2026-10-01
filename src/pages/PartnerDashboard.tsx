@@ -601,9 +601,20 @@ const PartnerDashboard: React.FC = () => {
     : "0.0";
   const starCount = Math.round(Number(avgRating));
   
-  // Accountant AI Engine Logic: Cumulative gross revenue minus dynamic platform fee configured by Admin
+  // Accountant AI Engine Logic: Cumulative unsettled gross revenue minus dynamic platform fee configured by Admin
   const cumulativeGrossRevenue = bookings
-    .filter(b => b.status === "completed")
+    .filter(b => {
+      if (b.status !== "completed") return false;
+      if (b.settled === true || b.isSettled === true || b.payoutStatus === 'settled') return false;
+      if (shopData?.lastSettledAt && b.createdAt) {
+        try {
+          if (new Date(b.createdAt).getTime() <= new Date(shopData.lastSettledAt).getTime()) {
+            return false;
+          }
+        } catch (e) {}
+      }
+      return true;
+    })
     .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
   const feeDeductionRatio = (100 - platformFeeRate) / 100;
   const walletBalance = cumulativeGrossRevenue * feeDeductionRatio;
@@ -621,7 +632,7 @@ const PartnerDashboard: React.FC = () => {
     try {
       const partnerName = shopData?.brandName || shopData?.brand_name || shopData?.ownerName || 'Partner Salon';
       const upiId = shopData?.upiId || shopData?.upi_id || shopData?.upi || '';
-      const eligibleBookings = bookings.filter((b: any) => b.status === 'completed' && !b.payoutRequested);
+      const eligibleBookings = bookings.filter((b: any) => b.status === 'completed' && !b.settled && !b.isSettled && b.payoutStatus !== 'settled' && !b.payoutRequested);
 
       // 1. Record in Payment_Verification collection (guaranteed 100% full Firestore write permission)
       const requestId = `instant_${user.uid}_${Date.now()}`;
