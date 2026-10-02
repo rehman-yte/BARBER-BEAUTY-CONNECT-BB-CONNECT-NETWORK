@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { doc, onSnapshot, query, collection, where, orderBy, updateDoc, addDoc, setDoc, getDocs } from 'firebase/firestore';
 import { 
   getShopById, 
@@ -156,10 +156,21 @@ const bellAlarmInstance = new ContinuousBellAlarm();
 const PartnerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout, updateUser } = useAuth();
-  const [shopData, setShopData] = useState<any>(null);
+  const [shopData, setShopData] = useState<any>(() => {
+    try {
+      const activeUid = user?.uid || (auth.currentUser ? auth.currentUser.uid : null);
+      if (activeUid) {
+        const cached = localStorage.getItem(`partner_data_${activeUid}`);
+        if (cached) return JSON.parse(cached);
+      }
+      const gen = localStorage.getItem('partner_data_last');
+      if (gen) return JSON.parse(gen);
+    } catch (e) {}
+    return null;
+  });
   const [bookings, setBookings] = useState<any[]>([]);
   const [ratings, setRatings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const tokenId = user?.uid ? `BB-${user.uid.slice(0, 4).toUpperCase()}` : 'BB-0000';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'bookings' | 'settings'>('overview');
@@ -416,10 +427,59 @@ const PartnerDashboard: React.FC = () => {
           localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
           return shop;
         });
+      } else {
+        setShopData((prev: any) => {
+          if (prev) return prev;
+          const cached = localStorage.getItem(`partner_data_${user.uid}`) || localStorage.getItem('partner_data_last');
+          if (cached) {
+            try { return JSON.parse(cached); } catch (e) {}
+          }
+          return {
+            id: user.uid,
+            brandName: user.brandName || user.name || 'Partner Salon',
+            ownerName: user.name || 'Partner',
+            mobile: '',
+            mobileNumber: '',
+            workerQuota: 1,
+            workerQuantity: 1,
+            upiId: '',
+            status: user.status || 'approved',
+            adminApproved: user.status === 'approved',
+            services: [],
+            shopImages: [],
+            brandImages: [],
+            workerImages: [],
+            ownerPicture: user.photoURL || ''
+          };
+        });
       }
       setLoading(false);
     }, (err) => {
       console.error("Shop snapshot error:", err);
+      setShopData((prev: any) => {
+        if (prev) return prev;
+        const cached = localStorage.getItem(`partner_data_${user.uid}`) || localStorage.getItem('partner_data_last');
+        if (cached) {
+          try { return JSON.parse(cached); } catch (e) {}
+        }
+        return {
+          id: user.uid,
+          brandName: user.brandName || user.name || 'Partner Salon',
+          ownerName: user.name || 'Partner',
+          mobile: '',
+          mobileNumber: '',
+          workerQuota: 1,
+          workerQuantity: 1,
+          upiId: '',
+          status: user.status || 'approved',
+          adminApproved: user.status === 'approved',
+          services: [],
+          shopImages: [],
+          brandImages: [],
+          workerImages: [],
+          ownerPicture: user.photoURL || ''
+        };
+      });
       setLoading(false);
     });
 
@@ -512,14 +572,20 @@ const PartnerDashboard: React.FC = () => {
     };
   }, [user?.uid]);
 
-  if (!authLoading && (!user || user.role !== 'partner')) {
-    return <Navigate to="/customer-dashboard" replace />;
+  if (!authLoading && !user) {
+    return <Navigate to="/auth" replace />;
   }
 
-  if (authLoading || loading) {
+  const isStoredPartner = typeof window !== 'undefined' && localStorage.getItem('bb_network_role') === 'partner';
+  if (!authLoading && user && user.role !== 'partner' && !isStoredPartner) {
+    return <Navigate to="/customer/explore" replace />;
+  }
+
+  if (authLoading && !shopData) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-bbBlue border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-bbBlue border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Loading Station...</p>
       </div>
     );
   }

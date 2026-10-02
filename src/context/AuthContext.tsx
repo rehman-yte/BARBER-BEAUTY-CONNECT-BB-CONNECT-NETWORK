@@ -18,6 +18,7 @@ interface AppUser {
   uid: string;
   email: string | null;
   name: string;
+  displayName?: string;
   role: 'customer' | 'partner' | 'admin';
   user_type: 'customer' | 'partner' | 'admin';
   status: 'active' | 'pending' | null;
@@ -30,6 +31,7 @@ interface AppUser {
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
+  isLoggedIn?: boolean;
   signUp: (email: string, pass: string, data: any) => Promise<void>;
   signIn: (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => Promise<void>;
   bypassLogin: (email: string, role: 'admin' | 'partner' | 'customer') => void;
@@ -442,7 +444,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, bypassLogin, signInWithGoogle, resetPassword, logout, refreshAuth: () => {}, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, isLoggedIn: !!user, signUp, signIn, bypassLogin, signInWithGoogle, resetPassword, logout, refreshAuth: () => {}, updateUser }}>
       {!loading ? children : (
         <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-bbBlue border-t-transparent rounded-full animate-spin"></div>

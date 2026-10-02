@@ -28,6 +28,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { subscribeToSettings } from './services/logic_engine';
 import { PersistenceService } from './services/PersistenceService';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // --- 404 Component ---
 const NotFound: React.FC = () => (
@@ -88,7 +89,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'custo
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-bbBlue border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Loading Gateway...</p>
+      </div>
+    );
+  }
 
   return (
     <Routes>
@@ -185,7 +193,9 @@ const LayoutWrapper: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-white overflow-x-hidden w-full">
       <Navbar />
       <main className="flex-grow w-full pt-[4.5rem] md:pt-[5rem]">
-        <AppRoutes />
+        <ErrorBoundary fallbackTitle="Partner Gateway Interruption">
+          <AppRoutes />
+        </ErrorBoundary>
       </main>
       <Footer />
       <AIChatBot />
@@ -194,21 +204,35 @@ const LayoutWrapper: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    try {
+      return !sessionStorage.getItem('bb_splash_shown');
+    } catch {
+      return false;
+    }
+  });
 
   return (
-    <AuthProvider>
-      <CartProvider>
-        <AnimatePresence mode="wait">
-          {showSplash && (
-            <SplashScreen onComplete={() => setShowSplash(false)} durationSeconds={5} />
-          )}
-        </AnimatePresence>
-        <HashRouter>
-          <LayoutWrapper />
-        </HashRouter>
-      </CartProvider>
-    </AuthProvider>
+    <ErrorBoundary fallbackTitle="BB Connect Network Application">
+      <AuthProvider>
+        <CartProvider>
+          <AnimatePresence mode="wait">
+            {showSplash && (
+              <SplashScreen 
+                onComplete={() => {
+                  setShowSplash(false);
+                  try { sessionStorage.setItem('bb_splash_shown', 'true'); } catch {}
+                }} 
+                durationSeconds={2} 
+              />
+            )}
+          </AnimatePresence>
+          <HashRouter>
+            <LayoutWrapper />
+          </HashRouter>
+        </CartProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

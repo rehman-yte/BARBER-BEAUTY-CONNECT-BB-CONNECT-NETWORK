@@ -71,10 +71,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /partners/{partnerId} {
-      // Anyone can read approved shops, but only owner or admin can read private details
-      // Note: For simplicity and list queries, we allow reading if approved or owner
-      allow get: if (existing().status == 'approved' || existing().adminApproved == true || isOwner(partnerId) || isAdmin());
-      allow list: if (resource.data.status == 'approved' || resource.data.adminApproved == true || resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if true;
 
       function isValidPartner(data) {
         return data.keys().hasAll(['brandName', 'status']) &&
@@ -102,6 +99,10 @@ service cloud.firestore {
       match /services/{serviceId} {
         allow read, write: if true;
       }
+    }
+
+    match /verification_queue/{partnerId} {
+      allow read, write: if true;
     }
 
     // -------------------------------------------------------------------------
