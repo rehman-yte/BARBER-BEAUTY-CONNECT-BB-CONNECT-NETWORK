@@ -20,6 +20,8 @@ import {
 } from '../services/logic_engine';
 import { PersistenceService, StorageManager } from '../services/PersistenceService';
 import { AdminComplaintsHub } from '../components/AdminComplaintsHub';
+import { PartnerBookingsExportHub } from '../components/admin/PartnerBookingsExportHub';
+import { PartnerOnboardingDossierHub } from '../components/admin/PartnerOnboardingDossierHub';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -81,7 +83,7 @@ const AdminDashboard: React.FC = () => {
   };
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(PersistenceService.load('system_maintenance') || false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings' | 'partner_payment_hub' | 'complaints';
+  const currentView = (searchParams.get('view') || 'overview') as 'overview' | 'verification' | 'shops' | 'ledger' | 'broadcast' | 'feedback' | 'settings' | 'partner_payment_hub' | 'complaints' | 'partner_bookings_export' | 'partner_onboarding_dossier';
   const navigate = useNavigate();
 
   const setCurrentView = (view: string) => {
@@ -343,6 +345,7 @@ const AdminDashboard: React.FC = () => {
         adminCommission: roundedAdminProfit,
         pendingVerifications,
         allPartners: mergedPartners,
+        allBookings: allBookings,
         settlements,
         auditLog: auditLog.sort((a, b) => b.bookingId.localeCompare(a.bookingId)),
         platformFee: configFee,
@@ -573,6 +576,24 @@ const AdminDashboard: React.FC = () => {
                 <button 
                   onClick={() => {
                     setShowToolsDropdown(false);
+                    setCurrentView('partner_bookings_export');
+                  }}
+                  className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase text-[#0056b3] hover:bg-blue-50 transition-all border-t border-gray-50"
+                >
+                  <span className="text-sm">📊</span> PARTNER BOOKINGS & CSV EXPORT
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowToolsDropdown(false);
+                    setCurrentView('partner_onboarding_dossier');
+                  }}
+                  className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase text-purple-700 hover:bg-purple-50 transition-all border-t border-gray-50"
+                >
+                  <span className="text-sm">📁</span> ONBOARDING DOSSIER & DOCS
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowToolsDropdown(false);
                     setCurrentView('complaints');
                   }}
                   className="w-full text-left flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase text-red-600 hover:bg-red-50 transition-all border-t border-gray-50"
@@ -583,6 +604,23 @@ const AdminDashboard: React.FC = () => {
             )}
           </div>
         </div>
+
+        {currentView === 'partner_bookings_export' && (
+          <PartnerBookingsExportHub 
+            partners={stats?.allPartners || []}
+            bookings={stats?.allBookings || stats?.auditLog?.map((a: any) => a.rawBooking || a) || []}
+            onBack={() => setCurrentView('overview')}
+            configFee={fee}
+          />
+        )}
+
+        {currentView === 'partner_onboarding_dossier' && (
+          <PartnerOnboardingDossierHub 
+            partners={stats?.allPartners || []}
+            onRefresh={fetchStats}
+            onBack={() => setCurrentView('overview')}
+          />
+        )}
 
         {currentView === 'complaints' && (
           <AdminComplaintsHub />
@@ -1796,6 +1834,8 @@ const AdminDashboard: React.FC = () => {
       >
         {[
           { id: 'overview', label: 'Dashboard' },
+          { id: 'partner_bookings_export', label: 'Slot CSV' },
+          { id: 'partner_onboarding_dossier', label: 'Dossiers' },
           { id: 'complaints', label: 'Complaints' },
           { id: 'verification', label: 'Vetting', badge: stats?.pendingVerifications?.length },
           { id: 'shops', label: 'shops' },
