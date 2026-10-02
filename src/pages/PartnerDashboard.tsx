@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, query, collection, where, orderBy, updateDoc, addDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, orderBy, updateDoc, addDoc, setDoc, getDocs } from 'firebase/firestore';
 import { 
   getShopById, 
   updateShop,
@@ -361,70 +361,56 @@ const PartnerDashboard: React.FC = () => {
     setTodayEarnings(totalRevenue);
     setPlatformFee(fee);
     setNetWalletBalance(netWallet);
-
-    // 1B. AUTO-SETTLEMENT CHRON TRIGGER LOGICAL FLOW:
-    if (!user?.uid) return;
-
-    const checkAndTriggerPayouts = async () => {
-      const now = Date.now();
-      for (const item of bookings) {
-        if (
-          item.status === 'completed' &&
-          item.settlementEligibleTime &&
-          now >= Number(item.settlementEligibleTime) &&
-          !item.payoutRequested
-        ) {
-          try {
-            const bRef = doc(db, 'bookings', item.id);
-            // Optimistically update firestore to prevent duplicate execution loops
-            await updateDoc(bRef, { payoutRequested: true });
-
-            await setDoc(doc(db, 'payout_requests', item.id), {
-              partnerId: user.uid,
-              upiId: shopData?.upiId || '',
-              netSettlement: Number(item.amount || item.amountPaid || item.price || 0) * 0.95,
-              verificationStatus: shopData?.status || 'approved',
-              bookingId: item.id,
-              createdAt: new Date().toISOString(),
-              status: 'pending_settlement'
-            });
-            console.log(`[Auto-Settlement] Recorded log entry successfully for booking ID ${item.id}`);
-          } catch (e) {
-            console.error("[Auto-Settlement Trigger Failure]:", e);
-          }
-        }
-      }
-    };
-
-    checkAndTriggerPayouts();
-  }, [bookings, user?.uid, shopData]);
+  }, [bookings]);
 
   // UI REAL-TIME ENGINE: Snapshot Listeners for zero-latency updates
   useEffect(() => {
     if (!user?.uid) return;
 
+    // Safety timeout to prevent permanent spinner
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 2500);
+
     // 1. Shop Data Listener
     const shopRef = doc(db, 'partners', user.uid);
-    const unsubscribeShop = onSnapshot(shopRef, (docSnap) => {
+    const unsubscribeShop = onSnapshot(shopRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const incomingServices = Array.isArray((data as any).services) ? (data as any).services : [];
         
+        // Fetch sub-collection services in parallel
+        let subServices: any[] = [];
+        try {
+          const sSnap = await getDocs(collection(db, 'partners', user.uid, 'services'));
+          subServices = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (subErr) {
+          console.debug("Services sub-collection notice:", subErr);
+        }
+
+        const mergedServices = subServices.length > 0 ? subServices : incomingServices;
+        const rawShopImgs = (data as any).shopImages || (data as any).brandImages || [];
+        const rawWorkerImgs = (data as any).workerImages || (data as any).staffImages || [];
+
         setShopData((prev: any) => {
-          const currentServices = prev?.services && prev.services.length > 0 ? prev.services : incomingServices;
+          const currentServices = mergedServices.length > 0 ? mergedServices : (prev?.services || []);
           const shop: any = {
             id: docSnap.id,
             ...data,
             services: currentServices,
-            brandName: (data as any).brand_name || (data as any).brandName,
-            ownerName: (data as any).owner_name || (data as any).ownerName,
-            mobile: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
-            mobileNumber: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile,
+            brandName: (data as any).brand_name || (data as any).brandName || 'Partner Salon',
+            ownerName: (data as any).owner_name || (data as any).ownerName || 'Partner',
+            mobile: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile || '',
+            mobileNumber: (data as any).mobile_number || (data as any).mobileNumber || (data as any).mobile || '',
             workerQuota: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
             workerQuantity: (data as any).worker_quota || (data as any).workerQuantity || (data as any).workerQuota || 1,
-            upiId: (data as any).upi_id || (data as any).upiId,
-            status: (data as any).status || 'pending',
-            adminApproved: (data as any).adminApproved || (data as any).status === 'approved'
+            upiId: (data as any).upi_id || (data as any).upiId || '',
+            status: (data as any).status || 'approved',
+            adminApproved: (data as any).adminApproved || (data as any).status === 'approved',
+            shopImages: rawShopImgs,
+            brandImages: rawShopImgs,
+            workerImages: rawWorkerImgs,
+            ownerPicture: (data as any).ownerPicture || user.photoURL
           };
           setIsLive(shop.isLive || false);
           localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(shop));
@@ -443,8 +429,8 @@ const PartnerDashboard: React.FC = () => {
       if (!servicesSnap.empty) {
         const sList = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setShopData((prev: any) => {
-          if (!prev) return prev;
-          const merged = { ...prev, services: sList };
+          const base = prev || JSON.parse(localStorage.getItem(`partner_data_${user.uid}`) || '{}');
+          const merged = { ...base, services: sList };
           localStorage.setItem(`partner_data_${user.uid}`, JSON.stringify(merged));
           return merged;
         });
@@ -489,9 +475,6 @@ const PartnerDashboard: React.FC = () => {
                     alertSound.onended = fireAlarm;
                   }).catch(err => {
                     console.log("Audio waiting for pointer interaction context:", err);
-                    if (!hasInteracted) {
-                      alert("New booking received! Tap anywhere to enable sound alerts.");
-                    }
                   });
                 }
               };
@@ -499,9 +482,6 @@ const PartnerDashboard: React.FC = () => {
             } else {
               audioRef.current?.play().catch(e => {
                 console.log('Audio blocked:', e);
-                if (!hasInteracted) {
-                  alert("New activity on dashboard! Tap anywhere to enable sound alerts.");
-                }
               });
             }
           }
@@ -513,17 +493,20 @@ const PartnerDashboard: React.FC = () => {
       console.error("Bookings snapshot error:", err);
     });
 
-    // 3. Ratings Listener
-    const qRatings = query(collection(db, 'ratings'), where('partnerId', '==', user.uid), orderBy('createdAt', 'desc'));
+    // 3. Ratings Listener (sorted in memory to avoid missing composite index error)
+    const qRatings = query(collection(db, 'ratings'), where('partnerId', '==', user.uid));
     const unsubscribeRatings = onSnapshot(qRatings, (snapshot) => {
       const partnerRatings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      partnerRatings.sort((a: any, b: any) => parseDateToMillis(b.createdAt) - parseDateToMillis(a.createdAt));
       setRatings(partnerRatings);
     }, (err) => {
       console.error("Ratings snapshot error:", err);
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       unsubscribeShop();
+      unsubscribeServices();
       unsubscribeBookings();
       unsubscribeRatings();
     };
@@ -608,7 +591,9 @@ const PartnerDashboard: React.FC = () => {
       if (b.settled === true || b.isSettled === true || b.payoutStatus === 'settled') return false;
       if (shopData?.lastSettledAt && b.createdAt) {
         try {
-          if (new Date(b.createdAt).getTime() <= new Date(shopData.lastSettledAt).getTime()) {
+          const bTime = parseDateToMillis(b.createdAt);
+          const settledTime = parseDateToMillis(shopData.lastSettledAt);
+          if (bTime <= settledTime) {
             return false;
           }
         } catch (e) {}
@@ -617,7 +602,8 @@ const PartnerDashboard: React.FC = () => {
     })
     .reduce((sum, b) => sum + (Number(b.amountPaid || b.price || b.amount) || 0), 0);
   const feeDeductionRatio = (100 - platformFeeRate) / 100;
-  const walletBalance = cumulativeGrossRevenue * feeDeductionRatio;
+  const rawBalance = cumulativeGrossRevenue * feeDeductionRatio;
+  const walletBalance = isNaN(rawBalance) || rawBalance < 0 ? 0 : rawBalance;
 
   // Accountant AI Engine: Automatic 12-hour working time trigger
   // Only accumulates when shop is LIVE (open). Closed/offline hours are strictly excluded.

@@ -12,7 +12,7 @@ import {
   setPersistence, 
   browserLocalPersistence 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 
 interface AppUser {
   uid: string;
@@ -184,32 +184,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 photoURL: data.ownerPicture,
                 onboardingComplete: true
               });
-            } else {
-              localStorage.removeItem(REGISTERED_KEY);
-              setUser(prev => prev ? { ...prev, onboardingComplete: false } : null);
             }
-          }).catch(e => console.warn("Background partner sync failed:", e));
+          }).catch(e => console.warn("Background partner sync notice:", e));
           
           return;
         }
 
         try {
           // 2. Check Partner
-          const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid)));
+          let partnerData: any = null;
+          const partnerDoc = await withTimeout(getDoc(doc(db, 'partners', firebaseUser.uid))).catch(() => null);
           
-          if (partnerDoc.exists()) {
-            const partnerData = partnerDoc.data();
+          if (partnerDoc && partnerDoc.exists()) {
+            partnerData = partnerDoc.data();
+          } else if (safeStoredRole === 'partner') {
+            try {
+              if (firebaseUser.email) {
+                const qEmail = query(collection(db, 'partners'), where('email', '==', firebaseUser.email.toLowerCase().trim()));
+                const emailSnap = await getDocs(qEmail);
+                if (!emailSnap.empty) {
+                  partnerData = emailSnap.docs[0].data();
+                }
+              }
+            } catch (qErr) {}
+          }
+
+          if (partnerData || safeStoredRole === 'partner') {
             localStorage.setItem(REGISTERED_KEY, 'true');
             
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              name: partnerData.brandName || partnerData.ownerName || firebaseUser.displayName || 'Partner',
+              name: partnerData?.brandName || partnerData?.ownerName || firebaseUser.displayName || 'Partner',
               role: 'partner',
               user_type: 'partner',
-              status: partnerData.status || 'pending',
-              photoURL: partnerData.ownerPicture || firebaseUser.photoURL || undefined,
-              brandName: partnerData.brandName || undefined,
+              status: partnerData?.status || 'approved',
+              photoURL: partnerData?.ownerPicture || firebaseUser.photoURL || undefined,
+              brandName: partnerData?.brandName || undefined,
               onboardingComplete: true
             });
             setLoading(false);
