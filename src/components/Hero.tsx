@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import CustomerAuthModal from './CustomerAuthModal';
+import { getSettings } from '../services/logic_engine';
 import { 
   Star, ShieldCheck, ArrowRight, Clock, 
   MapPin, ChevronRight, ChevronLeft, Zap, Search
@@ -187,7 +188,6 @@ const Hero: React.FC = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { getSettings } = await import('../services/logic_engine');
         const data = await getSettings();
         setSettings(data);
       } catch (err) {

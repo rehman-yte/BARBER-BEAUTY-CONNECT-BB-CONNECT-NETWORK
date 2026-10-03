@@ -19,7 +19,7 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, 
     setIsSubmitting(true);
     setError('');
     try {
-      await signInWithGoogle();
+      await signInWithGoogle('customer');
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {

@@ -21,7 +21,7 @@ interface AppUser {
   displayName?: string;
   role: 'customer' | 'partner' | 'admin';
   user_type: 'customer' | 'partner' | 'admin';
-  status: 'active' | 'pending' | null;
+  status: 'active' | 'pending' | 'approved' | null;
   photoURL?: string;
   brandName?: string;
   onboardingComplete?: boolean;
@@ -211,19 +211,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } catch (qErr) {}
           }
 
-          if (partnerData || safeStoredRole === 'partner') {
+          if (partnerData) {
+            // EXISTING PARTNER: Registered shop document found in database
             localStorage.setItem(REGISTERED_KEY, 'true');
             
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: partnerData?.brandName || partnerData?.ownerName || firebaseUser.displayName || 'Partner',
+              displayName: partnerData?.brandName || partnerData?.ownerName || firebaseUser.displayName || 'Partner',
               role: 'partner',
               user_type: 'partner',
               status: partnerData?.status || 'approved',
               photoURL: partnerData?.ownerPicture || firebaseUser.photoURL || undefined,
               brandName: partnerData?.brandName || undefined,
               onboardingComplete: true
+            });
+            setLoading(false);
+            return;
+          } else if (safeStoredRole === 'partner') {
+            // NEW PARTNER: Brand new Gmail without registered shop - needs onboarding
+            localStorage.removeItem(REGISTERED_KEY);
+            
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'New Partner',
+              displayName: firebaseUser.displayName || 'New Partner',
+              role: 'partner',
+              user_type: 'partner',
+              status: 'pending',
+              photoURL: firebaseUser.photoURL || undefined,
+              onboardingComplete: false
             });
             setLoading(false);
             return;

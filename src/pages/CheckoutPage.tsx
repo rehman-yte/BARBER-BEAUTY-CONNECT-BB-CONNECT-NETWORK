@@ -1279,7 +1279,7 @@ const CheckoutPage: React.FC = () => {
                       <div className="grid grid-cols-1 gap-4 font-sans">
                         {/* Razorpay Secure Gateway */}
                         <button 
-                          onClick={handleRazorpayPayment}
+                          onClick={() => handleRazorpayPayment()}
                           disabled={loading}
                           className="w-full flex items-center justify-between p-6 rounded-[1.5rem] border-2 border-bbBlue bg-blue-50/10 hover:bg-blue-50/30 hover:shadow-lg transition-all text-left duration-200 group cursor-pointer"
                         >
