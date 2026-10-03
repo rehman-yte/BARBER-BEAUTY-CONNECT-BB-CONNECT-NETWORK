@@ -193,9 +193,7 @@ const LayoutWrapper: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-white overflow-x-hidden w-full">
       <Navbar />
       <main className="flex-grow w-full pt-[4.5rem] md:pt-[5rem]">
-        <ErrorBoundary fallbackTitle="Partner Gateway Interruption">
-          <AppRoutes />
-        </ErrorBoundary>
+        <AppRoutes />
       </main>
       <Footer />
       <AIChatBot />
@@ -213,26 +211,24 @@ const App: React.FC = () => {
   });
 
   return (
-    <ErrorBoundary fallbackTitle="BB Connect Network Application">
-      <AuthProvider>
-        <CartProvider>
-          <AnimatePresence mode="wait">
-            {showSplash && (
-              <SplashScreen 
-                onComplete={() => {
-                  setShowSplash(false);
-                  try { sessionStorage.setItem('bb_splash_shown', 'true'); } catch {}
-                }} 
-                durationSeconds={2} 
-              />
-            )}
-          </AnimatePresence>
-          <HashRouter>
-            <LayoutWrapper />
-          </HashRouter>
-        </CartProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+    <AuthProvider>
+      <CartProvider>
+        <AnimatePresence mode="wait">
+          {showSplash && (
+            <SplashScreen 
+              onComplete={() => {
+                setShowSplash(false);
+                try { sessionStorage.setItem('bb_splash_shown', 'true'); } catch {}
+              }} 
+              durationSeconds={2} 
+            />
+          )}
+        </AnimatePresence>
+        <HashRouter>
+          <LayoutWrapper />
+        </HashRouter>
+      </CartProvider>
+    </AuthProvider>
   );
 };
 

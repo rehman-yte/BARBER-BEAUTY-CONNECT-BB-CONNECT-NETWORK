@@ -149,13 +149,12 @@ const Navbar: React.FC = () => {
             alt="BB Connect Network Logo" 
             className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 object-contain rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_#000000] group-hover:scale-105 transition-transform duration-300 bg-white shrink-0" 
           />
-          <div className="flex flex-col items-start leading-tight min-w-0">
-            <span className="text-[0.72rem] xs:text-[0.85rem] sm:text-[1rem] lg:text-[1.05rem] font-serif font-black text-black tracking-tight truncate max-w-[120px] xs:max-w-[170px] sm:max-w-none uppercase">
-              <span className="hidden xs:inline">BARBER &amp; BEAUTY CONNECT</span>
-              <span className="xs:hidden">BB CONNECT</span>
+          <div className="flex flex-col items-start justify-center leading-none min-w-0">
+            <span className="font-cinzel text-[0.82rem] xs:text-[0.95rem] sm:text-[1.1rem] md:text-[1.22rem] font-black text-black tracking-wide uppercase group-hover:text-blue-600 transition-colors drop-shadow-[0_1px_1px_rgba(0,0,0,0.06)]">
+              Barber <span className="text-blue-600 font-serif italic font-extrabold">&amp;</span> Beauty
             </span>
-            <span className="text-[0.4rem] sm:text-[0.5rem] font-mono font-bold text-blue-600 uppercase tracking-[0.1em] sm:tracking-[0.25em] mt-0.5 truncate">
-              BB CONNECT NETWORK
+            <span className="font-outfit text-[0.45rem] xs:text-[0.52rem] sm:text-[0.6rem] md:text-[0.66rem] font-black text-blue-600 uppercase tracking-[0.22em] sm:tracking-[0.28em] mt-0.5">
+              Connect Network
             </span>
           </div>
         </Link>
