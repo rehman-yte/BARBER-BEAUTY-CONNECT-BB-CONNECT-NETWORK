@@ -193,7 +193,9 @@ const LayoutWrapper: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-white overflow-x-hidden w-full">
       <Navbar />
       <main className="flex-grow w-full pt-[4.5rem] md:pt-[5rem]">
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
       </main>
       <Footer />
       <AIChatBot />

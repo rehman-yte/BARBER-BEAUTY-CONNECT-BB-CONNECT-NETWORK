@@ -105,10 +105,14 @@ const Navbar: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/', { replace: true });
+  const handleLogout = async () => {
     setShowDropdown(false);
+    navigate('/', { replace: true });
+    try {
+      await logout();
+    } catch (e) {
+      console.error("Logout notice:", e);
+    }
   };
 
   const notifications = [...broadcastNotifs, ...bookingNotifs]

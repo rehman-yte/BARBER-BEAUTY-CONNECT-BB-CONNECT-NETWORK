@@ -39,14 +39,9 @@ export const AIChatBot: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
-  // If user is not logged in, chatbot icon is not displayed
-  if (!isLoggedIn || !user) {
-    return null;
-  }
-
-  const userId = user.uid || (user as any).id || (user.email || '').replace(/[^a-zA-Z0-9]/g, '_');
-  const userName = (user as any).name || (user as any).ownerName || user.email?.split('@')[0] || 'Member';
-  const userRole = (user.role === 'partner' ? 'partner' : 'customer') as 'customer' | 'partner';
+  const userId = user?.uid || (user as any)?.id || (user?.email || '').replace(/[^a-zA-Z0-9]/g, '_') || '';
+  const userName = (user as any)?.name || (user as any)?.ownerName || user?.email?.split('@')[0] || 'Member';
+  const userRole = (user?.role === 'partner' ? 'partner' : 'customer') as 'customer' | 'partner';
 
   // Real-time Chat Subscription
   useEffect(() => {
@@ -154,6 +149,11 @@ export const AIChatBot: React.FC = () => {
       setIsSubmittingTicket(false);
     }
   };
+
+  // If user is not logged in, chatbot icon is not displayed
+  if (!isLoggedIn || !user) {
+    return null;
+  }
 
   return (
     <>

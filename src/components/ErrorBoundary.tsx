@@ -27,16 +27,16 @@ export class ErrorBoundary extends React.Component<Props, State> {
     console.error("[BB Connect ErrorBoundary caught an error]:", error, errorInfo);
   }
 
-  private handleRecover = () => {
-    try {
+  public componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && prevProps.children !== this.props.children) {
       this.setState({ hasError: false, error: null });
-      window.location.reload();
-    } catch (e) {
-      window.location.href = '/#/partner/dashboard';
     }
-  };
+  }
 
   public render() {
+    if (this.state.hasError) {
+      return null;
+    }
     return this.props.children;
   }
 }
