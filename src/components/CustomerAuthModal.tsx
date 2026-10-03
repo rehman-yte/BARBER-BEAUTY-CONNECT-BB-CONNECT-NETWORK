@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface CustomerAuthModalProps {
 
 const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { signInWithGoogle } = useAuth();
+  const navigate = useNavigate();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -20,8 +22,12 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose, 
     setError('');
     try {
       await signInWithGoogle('customer');
-      if (onSuccess) onSuccess();
       onClose();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate('/customer-dashboard');
+      }
     } catch (err: any) {
       const errMsg = err.message;
       if (errMsg.includes('auth/unauthorized-domain')) {

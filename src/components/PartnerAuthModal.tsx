@@ -33,7 +33,13 @@ const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({ isOpen, onClose }) 
     setIsSubmitting(true);
     setError('');
     try {
-      await signInWithGoogle('partner');
+      const loggedUser = await signInWithGoogle('partner');
+      onClose();
+      if (loggedUser.onboardingComplete) {
+        navigate('/partner/dashboard');
+      } else {
+        navigate('/partner/signup');
+      }
     } catch (err: any) {
       const errMsg = err.message || '';
       if (errMsg.includes('auth/unauthorized-domain')) {

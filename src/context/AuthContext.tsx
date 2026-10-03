@@ -33,9 +33,9 @@ interface AuthContextType {
   loading: boolean;
   isLoggedIn?: boolean;
   signUp: (email: string, pass: string, data: any) => Promise<void>;
-  signIn: (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => Promise<void>;
+  signIn: (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => Promise<AppUser>;
   bypassLogin: (email: string, role: 'admin' | 'partner' | 'customer') => void;
-  signInWithGoogle: (role: 'customer' | 'partner' | 'admin') => Promise<void>;
+  signInWithGoogle: (role: 'customer' | 'partner' | 'admin') => Promise<AppUser>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => void;
@@ -350,10 +350,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signIn = async (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin') => {
+  const signIn = async (email: string, pass: string, intendedRole: 'customer' | 'partner' | 'admin'): Promise<AppUser> => {
     try {
       localStorage.setItem(ROLE_KEY, intendedRole);
-      await signInWithEmailAndPassword(auth, email, pass);
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      const fbUser = userCredential.user;
+      const authedEmail = (fbUser.email || '').toLowerCase().trim();
+
+      let resolvedUser: AppUser;
+      if (intendedRole === 'admin' || authedEmail === OFFICIAL_ADMIN_EMAIL) {
+        resolvedUser = {
+          uid: fbUser.uid,
+          email: fbUser.email,
+          name: fbUser.displayName || 'System Admin',
+          displayName: fbUser.displayName || 'System Admin',
+          role: 'admin',
+          user_type: 'admin',
+          status: 'active',
+          token: adminConfig.adminSecret,
+          onboardingComplete: true
+        };
+      } else if (intendedRole === 'partner') {
+        const pDoc = await getDoc(doc(db, 'partners', fbUser.uid)).catch(() => null);
+        const exists = pDoc && pDoc.exists();
+        const pData = exists ? pDoc.data() : null;
+        resolvedUser = {
+          uid: fbUser.uid,
+          email: fbUser.email,
+          name: pData?.brandName || pData?.ownerName || fbUser.displayName || 'Partner',
+          displayName: pData?.brandName || pData?.ownerName || fbUser.displayName || 'Partner',
+          role: 'partner',
+          user_type: 'partner',
+          status: pData?.status || 'approved',
+          photoURL: pData?.ownerPicture || fbUser.photoURL || undefined,
+          brandName: pData?.brandName || undefined,
+          onboardingComplete: !!exists
+        };
+      } else {
+        resolvedUser = {
+          uid: fbUser.uid,
+          email: fbUser.email,
+          name: fbUser.displayName || 'Customer',
+          displayName: fbUser.displayName || 'Customer',
+          role: 'customer',
+          user_type: 'customer',
+          status: 'active',
+          photoURL: fbUser.photoURL || undefined,
+          onboardingComplete: true
+        };
+      }
+      setUser(resolvedUser);
+      setLoading(false);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(resolvedUser));
+      localStorage.setItem(ROLE_KEY, resolvedUser.role);
+      return resolvedUser;
     } catch (err: any) {
       localStorage.removeItem(ROLE_KEY);
       console.error("Firebase signIn error:", err);
@@ -383,12 +433,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   };
 
-  const signInWithGoogle = async (role: 'customer' | 'partner' | 'admin') => {
+  const signInWithGoogle = async (role: 'customer' | 'partner' | 'admin'): Promise<AppUser> => {
     try {
       localStorage.setItem(ROLE_KEY, role);
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
-      const authedEmail = (userCredential.user.email || '').toLowerCase().trim();
+      const fbUser = userCredential.user;
+      const authedEmail = (fbUser.email || '').toLowerCase().trim();
 
       if (role === 'admin' && authedEmail !== OFFICIAL_ADMIN_EMAIL) {
         // Immediate termination of unauthorized admin sign-in attempt
@@ -398,6 +449,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         throw new Error(`Access Denied: Only the official administrator Gmail (${OFFICIAL_ADMIN_EMAIL}) is authorized to access the Admin Panel.`);
       }
+
+      let resolvedUser: AppUser;
+
+      if (authedEmail === OFFICIAL_ADMIN_EMAIL || role === 'admin') {
+        resolvedUser = {
+          uid: fbUser.uid,
+          email: fbUser.email,
+          name: fbUser.displayName || 'System Admin',
+          displayName: fbUser.displayName || 'System Admin',
+          role: 'admin',
+          user_type: 'admin',
+          status: 'active',
+          token: adminConfig.adminSecret,
+          onboardingComplete: true
+        };
+      } else if (role === 'partner') {
+        let isExisting = false;
+        let partnerData: any = null;
+        try {
+          const pDoc = await getDoc(doc(db, 'partners', fbUser.uid));
+          if (pDoc.exists()) {
+            isExisting = true;
+            partnerData = pDoc.data();
+          } else if (fbUser.email) {
+            const qEmail = query(collection(db, 'partners'), where('email', '==', authedEmail));
+            const emailSnap = await getDocs(qEmail);
+            if (!emailSnap.empty) {
+              isExisting = true;
+              partnerData = emailSnap.docs[0].data();
+            }
+          }
+        } catch (e) {
+          const regKey = `bb_registered_${fbUser.uid}`;
+          if (localStorage.getItem(regKey) === 'true') {
+            isExisting = true;
+          }
+        }
+
+        if (isExisting) {
+          localStorage.setItem(`bb_registered_${fbUser.uid}`, 'true');
+          resolvedUser = {
+            uid: fbUser.uid,
+            email: fbUser.email,
+            name: partnerData?.brandName || partnerData?.ownerName || fbUser.displayName || 'Partner',
+            displayName: partnerData?.brandName || partnerData?.ownerName || fbUser.displayName || 'Partner',
+            role: 'partner',
+            user_type: 'partner',
+            status: partnerData?.status || 'approved',
+            photoURL: partnerData?.ownerPicture || fbUser.photoURL || undefined,
+            brandName: partnerData?.brandName || undefined,
+            onboardingComplete: true
+          };
+        } else {
+          localStorage.removeItem(`bb_registered_${fbUser.uid}`);
+          resolvedUser = {
+            uid: fbUser.uid,
+            email: fbUser.email,
+            name: fbUser.displayName || 'New Partner',
+            displayName: fbUser.displayName || 'New Partner',
+            role: 'partner',
+            user_type: 'partner',
+            status: 'pending',
+            photoURL: fbUser.photoURL || undefined,
+            onboardingComplete: false
+          };
+        }
+      } else {
+        // Customer
+        resolvedUser = {
+          uid: fbUser.uid,
+          email: fbUser.email,
+          name: fbUser.displayName || 'Customer',
+          displayName: fbUser.displayName || 'Customer',
+          role: 'customer',
+          user_type: 'customer',
+          status: 'active',
+          photoURL: fbUser.photoURL || undefined,
+          onboardingComplete: true
+        };
+        // Persist customer record in background
+        setDoc(doc(db, 'customers', fbUser.uid), {
+          uid: fbUser.uid,
+          email: fbUser.email,
+          name: fbUser.displayName || 'Customer',
+          photoURL: fbUser.photoURL || null,
+          role: 'customer',
+          status: 'active',
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
+      }
+
+      setUser(resolvedUser);
+      setLoading(false);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(resolvedUser));
+      localStorage.setItem(ROLE_KEY, resolvedUser.role);
+      return resolvedUser;
     } catch (err: any) {
       localStorage.removeItem(ROLE_KEY);
       console.error("Firebase Google Auth error:", err);

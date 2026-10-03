@@ -33,12 +33,16 @@ const AuthPage: React.FC = () => {
     setIsSubmitting(true);
     setError('');
     try {
-      await signInWithGoogle(role);
-      
-      // The check for UID in collections and redirection of new partners is handled 
-      // by the robust resolution logic in AuthContext combined with the useEffect above.
-      // This ensures that even if onAuthStateChanged takes a moment, the UI 
-      // will eventually resolve to the correct portal or signup page.
+      const loggedUser = await signInWithGoogle(role);
+      const isOfficialAdmin = (loggedUser.email || '').toLowerCase().trim() === 'haidartheworldking@gmail.com' || loggedUser.role === 'admin';
+      if (isOfficialAdmin) {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (loggedUser.role === 'partner') {
+        const path = loggedUser.onboardingComplete ? '/partner/dashboard' : '/partner/signup';
+        navigate(path, { replace: true });
+      } else {
+        navigate('/customer-dashboard', { replace: true });
+      }
     } catch (err: any) { 
       setError(err.message || 'Google login failed.');
       setIsSubmitting(false);
