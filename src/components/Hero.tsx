@@ -237,7 +237,7 @@ const Hero: React.FC = () => {
   const activeSlide = HERO_SLIDES[currentSlideIndex];
 
   return (
-    <section className="relative w-full overflow-hidden bg-white py-10 sm:py-14 md:py-16 lg:py-20 border-b-2 border-black/10">
+    <section className="relative w-full overflow-hidden bg-white py-6 sm:py-8 lg:py-10 xl:py-12 border-b-2 border-black/10">
       {/* Background Architectural Grid Pattern */}
       <div 
         aria-hidden="true" 
@@ -249,7 +249,7 @@ const Hero: React.FC = () => {
       />
 
       {/* Main Grid: Left Side Text Area + Right Side Invisible Sliding Images Container */}
-      <div className="relative max-w-[1440px] mx-auto px-5 sm:px-8 lg:px-12 grid grid-cols-1 lg:grid-cols-12 items-start gap-10 lg:gap-14">
+      <div className="relative max-w-[1440px] mx-auto px-5 sm:px-8 lg:px-12 grid grid-cols-1 lg:grid-cols-12 items-center gap-8 lg:gap-10">
         
         {/* =========================================================================
             LEFT COLUMN (CSS selector 2: div:nth-of-type(3) > div:nth-of-type(1))
@@ -259,7 +259,7 @@ const Hero: React.FC = () => {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="lg:col-span-7 flex flex-col gap-6 text-left items-start w-full z-10"
+          className="lg:col-span-7 flex flex-col gap-3.5 lg:gap-4 text-left items-start w-full z-10"
         >
           {/* Category Switcher */}
           <div className="inline-flex items-center p-1.5 bg-black rounded-2xl shadow-lg border border-black/20 gap-1.5 flex-wrap">
@@ -277,13 +277,13 @@ const Hero: React.FC = () => {
                     const matchingIdx = HERO_SLIDES.findIndex(s => s.category === cat.id);
                     if (matchingIdx !== -1) setCurrentSlideIndex(matchingIdx);
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all duration-300 ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-xs font-bold tracking-wide transition-all duration-300 ${
                     isSelected
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                       : 'text-white/70 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <span className="text-base">{cat.icon}</span>
+                  <span className="text-sm">{cat.icon}</span>
                   <span>{cat.name}</span>
                 </button>
               );
@@ -291,13 +291,13 @@ const Hero: React.FC = () => {
           </div>
 
           {/* Micro Index Header */}
-          <div className="flex items-center gap-2.5 text-xs font-mono font-bold tracking-widest uppercase text-blue-700">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+          <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest uppercase text-blue-700">
+            <span className="inline-block w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
             <span>{catMeta.tagline}</span>
           </div>
 
           {/* Master Headline in Black & Electric Blue */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-black text-black tracking-tight leading-[1.05] uppercase">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3.2rem] xl:text-[3.5rem] font-black text-black tracking-tight leading-[1.08] uppercase">
             {settings?.heroTitle ? (
               settings.heroTitle
             ) : (
@@ -312,14 +312,14 @@ const Hero: React.FC = () => {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg text-black/75 max-w-2xl leading-relaxed font-medium">
+          <p className="text-sm sm:text-base text-black/75 max-w-xl leading-relaxed font-medium">
             {settings?.heroSubtitle || 
               "Reserve your bespoke appointment at verified master barber ateliers and premier beauty sanctuaries. Protected by our 5-minute escrow hold and private salon concierge."
             }
           </p>
 
           {/* Interactive Fast-Booking Command Bar */}
-          <div className="w-full max-w-xl bg-white rounded-2xl border-2 border-black p-2.5 shadow-[6px_6px_0px_0px_#000000] flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="w-full max-w-xl bg-white rounded-2xl border-2 border-black p-2 sm:p-2.5 shadow-[6px_6px_0px_0px_#000000] flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-blue-50/60 rounded-xl border border-blue-200/60">
               <Search className="w-4 h-4 text-blue-600 shrink-0" />
               <div className="flex-1">
@@ -347,7 +347,7 @@ const Hero: React.FC = () => {
 
             <button
               onClick={() => handleAction('/customer/explore')}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm px-6 py-3.5 rounded-xl uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-95 shrink-0"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-95 shrink-0"
             >
               <span>Explore Slots</span>
               <ArrowRight className="w-4 h-4 text-white" />
@@ -355,13 +355,13 @@ const Hero: React.FC = () => {
           </div>
 
           {/* Quick Tags Strip */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
             <span className="text-xs font-bold text-black uppercase tracking-wider">Top Booked:</span>
             {catMeta.services.map((service) => (
               <button
                 key={service}
                 onClick={() => handleAction('/customer/explore')}
-                className="text-xs font-bold px-3 py-1 bg-white hover:bg-black hover:text-white text-black border border-black/30 rounded-lg transition-colors"
+                className="text-xs font-bold px-2.5 py-0.5 bg-white hover:bg-black hover:text-white text-black border border-black/30 rounded-lg transition-colors"
               >
                 {service}
               </button>
@@ -369,13 +369,13 @@ const Hero: React.FC = () => {
           </div>
 
           {/* Trust Ledger (Pure Blue & Black) */}
-          <div className="pt-5 border-t-2 border-black/10 w-full flex flex-wrap items-center gap-y-2 gap-x-6 text-xs font-bold text-black">
-            <div className="flex items-center gap-2 text-blue-700">
+          <div className="pt-3.5 border-t-2 border-black/10 w-full flex flex-wrap items-center gap-y-2 gap-x-5 text-xs font-bold text-black">
+            <div className="flex items-center gap-1.5 text-blue-700">
               <ShieldCheck className="w-4 h-4 text-blue-600" />
               <span>100% Escrow Protection Vault</span>
             </div>
             <span aria-hidden="true" className="text-black/30">|</span>
-            <div className="flex items-center gap-2 text-black">
+            <div className="flex items-center gap-1.5 text-black">
               <Zap className="w-4 h-4 text-blue-600" />
               <span>5-Minute Instant Hold Guarantee</span>
             </div>
@@ -400,8 +400,8 @@ const Hero: React.FC = () => {
           onMouseLeave={() => setIsPaused(false)}
           className="lg:col-span-5 relative flex flex-col items-center justify-center w-full self-stretch bg-transparent border-0 shadow-none p-0 select-none"
         >
-          {/* Full Crisp Display (No white corners, no mask, full image visibility) */}
-          <div className="relative w-full h-[380px] sm:h-[460px] lg:h-full min-h-[380px] sm:min-h-[460px] lg:min-h-[540px] rounded-3xl overflow-hidden shadow-2xl bg-black border-2 border-black group">
+          {/* Full Crisp Display (Standard balanced height on desktop) */}
+          <div className="relative w-full h-[340px] sm:h-[400px] lg:h-[450px] xl:h-[480px] min-h-[340px] sm:min-h-[400px] lg:min-h-[450px] xl:min-h-[480px] rounded-3xl overflow-hidden shadow-2xl bg-black border-2 border-black group">
             <AnimatePresence mode="wait">
               <motion.img
                 key={activeSlide.id}
